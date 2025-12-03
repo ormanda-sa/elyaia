@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <title>تجربة الفلتر + تسجيل الأحداث</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background: #f3f4f6;
+        padding: 24px;
+      }
+      .card {
+        max-width: 650px;
+        margin: 0 auto;
+        background: #fff;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      }
+      .card h1 {
+        font-size: 20px;
+        margin-bottom: 16px;
+        text-align: center;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .row label {
+        width: 80px;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+      }
+      .row select {
+        flex: 1;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+        font-size: 14px;
+      }
+      button {
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: none;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        background: #111827;
+        color: #fff;
+        margin-top: 6px;
+      }
+      button:active {
+        transform: scale(0.98);
+      }
+      .log {
+        margin-top: 16px;
+        font-family: monospace;
+        font-size: 13px;
+        background: #0f172a;
+        color: #e5e7eb;
+        padding: 10px;
+        border-radius: 8px;
+        max-height: 220px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>تجربة الفلتر + تسجيل الأحداث</h1>
+
+      <div class="row">
+        <label for="filter-brand">الماركة</label>
+        <select id="filter-brand">
+          <option value="">اختر...</option>
+          <option value="1">تويوتا</option>
+          <option value="2">نيسان</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <label for="filter-model">الموديل</label>
+        <select id="filter-model">
+          <option value="">اختر...</option>
+          <option value="10">كامري</option>
+          <option value="20">كورولا</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <label for="filter-year">السنة</label>
+        <select id="filter-year">
+          <option value="">اختر...</option>
+          <option value="100">2010</option>
+          <option value="101">2015</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <label for="filter-section">القسم</label>
+        <select id="filter-section">
+          <option value="">اختر...</option>
+          <option value="200">أضواء</option>
+          <option value="201">مكابح</option>
+        </select>
+      </div>
+
+      <!-- ✅ حقل الكلمة -->
+      <div class="row">
+        <label for="filter-keyword">الكلمة</label>
+        <select id="filter-keyword">
+          <option value="">اختر...</option>
+          <option value="300">شمعات</option>
+          <option value="301">اسطب</option>
+          <option value="302">فحمات</option>
+        </select>
+      </div>
+
+      <button id="filter-search-btn">تنفيذ البحث</button>
+
+      <div class="log" id="log-box"></div>
+    </div>
+
+    <script>
+      (function () {
+        // ==============================
+        // إعدادات: عدلهم حسب مشروعك
+        // ==============================
+        const API_BASE = "http://localhost:3000"; // مشروعك المحلي
+        const WIDGET_SECRET = "darb_filter_2025"; // نفس اللي في .env.local
+        const STORE_ID = "103ccdde-7538-4e56-b5a2-82638712d1b2"; // من جدول stores
+
+        const logBox = document.getElementById("log-box");
+
+        function appendLog(msg, data) {
+          const time = new Date().toLocaleTimeString("ar-EG");
+          logBox.textContent += `[${time}] ${msg} ${
+            data ? JSON.stringify(data) : ""
+          }\n`;
+          logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function getFilterSessionKey() {
+          const KEY = "darb_filter_sid";
+          try {
+            let v = localStorage.getItem(KEY);
+            if (!v) {
+              if (window.crypto && crypto.randomUUID) {
+                v = crypto.randomUUID();
+              } else {
+                v = String(Date.now()) + "-" + Math.random();
+              }
+              localStorage.setItem(KEY, v);
+            }
+            return v;
+          } catch (e) {
+            return "no-storage-" + Date.now();
+          }
+        }
+
+        async function logFilterEvent(payload) {
+          try {
+            appendLog("إرسال حدث...", payload);
+            const res = await fetch(API_BASE + "/api/widget/event", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-widget-secret": WIDGET_SECRET,
+              },
+              body: JSON.stringify({
+                store_id: STORE_ID,
+                session_key: getFilterSessionKey(),
+                ...payload,
+              }),
+            });
+            const json = await res.json();
+            appendLog("استجابة:", json);
+          } catch (e) {
+            appendLog("خطأ:", { message: String(e) });
+          }
+        }
+
+        window.DARB_FILTER_LOG_EVENT = logFilterEvent;
+
+        function setupFilterEvents() {
+          const brandSelect = document.getElementById("filter-brand");
+          const modelSelect = document.getElementById("filter-model");
+          const yearSelect = document.getElementById("filter-year");
+          const sectionSelect = document.getElementById("filter-section");
+          const keywordSelect = document.getElementById("filter-keyword");
+          const searchButton = document.getElementById("filter-search-btn");
+
+          if (brandSelect) {
+            brandSelect.addEventListener("change", function () {
+              const brandId = this.value ? Number(this.value) : null;
+              if (!brandId) return;
+              logFilterEvent({
+                event_type: "brand_select",
+                brand_id: brandId,
+              });
+            });
+          }
+
+          if (modelSelect) {
+            modelSelect.addEventListener("change", function () {
+              const modelId = this.value ? Number(this.value) : null;
+              if (!modelId) return;
+              logFilterEvent({
+                event_type: "model_select",
+                model_id: modelId,
+              });
+            });
+          }
+
+          if (yearSelect) {
+            yearSelect.addEventListener("change", function () {
+              const yearId = this.value ? Number(this.value) : null;
+              if (!yearId) return;
+              logFilterEvent({
+                event_type: "year_select",
+                year_id: yearId,
+              });
+            });
+          }
+
+          if (sectionSelect) {
+            sectionSelect.addEventListener("change", function () {
+              const sectionId = this.value ? Number(this.value) : null;
+              if (!sectionId) return;
+              logFilterEvent({
+                event_type: "section_select",
+                section_id: sectionId,
+              });
+            });
+          }
+
+          // ✅ حدث الكلمة
+          if (keywordSelect) {
+            keywordSelect.addEventListener("change", function () {
+              const keywordId = this.value ? Number(this.value) : null;
+              if (!keywordId) return;
+              logFilterEvent({
+                event_type: "keyword_click",
+                keyword_id: keywordId,
+              });
+            });
+          }
+
+          if (searchButton) {
+            searchButton.addEventListener("click", function () {
+              const brandId =
+                brandSelect && brandSelect.value
+                  ? Number(brandSelect.value)
+                  : null;
+              const modelId =
+                modelSelect && modelSelect.value
+                  ? Number(modelSelect.value)
+                  : null;
+              const yearId =
+                yearSelect && yearSelect.value
+                  ? Number(yearSelect.value)
+                  : null;
+              const sectionId =
+                sectionSelect && sectionSelect.value
+                  ? Number(sectionSelect.value)
+                  : null;
+              const keywordId =
+                keywordSelect && keywordSelect.value
+                  ? Number(keywordSelect.value)
+                  : null;
+
+              logFilterEvent({
+                event_type: "search_submit",
+                brand_id: brandId,
+                model_id: modelId,
+                year_id: yearId,
+                section_id: sectionId,
+                keyword_id: keywordId,
+                meta: {
+                  page_url: location.href,
+                  note: "test-html-page",
+                },
+              });
+
+              // هنا في المتجر الحقيقي بتحط تحويل المستخدم لصفحة النتائج
+            });
+          }
+        }
+
+        setupFilterEvents();
+      })();
+    </script>
+  </body>
+</html>

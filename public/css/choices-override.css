@@ -1,0 +1,30 @@
+/* تشغيل حقل البحث في قوائم الفلتر */
+.hero-filters-form .choices {
+  position: relative;
+}
+
+.hero-filters-form .choices__inner {
+  cursor: pointer;
+}
+
+/* تأكد أن Dropdown ما يختفي بسب [hidden] */
+.hero-filters-form .choices__list--dropdown {
+  z-index: 9999;
+}
+
+/* أعطِ dropdown ظهور طبيعي */
+.hero-filters-form .choices__list--dropdown[aria-expanded="true"],
+.hero-filters-form .choices__list--dropdown.is-active {
+  display: block !important;
+}
+
+/* تأكد أن input البحث ما هو مخفي */
+.hero-filters-form .choices__input.choices__input--cloned {
+  display: block !important;
+}
+
+/* بس عشان الشكل يكون أقرب للثيم */
+.hero-filters-form .choices__list--dropdown .choices__item {
+  text-align: right;
+  font-size: 13px;
+}
