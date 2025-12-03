@@ -38,7 +38,7 @@ function LoginInner() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "/dashboard/filter";
 
-  // ================== تسجيل الدخول ==================
+  // ================== تسجيل الدخول بالباسورد ==================
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -95,6 +95,15 @@ function LoginInner() {
     }
   }
 
+  // ================== الدخول عن طريق جوجل ==================
+  function handleGoogleLogin() {
+    const target = `/api/auth/google/start?redirectTo=${encodeURIComponent(
+      redirectTo,
+    )}`;
+    // نخلي المتصفح يروح مباشرة على مسار جوجل
+    window.location.href = target;
+  }
+
   // ================== إرسال طلب فتح حساب ==================
   async function handleInviteSubmit() {
     setInviteError(null);
@@ -120,7 +129,7 @@ function LoginInner() {
         const code = json.error || "INVITE_FAILED";
         if (code === "EMAIL_EXISTS") {
           setInviteError(
-            "هذا البريد مسجّل لدينا من قبل. إذا نسيت كلمة المرور يمكنك استخدام رابط (نسيت كلمة المرور) بالأسفل."
+            "هذا البريد مسجّل لدينا من قبل. إذا نسيت كلمة المرور يمكنك استخدام رابط (نسيت كلمة المرور) بالأسفل.",
           );
         } else if (code === "EMAIL_REQUIRED") {
           setInviteError("فضلاً أدخل البريد الإلكتروني.");
@@ -131,7 +140,7 @@ function LoginInner() {
       }
 
       setInviteMessage(
-        "تم استلام طلب فتح الحساب، سنتواصل معك عبر البريد في أقرب وقت."
+        "تم استلام طلب فتح الحساب، سنتواصل معك عبر البريد في أقرب وقت.",
       );
       setInviteEmail("");
     } catch (err) {
@@ -170,7 +179,6 @@ function LoginInner() {
               </p>
             </div>
 
-            {/* ✅ هذا الـ form الوحيد في الصفحة */}
             <form
               id="darb-login-form"
               onSubmit={handleSubmit}
@@ -251,25 +259,35 @@ function LoginInner() {
                 <span className="h-px flex-1 bg-slate-200" />
               </div>
 
-              {/* أزرار تواصل اجتماعي (ديكور) */}
+              {/* أزرار إضافية: جوجل + "أنا إنسان" (placeholder) */}
               <div className="grid grid-cols-3 gap-3 pt-1">
+                {/* زر جوجل */}
                 <button
                   type="button"
-                  className="h-9 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  onClick={handleGoogleLogin}
+                  className="inline-flex items-center justify-center gap-2 h-9 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
                 >
-                  
+                  {/* أيقونة بسيطة لحرف G، تقدر تبدلها بـ SVG رسمي لاحقاً */}
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-[11px] font-bold text-[#4285F4] border border-slate-200">
+                    G
+                  </span>
+                  <span>دخول عن طريق جوجل</span>
                 </button>
+
+                {/* زر التحقق (placeholder) */}
                 <button
                   type="button"
                   className="h-9 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
                 >
-                  G
+                  ↻ التحقق بأنك إنسان
                 </button>
+
+                {/* زر ثالث تقدر تستخدمه لأي شيء لاحقاً */}
                 <button
                   type="button"
-                  className="h-9 text-xs rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  className="h-9 text-xs rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-400 hover:bg-slate-100"
                 >
-                  ↻
+                  خيار آخر
                 </button>
               </div>
 
@@ -296,7 +314,6 @@ function LoginInner() {
                     </DialogDescription>
                   </DialogHeader>
 
-                  {/* ✅ div عادي، مو form */}
                   <div className="space-y-3 text-right">
                     <div className="space-y-1">
                       <label
