@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     const email = emailRaw.trim().toLowerCase();
     const supabase = getSupabaseServerClient();
 
-    // نتأكد أن الإيميل موجود في admin_users
+    // 1) نتأكد أن الإيميل موجود في admin_users
     const { data: adminUser, error: adminErr } = await supabase
       .from("admin_users")
       .select("id, email, name")
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // نحذف الأكواد القديمة غير المستخدمة
+    // 2) نحذف الأكواد القديمة غير المستخدمة
     const { error: delErr } = await supabase
       .from("admin_otp_codes")
       .delete()
@@ -48,14 +48,12 @@ export async function POST(req: NextRequest) {
       console.error("admin_otp_codes delete error:", delErr);
     }
 
-    // كود 6 أرقام
-    const code = String(randomInt(100000, 1000000));
-
+    // 3) توليد كود 6 أرقام وتخزينه
+    const code = String(randomInt(100000, 1000000)); // 100000 → 999999
     const expiresAt = new Date(
       Date.now() + OTP_TTL_MINUTES * 60 * 1000,
     ).toISOString();
 
-    // نحفظ الكود
     const { error: otpErr } = await supabase.from("admin_otp_codes").insert({
       admin_user_id: adminUser.id,
       code,
@@ -71,13 +69,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // إعدادات Resend
+    // 4) إرسال الإيميل عبر Resend (نفس نمط forgot-password)
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
     const RESEND_FROM =
-      process.env.RESEND_FROM_EMAIL || "Darb Filters <onboarding@resend.dev>";
+      process.env.RESEND_FROM_EMAIL ||
+      "Darb Filters <onboarding@resend.dev>";
 
     if (!RESEND_API_KEY) {
-      console.warn("RESEND_API_KEY not set – OTP email will not be sent.");
+      console.warn(
+        "RESEND_API_KEY is missing – OTP email will not be sent.",
+      );
       return NextResponse.json(
         {
           ok: false,
