@@ -18,16 +18,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const resendApiKey = process.env.RESEND_API_KEY;
-    if (!resendApiKey) {
-      console.error("RESEND_API_KEY is missing");
-      return NextResponse.json(
-        { ok: false, error: "إعدادات البريد غير مكتملة (RESEND_API_KEY)." },
-        { status: 500 },
-      );
-    }
-
-    const resend = new Resend(resendApiKey);
     const supabase = getSupabaseServerClient();
 
     // نبحث عن المستخدم في store_users
@@ -84,15 +74,32 @@ export async function POST(req: NextRequest) {
     }
 
     const baseUrl =
-      process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+      process.env.NEXT_PUBLIC_BASE_URL || "https://elyaia.vercel.app";
 
     const resetUrl = `${baseUrl}/dashboard/reset-password?token=${encodeURIComponent(
       token,
     )}`;
 
+    // إعدادات Resend
+    const resendApiKey = process.env.RESEND_API_KEY;
     const from =
       process.env.RESEND_FROM_EMAIL ||
       "Darb Filters <onboarding@resend.dev>";
+
+    // لو مافي RESEND_API_KEY ما نطيح 500، بس نطبع ونرجّع ok
+    if (!resendApiKey) {
+      console.warn(
+        "RESEND_API_KEY is missing, skipping email send. resetUrl =",
+        resetUrl,
+      );
+      return NextResponse.json({
+        ok: false,
+        error:
+          "تعذّر إرسال البريد حالياً، تأكد من إعدادات البريد أو جرّب لاحقاً.",
+      });
+    }
+
+    const resend = new Resend(resendApiKey);
 
     const { data: emailData, error: emailError } = await resend.emails.send({
       from,
