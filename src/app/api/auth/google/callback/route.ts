@@ -1,9 +1,10 @@
-// src/app/api/auth/google/callback/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 
-export const runtime = "nodejs";
+const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+const GOOGLE_USERINFO_ENDPOINT =
+  "https://openidconnect.googleapis.com/v1/userinfo";
 
 const SESSION_COOKIE = "darb_session";
 
@@ -24,91 +25,86 @@ type GoogleUserInfo = {
 };
 
 export async function GET(req: NextRequest) {
-  const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-  const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-  const BASE_URL =
-    process.env.NEXT_PUBLIC_SITE_URL || "https://elyaia.vercel.app";
-
-  const url = new URL(req.url);
+  const url = req.nextUrl;
   const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state") || "";
+  const state = url.searchParams.get("state") ?? "/dashboard/filter";
   const error = url.searchParams.get("error");
 
-  const redirectTo =
-    (state && decodeURIComponent(state)) || "/dashboard/filter";
-
   if (error || !code) {
-    console.error("Google OAuth error:", error);
+    console.error("Google auth error:", error);
     return NextResponse.redirect(
-      `${BASE_URL}/dashboard/login?error=google_oauth_failed`,
+      new URL("/dashboard/login?error=google_auth_error", url),
     );
   }
 
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-    console.error("Google OAuth env vars missing");
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    console.error("Google env vars missing");
     return NextResponse.redirect(
-      `${BASE_URL}/dashboard/login?error=google_env_missing`,
+      new URL("/dashboard/login?error=google_env", url),
     );
   }
 
-  const redirectUri = `${BASE_URL}/api/auth/google/callback`;
+  const origin = `${url.protocol}//${url.host}`;
+  const redirectUri = `${origin}/api/auth/google/callback`;
 
   try {
-    // 1) تبديل code بـ access_token
-    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    // 1) تبديل code إلى access_token
+    const tokenRes = await fetch(GOOGLE_TOKEN_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         code,
-        client_id: GOOGLE_CLIENT_ID,
-        client_secret: GOOGLE_CLIENT_SECRET,
+        client_id: clientId,
+        client_secret: clientSecret,
         redirect_uri: redirectUri,
         grant_type: "authorization_code",
       }),
     });
 
     if (!tokenRes.ok) {
-      const text = await tokenRes.text();
-      console.error("Google token error:", tokenRes.status, text);
+      const body = await tokenRes.text();
+      console.error("Google token error:", tokenRes.status, body);
       return NextResponse.redirect(
-        `${BASE_URL}/dashboard/login?error=google_token_failed`,
+        new URL("/dashboard/login?error=google_token_failed", url),
       );
     }
 
     const tokenJson = (await tokenRes.json()) as GoogleTokenResponse;
 
-    // 2) جلب معلومات المستخدم من Google
-    const userRes = await fetch(
-      "https://openidconnect.googleapis.com/v1/userinfo",
-      {
-        headers: {
-          Authorization: `Bearer ${tokenJson.access_token}`,
-        },
+    // 2) جلب بيانات المستخدم من Google
+    const userRes = await fetch(GOOGLE_USERINFO_ENDPOINT, {
+      headers: {
+        Authorization: `Bearer ${tokenJson.access_token}`,
       },
-    );
+    });
 
     if (!userRes.ok) {
-      const text = await userRes.text();
-      console.error("Google userinfo error:", userRes.status, text);
+      const body = await userRes.text();
+      console.error("Google userinfo error:", userRes.status, body);
       return NextResponse.redirect(
-        `${BASE_URL}/dashboard/login?error=google_userinfo_failed`,
+        new URL("/dashboard/login?error=google_userinfo_failed", url),
       );
     }
 
     const profile = (await userRes.json()) as GoogleUserInfo;
 
+    console.log("Google user:", profile);
+
     if (!profile.email || !profile.email_verified) {
       return NextResponse.redirect(
-        `${BASE_URL}/dashboard/login?error=google_email_not_verified`,
+        new URL("/dashboard/login?error=google_email_not_verified", url),
       );
     }
 
     const email = profile.email.toLowerCase();
     const googleSub = profile.sub;
+
     const supabase = getSupabaseServerClient();
 
-    // ================== 3) ربط المستخدم ==================
-    // أ) نحاول أولاً عن طريق google_sub (لو سبق ربط)
+    // 3) ربط المستخدم مع store_users (google_sub أو email)
     const { data: userBySub, error: subErr } = await supabase
       .from("store_users")
       .select("id, store_id, email, name, auth_provider")
@@ -121,7 +117,6 @@ export async function GET(req: NextRequest) {
       console.error("lookup by google_sub error:", subErr);
     }
 
-    // ب) لو ما لقيناه بالـ sub، نحاول عن طريق الإيميل
     if (!user) {
       const { data: userByEmail, error: emailErr } = await supabase
         .from("store_users")
@@ -134,13 +129,14 @@ export async function GET(req: NextRequest) {
       }
 
       if (!userByEmail) {
-        // مافيه حساب متجر بهذا الإيميل → رجّعه صفحة الدخول برسالة واضحة
-        return NextResponse.redirect(
-          `${BASE_URL}/dashboard/login?error=no_store_account`,
+        // مافيه حساب متجر بهذا الإيميل → ودّه على صفحة التسجيل للمتجر
+        const onboardingUrl = new URL(
+          `/merchant/onboarding?email=${encodeURIComponent(email)}`,
+          origin,
         );
+        return NextResponse.redirect(onboardingUrl);
       }
 
-      // ج) نربط حساب البريد بـ google_sub لأول مرة
       const newAuthProvider =
         userByEmail.auth_provider === "password"
           ? "both"
@@ -164,15 +160,14 @@ export async function GET(req: NextRequest) {
     }
 
     if (!user) {
-      // احتياط، المفروض ما نوصل هنا
       return NextResponse.redirect(
-        `${BASE_URL}/dashboard/login?error=store_not_found`,
+        new URL("/dashboard/login?error=store_not_found", url),
       );
     }
 
-    // ================== 4) إنشاء جلسة في جدول sessions ==================
+    // 4) إنشاء جلسة في جدول sessions
     const sessionToken = randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 يوم
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
     const { error: sessionErr } = await supabase.from("sessions").insert({
       user_type: "store",
@@ -185,14 +180,14 @@ export async function GET(req: NextRequest) {
     if (sessionErr) {
       console.error("create session error:", sessionErr);
       return NextResponse.redirect(
-        `${BASE_URL}/dashboard/login?error=session_failed`,
+        new URL("/dashboard/login?error=session_failed", url),
       );
     }
 
-    // ================== 5) ضبط الكوكيّات ==================
-    const res = NextResponse.redirect(`${BASE_URL}${redirectTo}`);
+    // 5) الكوكيز + إعادة التوجيه للـ state (/dashboard/filter مثلاً)
+    const redirectTarget = new URL(state, origin);
+    const res = NextResponse.redirect(redirectTarget);
 
-    // كوكي السيشن (نفس اللي يستخدمه نظام المتاجر)
     res.cookies.set(SESSION_COOKIE, sessionToken, {
       httpOnly: true,
       sameSite: "lax",
@@ -201,7 +196,6 @@ export async function GET(req: NextRequest) {
       maxAge: 30 * 24 * 60 * 60,
     });
 
-    // نفس العلامة اللي تستخدمها في login بالباسورد
     res.cookies.set("logged_in", "1", {
       httpOnly: false,
       sameSite: "lax",
@@ -213,10 +207,8 @@ export async function GET(req: NextRequest) {
     return res;
   } catch (e) {
     console.error("Google callback exception:", e);
-    const BASE_URL =
-      process.env.NEXT_PUBLIC_SITE_URL || "https://elyaia.vercel.app";
     return NextResponse.redirect(
-      `${BASE_URL}/dashboard/login?error=google_callback_error`,
+      new URL("/dashboard/login?error=google_token_failed", url),
     );
   }
 }

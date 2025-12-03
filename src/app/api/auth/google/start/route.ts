@@ -1,35 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "nodejs";
+const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 
 export async function GET(req: NextRequest) {
-  const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-  const BASE_URL =
-    process.env.NEXT_PUBLIC_SITE_URL || "https://elyaia.vercel.app";
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const redirectToParam =
+    req.nextUrl.searchParams.get("redirectTo") ?? "/dashboard/filter";
 
-  if (!GOOGLE_CLIENT_ID) {
+  // لأننا مرسلين redirectTo بـ encodeURIComponent من الفرونت
+  const redirectTo = decodeURIComponent(redirectToParam);
+
+  if (!clientId) {
     console.error("GOOGLE_CLIENT_ID is missing");
-    return NextResponse.redirect(new URL("/dashboard/login", BASE_URL));
+    return NextResponse.redirect(
+      new URL("/dashboard/login?error=google_env", req.nextUrl),
+    );
   }
 
-  const { searchParams } = new URL(req.url);
-  const redirectTo = searchParams.get("redirectTo") || "/dashboard/filter";
+  const origin = req.nextUrl.origin;
+  const redirectUri = new URL(
+    "/api/auth/google/callback",
+    origin,
+  ).toString();
 
-  const redirectUri = `${BASE_URL}/api/auth/google/callback`;
+  const url = new URL(GOOGLE_AUTH_ENDPOINT);
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", "openid email profile");
+  url.searchParams.set("access_type", "offline");
+  url.searchParams.set("prompt", "consent");
+  // نخزن المسار كما هو (بدون encode)
+  url.searchParams.set("state", redirectTo);
 
-  // نخزن redirectTo في state (بشكل بسيط)
-  const state = encodeURIComponent(redirectTo);
-
-  const googleAuthUrl = new URL(
-    "https://accounts.google.com/o/oauth2/v2/auth",
-  );
-  googleAuthUrl.searchParams.set("client_id", GOOGLE_CLIENT_ID);
-  googleAuthUrl.searchParams.set("redirect_uri", redirectUri);
-  googleAuthUrl.searchParams.set("response_type", "code");
-  googleAuthUrl.searchParams.set("scope", "openid email profile");
-  googleAuthUrl.searchParams.set("access_type", "offline");
-  googleAuthUrl.searchParams.set("prompt", "consent");
-  googleAuthUrl.searchParams.set("state", state);
-
-  return NextResponse.redirect(googleAuthUrl.toString());
+  return NextResponse.redirect(url.toString());
 }
