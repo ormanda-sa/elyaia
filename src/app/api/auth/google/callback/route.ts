@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
   const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
   const BASE_URL =
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    process.env.NEXT_PUBLIC_SITE_URL || "https://elyaia.vercel.app";
 
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
@@ -214,7 +214,7 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     console.error("Google callback exception:", e);
     const BASE_URL =
-      process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+      process.env.NEXT_PUBLIC_SITE_URL || "https://elyaia.vercel.app";
     return NextResponse.redirect(
       `${BASE_URL}/dashboard/login?error=google_callback_error`,
     );
