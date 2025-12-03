@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
 
     const amount = inv.amount_cents;
 
-    const origin = req.headers.get("origin") || "http://localhost:3000";
+    const origin = req.headers.get("origin") || "https://elyaia.vercel.app";
     const successUrl = `${origin}/dashboard/invoices/${invoiceId}/pay?status=success`;
     const failedUrl = `${origin}/dashboard/invoices/${invoiceId}/pay?status=failed`;
 

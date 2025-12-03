@@ -54,7 +54,7 @@ export default function AdminLoginPage() {
         body: JSON.stringify({ email }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         setErrorMsg(data?.error || "تعذر إرسال كود التحقق.");
@@ -89,13 +89,14 @@ export default function AdminLoginPage() {
         body: JSON.stringify({ email, code }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         setErrorMsg(data?.error || "تعذر التحقق من الكود.");
         return;
       }
 
+      // نجاح: نحول للوحة الإدارة العامة
       router.push("/general-manager");
     } catch (err) {
       console.error(err);
@@ -116,7 +117,7 @@ export default function AdminLoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErrorMsg(data?.error || "تعذر إعادة إرسال الكود.");
         return;
@@ -133,19 +134,24 @@ export default function AdminLoginPage() {
   return (
     <div
       dir="rtl"
-      className="min-h-screen flex items-center justify-center bg-muted"
+      className="flex min-h-screen items-center justify-center bg-muted"
     >
       <Card className="w-full max-w-sm shadow-lg">
         {step === "email" && (
           <>
             <CardHeader>
-              <CardTitle className="text-right">تسجيل دخول المدير العام</CardTitle>
-              <CardDescription className="text-xs text-right">
-                أدخل بريدك الإلكتروني لنرسل لك كود التحقق لمرة واحدة.
+              <CardTitle className="text-right">
+                تسجيل دخول المدير العام
+              </CardTitle>
+              <CardDescription className="text-right text-xs">
+                أدخل بريدك الإلكتروني لنرسل لك كود تحقق لمرة واحدة (OTP).
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSendCode} className="space-y-4 text-right">
+              <form
+                onSubmit={handleSendCode}
+                className="space-y-4 text-right"
+              >
                 <div className="space-y-1">
                   <Label htmlFor="email">البريد الإلكتروني</Label>
                   <Input
@@ -160,10 +166,12 @@ export default function AdminLoginPage() {
                 </div>
 
                 {errorMsg && (
-                  <p className="text-xs text-red-500 text-right">{errorMsg}</p>
+                  <p className="text-right text-xs text-red-500">
+                    {errorMsg}
+                  </p>
                 )}
                 {infoMsg && (
-                  <p className="text-xs text-muted-foreground text-right">
+                  <p className="text-right text-xs text-muted-foreground">
                     {infoMsg}
                   </p>
                 )}
@@ -179,16 +187,19 @@ export default function AdminLoginPage() {
         {step === "code" && (
           <>
             <CardHeader>
-              <CardTitle>Enter verification code</CardTitle>
-              <CardDescription>
-                We sent a 6-digit code to your email: {email}
+              <CardTitle className="text-right">أدخل كود التحقق</CardTitle>
+              <CardDescription className="text-right text-xs">
+                أرسلنا كود مكوّن من 6 أرقام إلى بريدك:{" "}
+                <span className="font-medium">{email}</span>
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleVerifyCode}>
                 <FieldGroup>
                   <Field>
-                    <FieldLabel htmlFor="otp">Verification code</FieldLabel>
+                    <FieldLabel htmlFor="otp">
+                      كود التحقق (6 أرقام)
+                    </FieldLabel>
                     <InputOTP
                       maxLength={6}
                       id="otp"
@@ -206,39 +217,39 @@ export default function AdminLoginPage() {
                         <InputOTPSlot index={5} />
                       </InputOTPGroup>
                     </InputOTP>
-                    <FieldDescription>
-                      Enter the 6-digit code sent to your email.
+                    <FieldDescription className="text-xs">
+                      أدخل الكود الذي وصلك على البريد الإلكتروني.
                     </FieldDescription>
                   </Field>
 
                   {errorMsg && (
-                    <p className="text-xs text-red-500 text-right mt-2">
+                    <p className="mt-2 text-right text-xs text-red-500">
                       {errorMsg}
                     </p>
                   )}
                   {infoMsg && (
-                    <p className="text-xs text-muted-foreground text-right mt-1">
+                    <p className="mt-1 text-right text-xs text-muted-foreground">
                       {infoMsg}
                     </p>
                   )}
 
                   <FieldGroup className="mt-4 space-y-2">
-                    <Button type="submit" disabled={isLoading}>
-                      {isLoading ? "Verifying..." : "Verify"}
+                    <Button type="submit" disabled={isLoading} className="w-full">
+                      {isLoading ? "جاري التحقق..." : "تأكيد الدخول"}
                     </Button>
-                    <FieldDescription className="text-center">
-                      Didn&apos;t receive the code?{" "}
+                    <FieldDescription className="text-center text-xs">
+                      ما وصلك الكود؟{" "}
                       <button
                         type="button"
                         className="underline"
                         onClick={handleResend}
                         disabled={isLoading}
                       >
-                        Resend
+                        إعادة إرسال
                       </button>
                     </FieldDescription>
-                    <FieldDescription className="text-center">
-                      بريدك خطأ؟{" "}
+                    <FieldDescription className="text-center text-xs">
+                      البريد غير صحيح؟{" "}
                       <button
                         type="button"
                         className="underline"

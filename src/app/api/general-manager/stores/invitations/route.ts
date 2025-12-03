@@ -5,7 +5,7 @@ import { Resend } from "resend";
 const resendApiKey = process.env.RESEND_API_KEY;
 const fromEmail = process.env.RESEND_FROM_EMAIL || "no-reply@elyaia.com";
 const defaultInviteUrl =
-  process.env.RESEND_INVITE_URL || "http://localhost:3000/general-manager/onboarding";
+  process.env.RESEND_INVITE_URL || "https://elyaia.vercel.app/general-manager/onboarding";
 
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 

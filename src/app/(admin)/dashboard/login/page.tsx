@@ -1,4 +1,3 @@
-// src/app/(admin)/dashboard/login/page.tsx
 "use client";
 
 import React, { useState, Suspense } from "react";
@@ -11,16 +10,35 @@ import Button from "@/components/ui/button/Button";
 import { EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input as UiInput } from "@/components/ui/input";
+
 function LoginInner() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // دعوة فتح حساب
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteSending, setInviteSending] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "/dashboard/filter";
 
+  // ================== تسجيل الدخول ==================
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -52,7 +70,7 @@ function LoginInner() {
         }),
       });
 
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
 
       if (!res.ok || !json.ok) {
         const code = json.error || "LOGIN_FAILED";
@@ -67,7 +85,7 @@ function LoginInner() {
         return;
       }
 
-      // علامة بسيطة للحارس في (admin)/layout.tsx
+      // علامة بسيطة لو عندك حارس في (admin)/layout.tsx
       document.cookie = "logged_in=1; path=/";
 
       router.replace(redirectTo);
@@ -77,6 +95,54 @@ function LoginInner() {
     }
   }
 
+  // ================== إرسال طلب فتح حساب ==================
+  async function handleInviteSubmit() {
+    setInviteError(null);
+    setInviteMessage(null);
+
+    const email = inviteEmail.trim();
+    if (!email) {
+      setInviteError("فضلاً أدخل البريد الإلكتروني.");
+      return;
+    }
+
+    setInviteSending(true);
+    try {
+      const res = await fetch("/api/dashboard/store-invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok || !json.ok) {
+        const code = json.error || "INVITE_FAILED";
+        if (code === "EMAIL_EXISTS") {
+          setInviteError(
+            "هذا البريد مسجّل لدينا من قبل. إذا نسيت كلمة المرور يمكنك استخدام رابط (نسيت كلمة المرور) بالأسفل."
+          );
+        } else if (code === "EMAIL_REQUIRED") {
+          setInviteError("فضلاً أدخل البريد الإلكتروني.");
+        } else {
+          setInviteError("تعذّر إرسال الطلب، حاول مرة أخرى.");
+        }
+        return;
+      }
+
+      setInviteMessage(
+        "تم استلام طلب فتح الحساب، سنتواصل معك عبر البريد في أقرب وقت."
+      );
+      setInviteEmail("");
+    } catch (err) {
+      console.error(err);
+      setInviteError("حدث خطأ في الاتصال، حاول مرة أخرى.");
+    } finally {
+      setInviteSending(false);
+    }
+  }
+
+  // ================== JSX ==================
   return (
     <div
       className="min-h-screen flex items-center justify-center bg-slate-100 px-4"
@@ -104,6 +170,7 @@ function LoginInner() {
               </p>
             </div>
 
+            {/* ✅ هذا الـ form الوحيد في الصفحة */}
             <form
               id="darb-login-form"
               onSubmit={handleSubmit}
@@ -184,7 +251,7 @@ function LoginInner() {
                 <span className="h-px flex-1 bg-slate-200" />
               </div>
 
-              {/* أزرار تواصل اجتماعي */}
+              {/* أزرار تواصل اجتماعي (ديكور) */}
               <div className="grid grid-cols-3 gap-3 pt-1">
                 <button
                   type="button"
@@ -206,12 +273,83 @@ function LoginInner() {
                 </button>
               </div>
 
-              <p className="pt-2 text-xs text-center text-slate-500">
-                ما عندك حساب؟{" "}
-                <span className="text-brand-500 hover:text-brand-600 cursor-pointer">
-                  تواصل معنا لفتح حساب للمتجر
-                </span>
-              </p>
+              {/* دعوة فتح حساب – بدون form متداخل */}
+              <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+                <p className="pt-2 text-xs text-center text-slate-500">
+                  ما عندك حساب؟{" "}
+                  <DialogTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-brand-500 hover:text-brand-600 cursor-pointer underline-offset-2"
+                    >
+                      تواصل معنا لفتح حساب للمتجر
+                    </button>
+                  </DialogTrigger>
+                </p>
+
+                <DialogContent dir="rtl" className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>طلب فتح حساب للمتجر</DialogTitle>
+                    <DialogDescription className="text-[11px]">
+                      أدخل بريدك الإلكتروني وسنقوم بمراجعة طلبك والتواصل معك
+                      بخصوص تفعيل لوحة التحكم وربطها بمتجرك.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {/* ✅ div عادي، مو form */}
+                  <div className="space-y-3 text-right">
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="invite-email"
+                        className="text-xs font-medium text-slate-700"
+                      >
+                        البريد الإلكتروني لصاحب المتجر
+                      </label>
+                      <UiInput
+                        id="invite-email"
+                        type="email"
+                        placeholder="owner@example.com"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        className="h-9 text-xs"
+                      />
+                    </div>
+
+                    {inviteError && (
+                      <p className="text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-md px-2 py-1.5">
+                        {inviteError}{" "}
+                        {inviteError.includes("نسيت كلمة المرور") && (
+                          <Link
+                            href="/dashboard/forgot-password"
+                            className="ml-1 text-brand-600 underline"
+                          >
+                            نسيت كلمة المرور؟
+                          </Link>
+                        )}
+                      </p>
+                    )}
+
+                    {inviteMessage && (
+                      <p className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1.5">
+                        {inviteMessage}
+                      </p>
+                    )}
+
+                    <DialogFooter className="mt-1 flex justify-between">
+                      <button
+                        type="button"
+                        onClick={handleInviteSubmit}
+                        disabled={inviteSending}
+                        className="inline-flex items-center justify-center rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-70 disabled:cursor-not-allowed"
+                      >
+                        {inviteSending
+                          ? "جاري إرسال الطلب..."
+                          : "إرسال طلب فتح حساب"}
+                      </button>
+                    </DialogFooter>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </form>
           </div>
 

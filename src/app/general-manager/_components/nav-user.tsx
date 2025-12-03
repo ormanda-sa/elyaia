@@ -1,5 +1,7 @@
-// src/app/general-manager/_components/nav-user.tsx
 "use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   Avatar,
@@ -30,8 +32,12 @@ type NavUserProps = {
   };
 };
 
+const ADMIN_SESSION_COOKIE = "gm_admin_session";
+
 export function NavUser({ user }: NavUserProps) {
   const { isMobile } = useSidebar();
+  const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const initials =
     user?.name
@@ -39,6 +45,27 @@ export function NavUser({ user }: NavUserProps) {
       .map((part) => part[0])
       .join("")
       .toUpperCase() || "GM";
+
+  async function handleLogout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      // نضرب API الخروج
+      await fetch("/api/general-manager/auth/logout", {
+        method: "POST",
+      });
+    } catch (err) {
+      console.error("logout error:", err);
+    } finally {
+      // 🔥 نضمن حذف الكوكي من المتصفح نفسه كمان
+      document.cookie = `${ADMIN_SESSION_COOKIE}=; Max-Age=0; path=/;`;
+
+      // نرجع لصفحة تسجيل الدخول للإدارة العامة
+      router.push("/admin-login");
+      router.refresh();
+      setLoggingOut(false);
+    }
+  }
 
   return (
     <SidebarMenu>
@@ -59,16 +86,15 @@ export function NavUser({ user }: NavUserProps) {
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
-                <span className="text-muted-foreground truncate text-xs">
+                <span className="truncate text-xs text-muted-foreground">
                   {user.email}
                 </span>
               </div>
-              {/* بدل آيكون النقاط نحط ثلاث نقاط نصية صغيرة عشان نحافظ على الشكل */}
               <span className="ml-auto text-lg leading-none">⋯</span>
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+            className="min-w-56 rounded-lg"
             side={isMobile ? "bottom" : "right"}
             align="end"
             sideOffset={4}
@@ -85,7 +111,7 @@ export function NavUser({ user }: NavUserProps) {
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user.name}</span>
-                  <span className="text-muted-foreground truncate text-xs">
+                  <span className="truncate text-xs text-muted-foreground">
                     {user.email}
                   </span>
                 </div>
@@ -98,7 +124,13 @@ export function NavUser({ user }: NavUserProps) {
               <DropdownMenuItem>Notifications</DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Log out</DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="cursor-pointer text-red-600 focus:text-red-700"
+            >
+              {loggingOut ? "جاري تسجيل الخروج..." : "تسجيل الخروج"}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

@@ -1,88 +1,111 @@
 // src/app/api/general-manager/auth/request-otp/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { randomInt } from "crypto";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 
-function generateSixDigitCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
+export const runtime = "nodejs";
 
-// TODO: اربطها بمزود الإيميل الخاص فيك (Resend, SMTP, الخ)
-async function sendAdminOtpEmail(params: {
-  email: string;
-  code: string;
-}) {
-  const { email, code } = params;
-
-  // هنا حاليًا بس console.log عشان التطوير
-  console.log("[ADMIN OTP] إرسال كود إلى:", email, "code:", code);
-
-  // مثال مستقبلي:
-  // await resend.emails.send({ to: email, subject: "...", text: `كودك: ${code}` });
-}
+const OTP_TTL_MINUTES = 10;
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = getSupabaseServerClient();
-    const body = await req.json().catch(() => null) as { email?: string } | null;
+    const body = await req.json().catch(() => null);
+    const emailRaw = body?.email;
 
-    if (!body?.email || typeof body.email !== "string") {
+    if (!emailRaw || typeof emailRaw !== "string") {
       return NextResponse.json(
         { error: "البريد الإلكتروني مطلوب." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const email = body.email.trim().toLowerCase();
+    const email = emailRaw.trim().toLowerCase();
+    const supabase = getSupabaseServerClient();
 
-    // 1) تأكد إن الإيميل موجود في admin_users
-    const { data: adminUser, error: adminUserError } = await supabase
+    // نتأكد أن الإيميل موجود في admin_users
+    const { data: adminUser, error: adminErr } = await supabase
       .from("admin_users")
-      .select("*")
+      .select("id, email")
       .eq("email", email)
-      .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (adminUserError || !adminUser) {
-      // لا نوضح كثير عشان الأمان
+    if (adminErr || !adminUser) {
       return NextResponse.json(
-        { error: "هذا البريد غير مخوّل للوصول." },
-        { status: 403 }
+        { error: "هذا البريد غير مسجّل كمدير عام." },
+        { status: 400 },
       );
     }
 
-    // 2) إنشاء كود 6 أرقام
-    const code = generateSixDigitCode();
+    // نقدر نحذف الأكواد القديمة غير المستخدمة لهذا المستخدم (اختياري)
+    await supabase
+      .from("admin_otp_codes")
+      .delete()
+      .eq("admin_user_id", adminUser.id)
+      .is("consumed_at", null);
 
-    // نخلي الكود صالح مثلاً 10 دقائق
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    // كود 6 أرقام
+    const code = String(randomInt(100000, 1000000)); // 100000 → 999999
 
-    // 3) حفظ الكود في جدول admin_otp_codes
-    const { error: insertError } = await supabase.from("admin_otp_codes").insert({
+    const expiresAt = new Date(
+      Date.now() + OTP_TTL_MINUTES * 60 * 1000,
+    ).toISOString();
+
+    // نحفظه مباشر في admin_otp_codes (بدون هاش لأن عندك العمود code جاهز)
+    const { error: otpErr } = await supabase.from("admin_otp_codes").insert({
       admin_user_id: adminUser.id,
       code,
       expires_at: expiresAt,
+      consumed_at: null,
     });
 
-    if (insertError) {
-      console.error("[ADMIN OTP] insert error", insertError);
+    if (otpErr) {
+      console.error("admin_otp_codes insert error:", otpErr);
       return NextResponse.json(
-        { error: "حدث خطأ أثناء إنشاء كود التحقق." },
-        { status: 500 }
+        { error: "تعذر إنشاء كود التحقق." },
+        { status: 500 },
       );
     }
 
-    // 4) إرسال الكود على الإيميل
-    await sendAdminOtpEmail({ email, code });
+    // نرسل الإيميل عبر Resend
+    const RESEND_API_KEY = process.env.RESEND_API_KEY;
+    const RESEND_FROM = process.env.RESEND_FROM_EMAIL || "noreply@example.com";
 
-    return NextResponse.json({
-      success: true,
-      message: "تم إرسال كود التحقق إلى البريد الإلكتروني (إن وجد).",
-    });
+    if (!RESEND_API_KEY) {
+      console.warn("RESEND_API_KEY not set – OTP email will not be sent.");
+    } else {
+      const subject = "كود التحقق لتسجيل دخول لوحة الإدارة العامة";
+      const html = `
+        <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; direction: rtl; text-align: right;">
+          <p>مرحباً،</p>
+          <p>كود التحقق الخاص بتسجيل دخول لوحة الإدارة العامة هو:</p>
+          <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px;">${code}</p>
+          <p>هذا الكود صالح لمدة ${OTP_TTL_MINUTES} دقائق.</p>
+        </div>
+      `;
+
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: RESEND_FROM,
+          to: [email],
+          subject,
+          html,
+        }),
+      }).catch((err) => {
+        console.error("Resend error:", err);
+      });
+    }
+
+    return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[ADMIN OTP] unexpected error", err);
+    console.error("request-otp error:", err);
     return NextResponse.json(
       { error: "حدث خطأ غير متوقع." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

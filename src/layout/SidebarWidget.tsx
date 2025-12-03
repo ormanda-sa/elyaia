@@ -1,3 +1,4 @@
+// src/layout/SidebarWidget.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -20,21 +21,33 @@ export default function SidebarWidget() {
         const res = await fetch("/api/dashboard/store-id", {
           cache: "no-store",
         });
-        const json = await res.json().catch(() => ({}));
+
+        const json = await res.json().catch(() => ({} as any));
+
+        // 🔹 الحالة المهمة: 401 = مستخدم مو مسجل دخول
+        if (res.status === 401) {
+          // لا نطبع error ولا نعرض الودجت
+          return;
+        }
+
         if (!res.ok) {
+          // أخطاء حقيقية فقط (مثلاً 500)
           console.error("store-id api error:", json);
           return;
         }
+
         if (!cancelled) {
           setInfo({
             store_id: json.store_id,
-            event_secret: json.event_secret || "darb_filter_2025",
+            event_secret: json.event_secret ?? "darb_filter_2025",
           });
         }
       } catch (err) {
-        console.error("store-id fetch error:", err);
+        console.error("store-id api exception:", err);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
@@ -44,28 +57,24 @@ export default function SidebarWidget() {
     };
   }, []);
 
-  const safeStoreId =
-    info?.store_id && info.store_id !== "undefined"
-      ? info.store_id
-      : "";
+  // لو مافيه بيانات أو لسه يحمل → لا نعرض شيء
+  if (loading || !info) return null;
 
-  const eventSecret = info?.event_secret || "darb_filter_2025";
-
-  const snippet = `
+  const snippet = `<script>
   (function () {
     var s = document.createElement('script');
     s.src = "/widgets.js";
     s.async = true;
 
-    s.setAttribute("data-store-id", "${safeStoreId || "PUT_YOUR_STORE_ID_HERE"}");
-    s.setAttribute("data-event-secret", "${eventSecret}");
+    s.setAttribute("data-store-id", "${info.store_id}");
+    s.setAttribute("data-event-secret", "${info.event_secret}");
 
     var firstScript = document.getElementsByTagName("script")[0];
     firstScript.parentNode.insertBefore(s, firstScript);
   })();
-`;
+</script>`;
 
-  const handleCopy = async () => {
+  async function handleCopy() {
     try {
       await navigator.clipboard.writeText(snippet);
       setCopied(true);
@@ -73,7 +82,7 @@ export default function SidebarWidget() {
     } catch (err) {
       console.error("copy snippet error:", err);
     }
-  };
+  }
 
   return (
     <div
@@ -91,15 +100,13 @@ export default function SidebarWidget() {
         <div className="mb-1 font-medium text-gray-700">
           Store ID:
           <span className="mr-1 font-mono text-[10px] text-indigo-600">
-            {loading
-              ? "جاري التحميل..."
-              : safeStoreId || "لم يتم العثور على Store ID"}
+            {info.store_id}
           </span>
         </div>
         <div className="text-[10px] text-gray-500">
           Event Secret:
           <span className="mr-1 font-mono text-[10px] text-gray-600">
-            {eventSecret}
+            {info.event_secret}
           </span>
         </div>
       </div>
@@ -113,18 +120,10 @@ export default function SidebarWidget() {
       <button
         type="button"
         onClick={handleCopy}
-        disabled={!safeStoreId}
-        className="flex w-full items-center justify-center rounded-lg bg-brand-500 p-3 text-theme-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-slate-400"
+        className="flex w-full items-center justify-center rounded-lg bg-brand-500 p-3 text-theme-sm font-medium text-white hover:bg-brand-600"
       >
         {copied ? "👍 تم نسخ الكود" : "نسخ كود السكربت"}
       </button>
-
-      {!safeStoreId && !loading && (
-        <p className="mt-2 text-[10px] text-red-500">
-          لم نتمكن من قراءة Store ID من الجلسة. تأكد أن المستخدم سجّل الدخول وأن
-          جدول الجلسات يحتوي store_id بشكل صحيح.
-        </p>
-      )}
     </div>
   );
 }

@@ -1,40 +1,41 @@
 // src/app/general-manager/layout.tsx
-"use client";
+import type { ReactNode } from "react";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { getSupabaseServerClient } from "@/lib/supabaseServer";
+import { GeneralManagerShell } from "./GeneralManagerShell";
 
-import React from "react";
-import type { ReactNode, CSSProperties } from "react";
-
-import { AppSidebar } from "./_components/app-sidebar";
-import { SiteHeader } from "./_components/site-header";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+const ADMIN_SESSION_COOKIE = "gm_admin_session";
 
 type LayoutProps = {
   children: ReactNode;
 };
 
-export default function GeneralManagerLayout({ children }: LayoutProps) {
-  return (
-    <div dir="rtl" className="min-h-screen bg-[#f5f5f5] text-neutral-900">
-      <SidebarProvider
-        style={
-          {
-            "--sidebar-width": "calc(var(--spacing) * 72)",
-            "--header-height": "calc(var(--spacing) * 12)",
-          } as CSSProperties
-        }
-      >
-        <AppSidebar variant="inset" />
+export default async function GeneralManagerLayout({ children }: LayoutProps) {
+  // 👈 هنا كانت المشكلة: لازم await
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
 
-        <SidebarInset>
-          <SiteHeader />
-          <div className="flex flex-1 flex-col">
-            <div className="@container/main flex flex-1 flex-col gap-2">
-              {/* هنا يطلع محتوى كل صفحة: dashboard, stores, ... */}
-              {children}
-            </div>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
-    </div>
-  );
+  // لو مافيه كوكي أصلاً → روح صفحة تسجيل الدخول
+  if (!sessionToken) {
+    redirect("/admin-login");
+  }
+
+  const supabase = getSupabaseServerClient();
+  const nowIso = new Date().toISOString();
+
+  const { data: sessionRow, error } = await supabase
+    .from("sessions")
+    .select("id, user_type, expires_at")
+    .eq("session_token", sessionToken)
+    .gt("expires_at", nowIso)
+    .maybeSingle();
+
+  // لو مافيه جلسة admin فعّالة → رجّعه برضه
+  if (error || !sessionRow || sessionRow.user_type !== "admin") {
+    redirect("/admin-login");
+  }
+
+  // هنا فقط لو الأمور تمام
+  return <GeneralManagerShell>{children}</GeneralManagerShell>;
 }
