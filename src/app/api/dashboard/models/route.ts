@@ -5,7 +5,6 @@ import { getCurrentStoreId } from "@/lib/currentStore";
 
 /**
  * GET /api/dashboard/models?brand_id=...
- * يرجّع كل السيارات (الموديلات) لمتجر المستخدم الحالي
  */
 export async function GET(req: NextRequest) {
   const supabase = getSupabaseServerClient();
@@ -20,6 +19,7 @@ export async function GET(req: NextRequest) {
   }
 
   const brandIdParam = searchParams.get("brand_id");
+
   const query = supabase
     .from("filter_models")
     .select("id, name_ar, slug, salla_category_id, brand_id, sort_order")
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/dashboard/models
- * body: { brand_id, name_ar, slug?, salla_category_id? }
+ * body: { brand_id, name_ar, slug?, salla_category_id?, sort_order? }
  */
 export async function POST(req: NextRequest) {
   const supabase = getSupabaseServerClient();
@@ -64,7 +64,13 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { brand_id, name_ar, slug, salla_category_id } = body || {};
+  const {
+    brand_id,
+    name_ar,
+    slug,
+    salla_category_id,
+    sort_order,
+  } = body || {};
 
   if (!brand_id || !name_ar) {
     return NextResponse.json(
@@ -73,15 +79,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const insertData: Record<string, any> = {
+    store_id: storeId,
+    brand_id,
+    name_ar,
+    slug: slug || null,
+    salla_category_id: salla_category_id || null,
+  };
+
+  if (sort_order !== undefined && sort_order !== null) {
+    insertData.sort_order = Number(sort_order);
+  }
+
   const { data, error } = await supabase
     .from("filter_models")
-    .insert({
-      store_id: storeId,
-      brand_id,
-      name_ar,
-      slug: slug || null,
-      salla_category_id: salla_category_id || null,
-    })
+    .insert(insertData)
     .select()
     .single();
 
@@ -98,7 +110,7 @@ export async function POST(req: NextRequest) {
 
 /**
  * PUT /api/dashboard/models
- * body: { id, name_ar?, slug?, salla_category_id? }
+ * body: { id, name_ar?, slug?, salla_category_id?, sort_order? }
  */
 export async function PUT(req: NextRequest) {
   const supabase = getSupabaseServerClient();
@@ -112,7 +124,13 @@ export async function PUT(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { id, name_ar, slug, salla_category_id } = body || {};
+  const {
+    id,
+    name_ar,
+    slug,
+    salla_category_id,
+    sort_order,
+  } = body || {};
 
   if (!id) {
     return NextResponse.json(
@@ -126,6 +144,15 @@ export async function PUT(req: NextRequest) {
   if (slug !== undefined) update.slug = slug;
   if (salla_category_id !== undefined)
     update.salla_category_id = salla_category_id;
+  if (sort_order !== undefined && sort_order !== null)
+    update.sort_order = Number(sort_order);
+
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json(
+      { error: "No fields to update" },
+      { status: 400 },
+    );
+  }
 
   const { data, error } = await supabase
     .from("filter_models")
