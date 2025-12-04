@@ -5,7 +5,6 @@ import { getCurrentStoreId } from "@/lib/currentStore";
 
 /**
  * GET /api/dashboard/years?model_id=...
- * يرجّع كل السنوات لموديل معيّن (أو لكل الموديلات) لمتجر المستخدم الحالي
  */
 export async function GET(req: NextRequest) {
   const supabase = getSupabaseServerClient();
@@ -13,10 +12,7 @@ export async function GET(req: NextRequest) {
 
   const storeId = await getCurrentStoreId();
   if (!storeId) {
-    return NextResponse.json(
-      { error: "UNAUTHORIZED" },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
   const modelIdParam = searchParams.get("model_id");
@@ -58,10 +54,7 @@ export async function POST(req: NextRequest) {
   const storeId = await getCurrentStoreId();
 
   if (!storeId) {
-    return NextResponse.json(
-      { error: "UNAUTHORIZED" },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
   const body = await req.json();
@@ -74,16 +67,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const insertData: Record<string, any> = {
+    store_id: storeId,
+    model_id,
+    year,
+    slug: slug || null,
+    salla_year_id: salla_year_id || null,
+  };
+
+  if (sort_order !== undefined && sort_order !== null) {
+    insertData.sort_order = Number(sort_order);
+  }
+
   const { data, error } = await supabase
     .from("filter_years")
-    .insert({
-      store_id: storeId,
-      model_id,
-      year,
-      slug: slug || null,
-      salla_year_id: salla_year_id || null,
-      sort_order: sort_order ?? null,
-    })
+    .insert(insertData)
     .select()
     .single();
 
@@ -107,27 +105,30 @@ export async function PUT(req: NextRequest) {
   const storeId = await getCurrentStoreId();
 
   if (!storeId) {
-    return NextResponse.json(
-      { error: "UNAUTHORIZED" },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
   const body = await req.json();
   const { id, year, slug, salla_year_id, sort_order } = body || {};
 
   if (!id) {
-    return NextResponse.json(
-      { error: "id is required" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
   }
 
   const update: Record<string, any> = {};
   if (year !== undefined) update.year = year;
   if (slug !== undefined) update.slug = slug;
   if (salla_year_id !== undefined) update.salla_year_id = salla_year_id;
-  if (sort_order !== undefined) update.sort_order = sort_order;
+  if (sort_order !== undefined && sort_order !== null) {
+    update.sort_order = Number(sort_order);
+  }
+
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json(
+      { error: "No fields to update" },
+      { status: 400 },
+    );
+  }
 
   const { data, error } = await supabase
     .from("filter_years")
@@ -157,20 +158,14 @@ export async function DELETE(req: NextRequest) {
   const storeId = await getCurrentStoreId();
 
   if (!storeId) {
-    return NextResponse.json(
-      { error: "UNAUTHORIZED" },
-      { status: 401 },
-    );
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
   const body = await req.json();
   const { id } = body || {};
 
   if (!id) {
-    return NextResponse.json(
-      { error: "id is required" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
   }
 
   const { error } = await supabase
