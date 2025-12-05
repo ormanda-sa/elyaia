@@ -4,6 +4,12 @@ import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*", // أو حط دومينك بدل النجمة لو حاب
+  "Access-Control-Allow-Methods": "GET,OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
 export async function GET(
   _req: NextRequest,
   context: { params: Promise<{ storeId: string }> },
@@ -14,7 +20,10 @@ export async function GET(
   if (!storeId) {
     return NextResponse.json(
       { error: "store_id is required" },
-      { status: 400 },
+      {
+        status: 400,
+        headers: CORS_HEADERS,
+      },
     );
   }
 
@@ -25,7 +34,10 @@ export async function GET(
     console.error("[WIDGET_DATA_ENV_ERROR] Missing Supabase env vars");
     return NextResponse.json(
       { error: "Supabase env vars are missing" },
-      { status: 500 },
+      {
+        status: 500,
+        headers: CORS_HEADERS,
+      },
     );
   }
 
@@ -44,7 +56,10 @@ export async function GET(
       console.error("[WIDGET_DATA_NOT_FOUND]", error);
       return NextResponse.json(
         { error: "Snapshot not found" },
-        { status: 404 },
+        {
+          status: 404,
+          headers: CORS_HEADERS,
+        },
       );
     }
 
@@ -53,6 +68,7 @@ export async function GET(
     return new NextResponse(JSON.stringify(payload), {
       status: 200,
       headers: {
+        ...CORS_HEADERS,
         "Content-Type": "application/json; charset=utf-8",
         "Cache-Control": "s-maxage=300, stale-while-revalidate=600",
       },
@@ -61,7 +77,18 @@ export async function GET(
     console.error("[WIDGET_DATA_UNEXPECTED]", err);
     return NextResponse.json(
       { error: "Internal Server Error" },
-      { status: 500 },
+      {
+        status: 500,
+        headers: CORS_HEADERS,
+      },
     );
   }
+}
+
+// معالجة preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: CORS_HEADERS,
+  });
 }
