@@ -347,6 +347,24 @@ export async function GET(_req: NextRequest) {
           setFieldError(section, !sectionId);
         }
 
+        // زر البحث: حالة "جاري التحميل..."
+        function setButtonLoading(isLoading) {
+          if (!filterBtn) return;
+          if (isLoading) {
+            if (!filterBtn.dataset.originalText) {
+              filterBtn.dataset.originalText = filterBtn.innerHTML;
+            }
+            filterBtn.disabled = true;
+            filterBtn.innerHTML = "جاري التحميل...";
+          } else {
+            var original = filterBtn.dataset.originalText;
+            if (original) {
+              filterBtn.innerHTML = original;
+            }
+            updateFilterButtonState();
+          }
+        }
+
         function initChoices(selectEl, placeholder) {
           return new Choices(selectEl, {
             searchEnabled: true,
@@ -774,100 +792,108 @@ export async function GET(_req: NextRequest) {
             return;
           }
 
-          var brandObj =
-            brands.find(function (b) {
-              return String(b.id) === String(brandId);
-            }) || null;
+          // هنا نفعّل "جاري التحميل..."
+          setButtonLoading(true);
 
-          var modelRow =
-            models.find(function (m) {
-              return String(m.id) === String(modelId);
-            }) || null;
+          try {
+            var brandObj =
+              brands.find(function (b) {
+                return String(b.id) === String(brandId);
+              }) || null;
 
-          var carSlug =
-            (modelRow && modelRow.slug) ||
-            (brandObj && brandObj.slug) ||
-            "قطع-غيار";
+            var modelRow =
+              models.find(function (m) {
+                return String(m.id) === String(modelId);
+              }) || null;
 
-          var yearRow =
-            years.find(function (y) {
-              return String(y.id) === String(yearId);
-            }) || null;
+            var carSlug =
+              (modelRow && modelRow.slug) ||
+              (brandObj && brandObj.slug) ||
+              "قطع-غيار";
 
-          var sectionRow =
-            sections.find(function (s) {
-              return String(s.id) === String(sectionId);
-            }) || null;
+            var yearRow =
+              years.find(function (y) {
+                return String(y.id) === String(yearId);
+              }) || null;
 
-          var sallaCompanyId  = (brandObj && brandObj.salla_company_id) || brandId;
-          var sallaCategoryId = (modelRow && modelRow.salla_category_id) || modelId;
-          var sallaYearId     = (yearRow && yearRow.salla_year_id) || yearId;
-          var sallaSectionId  = (sectionRow && sectionRow.salla_section_id) || sectionId;
+            var sectionRow =
+              sections.find(function (s) {
+                return String(s.id) === String(sectionId);
+              }) || null;
 
-          var selectedKeywordIds = partsChoices.getValue(true) || [];
-          if (!Array.isArray(selectedKeywordIds)) {
-            selectedKeywordIds = [selectedKeywordIds];
-          }
+            var sallaCompanyId  = (brandObj && brandObj.salla_company_id) || brandId;
+            var sallaCategoryId = (modelRow && modelRow.salla_category_id) || modelId;
+            var sallaYearId     = (yearRow && yearRow.salla_year_id) || yearId;
+            var sallaSectionId  = (sectionRow && sectionRow.salla_section_id) || sectionId;
 
-          var keywordIdsNumeric = selectedKeywordIds
-            .map(function (v) { return Number(v); })
-            .filter(function (v) { return !Number.isNaN(v); });
-
-          var keywordLabels = [];
-          keywordIdsNumeric.forEach(function (id) {
-            var k = (keywords || []).find(function (kw) {
-              return Number(kw.id) === id;
-            });
-            if (k) {
-              keywordLabels.push(k.name_ar || k.slug || ("#" + k.id));
+            var selectedKeywordIds = partsChoices.getValue(true) || [];
+            if (!Array.isArray(selectedKeywordIds)) {
+              selectedKeywordIds = [selectedKeywordIds];
             }
-          });
 
-          var keywordParam = "";
-          if (keywordLabels.length) {
-            keywordParam = encodeURIComponent(keywordLabels.join("||"));
+            var keywordIdsNumeric = selectedKeywordIds
+              .map(function (v) { return Number(v); })
+              .filter(function (v) { return !Number.isNaN(v); });
+
+            var keywordLabels = [];
+            keywordIdsNumeric.forEach(function (id) {
+              var k = (keywords || []).find(function (kw) {
+                return Number(kw.id) === id;
+              });
+              if (k) {
+                keywordLabels.push(k.name_ar || k.slug || ("#" + k.id));
+              }
+            });
+
+            var keywordParam = "";
+            if (keywordLabels.length) {
+              keywordParam = encodeURIComponent(keywordLabels.join("||"));
+            }
+
+            var domain = await resolveStoreDomain(storeId);
+
+            var url =
+              domain +
+              "/category/" +
+              encodeURIComponent(carSlug) +
+              "?filters[company]=" +
+              encodeURIComponent(sallaCompanyId) +
+              "&filters[category]=" +
+              encodeURIComponent(sallaCategoryId) +
+              "&filters[category_id]=" +
+              encodeURIComponent(sallaYearId) +
+              "&filters[brand_id]=" +
+              encodeURIComponent(sallaSectionId);
+
+            if (keywordParam) {
+              url += "&keyword=" + keywordParam;
+            }
+
+            var brandNumeric   = Number(brandId);
+            var modelNumeric   = Number(modelId);
+            var yearNumeric    = Number(yearId);
+            var sectionNumeric = Number(sectionId);
+
+            logFilterEvent({
+              event_type: "search_submit",
+              brand_id:   !Number.isNaN(brandNumeric)   ? brandNumeric   : null,
+              model_id:   !Number.isNaN(modelNumeric)   ? modelNumeric   : null,
+              year_id:    !Number.isNaN(yearNumeric)    ? yearNumeric    : null,
+              section_id: !Number.isNaN(sectionNumeric) ? sectionNumeric : null,
+              keyword_ids: keywordIdsNumeric,
+              meta: {
+                page_url: window.location.href,
+                target_url: url,
+                has_keywords: keywordIdsNumeric.length > 0,
+                keyword_labels: keywordLabels,
+              },
+            });
+
+            window.location.href = url;
+          } catch (err) {
+            console.error("[widgets.js] search click error:", err);
+            setButtonLoading(false);
           }
-
-          var domain = await resolveStoreDomain(storeId);
-
-          var url =
-            domain +
-            "/category/" +
-            encodeURIComponent(carSlug) +
-            "?filters[company]=" +
-            encodeURIComponent(sallaCompanyId) +
-            "&filters[category]=" +
-            encodeURIComponent(sallaCategoryId) +
-            "&filters[category_id]=" +
-            encodeURIComponent(sallaYearId) +
-            "&filters[brand_id]=" +
-            encodeURIComponent(sallaSectionId);
-
-          if (keywordParam) {
-            url += "&keyword=" + keywordParam;
-          }
-
-          var brandNumeric   = Number(brandId);
-          var modelNumeric   = Number(modelId);
-          var yearNumeric    = Number(yearId);
-          var sectionNumeric = Number(sectionId);
-
-          logFilterEvent({
-            event_type: "search_submit",
-            brand_id:   !Number.isNaN(brandNumeric)   ? brandNumeric   : null,
-            model_id:   !Number.isNaN(modelNumeric)   ? modelNumeric   : null,
-            year_id:    !Number.isNaN(yearNumeric)    ? yearNumeric    : null,
-            section_id: !Number.isNaN(sectionNumeric) ? sectionNumeric : null,
-            keyword_ids: keywordIdsNumeric,
-            meta: {
-              page_url: window.location.href,
-              target_url: url,
-              has_keywords: keywordIdsNumeric.length > 0,
-              keyword_labels: keywordLabels,
-            },
-          });
-
-          window.location.href = url;
         });
 
         var countEl = wrap.querySelector("#countUp");
