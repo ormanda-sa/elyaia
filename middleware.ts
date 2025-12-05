@@ -4,34 +4,40 @@ import { NextResponse } from "next/server";
 
 const ADMIN_SESSION_COOKIE = "gm_admin_session";
 
-const allowedOrigins = [
-  "http://localhost:3000",      // التطوير
-  "https://elyaia.vercel.app",  // البرودكشن
-];
-
 export function middleware(req: NextRequest) {
   const { nextUrl, cookies } = req;
   const pathname = nextUrl.pathname;
-  const origin = req.headers.get("origin") || "";
 
   const isAdminArea = pathname.startsWith("/general-manager");
   const isWidgetApi = pathname.startsWith("/api/widget");
 
-  // 🟡 أولاً: تعامل مع preflight للـ CORS على /api/widget/*
-  if (isWidgetApi && req.method === "OPTIONS") {
-    const res = new NextResponse(null, { status: 200 });
+  // ===================== CORS لـ /api/widget/* =====================
+  if (isWidgetApi) {
+    const origin = req.headers.get("origin") || "*";
 
-    if (allowedOrigins.includes(origin)) {
-      res.headers.set("Access-Control-Allow-Origin", origin);
+    const corsHeaders: Record<string, string> = {
+      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, x-widget-secret",
+    };
+
+    // طلبات الـ preflight (OPTIONS)
+    if (req.method === "OPTIONS") {
+      return new NextResponse(null, {
+        status: 204,
+        headers: corsHeaders,
+      });
     }
-    res.headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    res.headers.set("Vary", "Origin");
 
+    // باقي الطلبات (GET / POST) نعديها مع هيدرات CORS
+    const res = NextResponse.next();
+    for (const [key, value] of Object.entries(corsHeaders)) {
+      res.headers.set(key, value);
+    }
     return res;
   }
 
-  // 🔒 ثانياً: منطق الـ admin حقك كما هو
+  // ===================== حماية لوحة المدير العام =====================
   if (isAdminArea) {
     const sessionToken = cookies.get(ADMIN_SESSION_COOKIE)?.value;
 
@@ -43,28 +49,15 @@ export function middleware(req: NextRequest) {
       );
       return NextResponse.redirect(loginUrl);
     }
+
+    return NextResponse.next();
   }
 
-  // 🟢 باقي الطلبات تمشي عادي
-  const res = NextResponse.next();
-
-  // نضيف CORS على ردود /api/widget/*
-  if (isWidgetApi) {
-    if (allowedOrigins.includes(origin)) {
-      res.headers.set("Access-Control-Allow-Origin", origin);
-      res.headers.set("Vary", "Origin");
-    }
-    res.headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  }
-
-  return res;
+  // باقي المسارات ما نلمسها
+  return NextResponse.next();
 }
 
-// هنا خلى الـ middleware يشتغل على المسارين معًا
+// نخلي الميدل وير يشتغل على المسارين
 export const config = {
-  matcher: [
-    "/general-manager/:path*",
-    "/api/widget/:path*",
-  ],
+  matcher: ["/general-manager/:path*", "/api/widget/:path*"],
 };
