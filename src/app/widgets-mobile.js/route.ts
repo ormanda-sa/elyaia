@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets-mobile.js — Advanced Car Picker (DB-based, no Firestore)
+// widgets-mobile.js — Darb Advanced Car Picker (DB-based, same logic as widgets.js)
 (function () {
   try {
     var script =
@@ -179,122 +179,23 @@ export async function GET(_req: NextRequest) {
       var buttonLabel =
         typeof cfg.label === "string" ? cfg.label : "اختيار السيارة";
 
-      // بديل SECTION_TREE من Firestore → نبنيه من API قاعدة البيانات
-      var SECTION_TREE = {};
-      var CATEGORIES = [];
+      // نفس اللي في widgets.js لكن في بوب أب
+      var brands = [];
+      var models = [];
+      var years = [];
+      var sections = [];
+      var keywords = [];
 
-      async function loadData() {
-        SECTION_TREE = {};
-        CATEGORIES = [];
+      var state = {
+        brand: null,  // = brandObj من API
+        type: null,   // = modelRow (car)
+        model: null,  // = yearRow
+        section: null,
+        options: [],  // أسماء القطع المختارة (labels)
+      };
+      var step = 0;
 
-        var allSections = await loadSections(storeId);
-        var brands = await loadBrands(storeId);
-
-        for (var i = 0; i < brands.length; i++) {
-          var b = brands[i];
-          var brandKey = String(b.id);
-
-          var brandNode = {
-            _meta: {
-              id: b.id,
-              slug: (b.slug || "").trim(),
-              name: b.name_ar || b.name || "",
-              carOrder: [],
-            },
-          };
-
-          SECTION_TREE[brandKey] = brandNode;
-
-          var brandObj = {
-            id: b.id,
-            slug: (b.slug || "").trim(),
-            name: b.name_ar || b.name || "",
-            children: [],
-          };
-
-          var models = await loadModels(storeId, b.id);
-
-          for (var j = 0; j < models.length; j++) {
-            var m = models[j];
-            var carKey = String(m.id);
-
-            var carMeta = {
-              id: m.id,
-              slug: (m.slug || "").trim(),
-              name: m.name_ar || m.name || "",
-            };
-
-            var years = await loadYears(storeId, m.id);
-            var yearsArr = (years || []).map(function (yr) {
-              return {
-                id: yr.id,
-                name: String(yr.year),
-                slug: (yr.slug || "").trim(),
-              };
-            });
-
-            var mappedSections = (allSections || []).map(function (s) {
-              return {
-                id: s.id,
-                slug: (s.slug || "").trim(),
-                name: s.name_ar || s.name || "",
-                options: [], // نملأها لاحقاً من /keywords
-              };
-            });
-
-            brandNode[carKey] = {
-              _meta: carMeta,
-              years: yearsArr,
-              sections: mappedSections,
-            };
-
-            var carObj = {
-              id: carMeta.id,
-              slug: carMeta.slug,
-              name: carMeta.name,
-              children: yearsArr.slice(),
-            };
-
-            carObj.__brandKey = brandKey;
-            carObj.__carKey = carKey;
-
-            brandObj.children.push(carObj);
-          }
-
-          CATEGORIES.push(brandObj);
-        }
-      }
-
-      function getRawCarNode(selectedType) {
-        if (
-          !selectedType ||
-          !selectedType.__brandKey ||
-          !selectedType.__carKey
-        )
-          return null;
-        var brandNode = SECTION_TREE[selectedType.__brandKey];
-        if (!brandNode) return null;
-        var carNode = brandNode[selectedType.__carKey];
-        return carNode && carNode._meta ? carNode : null;
-      }
-
-      function getSectionsOfSelectedCar() {
-        var rawCar = getRawCarNode(state.type);
-        var secs = Array.isArray(rawCar && rawCar.sections)
-          ? rawCar.sections
-          : [];
-        return secs.map(function (s) {
-          return {
-            id: s.id,
-            slug: s.slug,
-            name: s.name,
-            options: Array.isArray(s.options) ? s.options.slice() : [],
-          };
-        });
-      }
-
-      // ============ UI + منطق (نفس سكربت اختيار السيارة) ============
-
+      // زر الفتح — نفس اللي عندك
       var openBtn = document.createElement("button");
       openBtn.className = "popup-open-btn";
 
@@ -311,6 +212,7 @@ export async function GET(_req: NextRequest) {
 
       document.body.appendChild(openBtn);
 
+      // البوب أب نفس الكود تبعك
       var popup = document.createElement("div");
       popup.className = "fullpage-popup";
       popup.innerHTML =
@@ -327,15 +229,6 @@ export async function GET(_req: NextRequest) {
         '<button class="popup-confirm" style="display:none">تأكيد</button>' +
         "</div>";
       document.body.appendChild(popup);
-
-      var state = {
-        brand: null,
-        type: null,
-        model: null,
-        section: null,
-        options: [],
-      };
-      var step = 0;
 
       var backBtn = popup.querySelector(".popup-back");
       var closeBtn = popup.querySelector(".popup-close");
@@ -391,6 +284,25 @@ export async function GET(_req: NextRequest) {
         );
       }
 
+      function setPlaceholder(text) {
+        listDiv.innerHTML =
+          '<button disabled style="opacity:.7;border:none;background:#f3f4f6;border-radius:999px;padding:8px 12px;margin-top:16px;">' +
+          text +
+          "</button>";
+      }
+
+      function renderBreadcrumbs() {
+        crumbs.innerHTML = "";
+        if (state.brand)
+          crumbs.innerHTML += "🏢 " + (state.brand.name_ar || state.brand.name || "—") + " / ";
+        if (state.type)
+          crumbs.innerHTML += (state.type.name_ar || state.type.name || "—") + " / ";
+        if (state.model)
+          crumbs.innerHTML += (String(state.model.year) || state.model.name || "—") + " / ";
+        if (state.section)
+          crumbs.innerHTML += (state.section.name_ar || state.section.name || "—") + " / ";
+      }
+
       function renderStep(newStep) {
         step = newStep;
         setProgressBar(step);
@@ -399,103 +311,171 @@ export async function GET(_req: NextRequest) {
         confirmBtn.style.display = "none";
         selectedOptionsDiv.style.display = "none";
         selectedOptionsDiv.innerHTML = "";
-        crumbs.innerHTML = "";
-
-        if (state.brand)
-          crumbs.innerHTML += "🏢 " + (state.brand.name || "—") + " / ";
-        if (state.type) crumbs.innerHTML += (state.type.name || "—") + " / ";
-        if (state.model) crumbs.innerHTML += (state.model.name || "—") + " / ";
-        if (state.section)
-          crumbs.innerHTML += (state.section.name || "—") + " / ";
+        renderBreadcrumbs();
 
         if (step === 0) {
-          CATEGORIES.forEach(function (brand) {
+          if (!brands.length) {
+            setPlaceholder("لا توجد ماركات متاحة حالياً");
+            return;
+          }
+          brands.forEach(function (brand) {
             var btn = document.createElement("button");
-            btn.textContent = brand.name || "—";
+            btn.textContent = brand.name_ar || brand.name || "—";
             if (state.brand && state.brand.id === brand.id)
               btn.className = "selected";
-            btn.onclick = function () {
+            btn.onclick = async function () {
               state.brand = brand;
               state.type = null;
               state.model = null;
               state.section = null;
               state.options = [];
-              renderStep(1);
+              models = [];
+              years = [];
+              sections = [];
+              keywords = [];
+              renderBreadcrumbs();
+
+              setPlaceholder("جاري تحميل الموديلات...");
+              try {
+                models = await loadModels(storeId, brand.id);
+              } catch (_) {
+                models = [];
+              }
+              if (!models.length) {
+                setPlaceholder("لا توجد موديلات لهذه الماركة");
+              } else {
+                renderStep(1);
+              }
             };
             listDiv.appendChild(btn);
           });
         } else if (step === 1) {
-          (state.brand && state.brand.children ? state.brand.children : []).forEach(
-            function (type) {
-              var btn = document.createElement("button");
-              btn.textContent = type.name;
-              if (state.type && state.type.id === type.id)
-                btn.className = "selected";
-              btn.onclick = function () {
-                state.type = type;
-                state.model = null;
-                state.section = null;
-                state.options = [];
-                renderStep(2);
-              };
-              listDiv.appendChild(btn);
-            }
-          );
-        } else if (step === 2) {
-          (state.type && state.type.children ? state.type.children : []).forEach(
-            function (model) {
-              var btn = document.createElement("button");
-              btn.textContent = model.name;
-              if (state.model && state.model.id === model.id)
-                btn.className = "selected";
-              btn.onclick = function () {
-                state.model = model;
-                state.section = null;
-                state.options = [];
-                renderStep(3);
-              };
-              listDiv.appendChild(btn);
-            }
-          );
-        } else if (step === 3) {
-          var sections = getSectionsOfSelectedCar();
-          sections.forEach(function (section) {
+          if (!models.length) {
+            setPlaceholder("لا توجد موديلات متاحة");
+            return;
+          }
+          models.forEach(function (m) {
             var btn = document.createElement("button");
-            btn.textContent = section.name;
-            if (state.section && state.section.id === section.id)
+            btn.textContent = m.name_ar || m.name || "—";
+            if (state.type && state.type.id === m.id)
               btn.className = "selected";
-
             btn.onclick = async function () {
-              state.section = section;
+              state.type = m;
+              state.model = null;
+              state.section = null;
               state.options = [];
+              years = [];
+              sections = [];
+              keywords = [];
+              renderBreadcrumbs();
 
-              try {
-                var brandId = state.brand.id;
-                var modelId = state.type.id;
-                var yearId = state.model.id;
-                var sectionId = section.id;
-
-                var kws = await loadKeywords(
-                  storeId,
-                  brandId,
-                  modelId,
-                  yearId,
-                  sectionId
-                );
-
-                section.options = (kws || []).map(function (k) {
-                  return k.name_ar || k.slug || ("#" + k.id);
+              var modelNumeric = Number(m.id);
+              if (!Number.isNaN(modelNumeric)) {
+                logFilterEvent({
+                  event_type: "model_select_popup",
+                  model_id: modelNumeric,
                 });
-              } catch (e) {
-                section.options = [];
               }
 
+              setPlaceholder("جاري تحميل السنوات...");
+              try {
+                years = await loadYears(storeId, m.id);
+              } catch (_) {
+                years = [];
+              }
+              if (!years.length) {
+                setPlaceholder("لا توجد سنوات لهذا الموديل");
+              } else {
+                renderStep(2);
+              }
+            };
+            listDiv.appendChild(btn);
+          });
+        } else if (step === 2) {
+          if (!years.length) {
+            setPlaceholder("لا توجد سنوات متاحة");
+            return;
+          }
+          years.forEach(function (y) {
+            var btn = document.createElement("button");
+            btn.textContent = String(y.year || y.name);
+            if (state.model && state.model.id === y.id)
+              btn.className = "selected";
+            btn.onclick = async function () {
+              state.model = y;
+              state.section = null;
+              state.options = [];
+              sections = [];
+              keywords = [];
+              renderBreadcrumbs();
+
+              var yearNumeric = Number(y.id);
+              if (!Number.isNaN(yearNumeric)) {
+                logFilterEvent({
+                  event_type: "year_select_popup",
+                  year_id: yearNumeric,
+                });
+              }
+
+              setPlaceholder("جاري تحميل الأقسام...");
+              try {
+                sections = await loadSections(storeId);
+              } catch (_) {
+                sections = [];
+              }
+              if (!sections.length) {
+                setPlaceholder("لا توجد أقسام متاحة");
+              } else {
+                renderStep(3);
+              }
+            };
+            listDiv.appendChild(btn);
+          });
+        } else if (step === 3) {
+          if (!sections.length) {
+            setPlaceholder("لا توجد أقسام متاحة");
+            return;
+          }
+          sections.forEach(function (sec) {
+            var btn = document.createElement("button");
+            btn.textContent = sec.name_ar || sec.name || "—";
+            if (state.section && state.section.id === sec.id)
+              btn.className = "selected";
+            btn.onclick = async function () {
+              state.section = sec;
+              state.options = [];
+              keywords = [];
+              renderBreadcrumbs();
+
+              var sectionNumeric = Number(sec.id);
+              if (!Number.isNaN(sectionNumeric)) {
+                logFilterEvent({
+                  event_type: "section_select_popup",
+                  section_id: sectionNumeric,
+                });
+              }
+
+              setPlaceholder("جاري تحميل القطع...");
+              try {
+                keywords = await loadKeywords(
+                  storeId,
+                  state.brand.id,
+                  state.type.id,
+                  state.model.id,
+                  sec.id
+                );
+              } catch (_) {
+                keywords = [];
+              }
+              if (!keywords.length) {
+                setPlaceholder("لا توجد كلمات/قطع لهذا القسم، يمكنك تأكيد البحث مباشرة.");
+              }
               renderStep(4);
             };
-
             listDiv.appendChild(btn);
           });
         } else if (step === 4) {
+          // اختيار القطع (اختياري)
           selectedOptionsDiv.style.display = "flex";
           confirmBtn.style.display = "block";
           selectedOptionsDiv.innerHTML = "";
@@ -516,20 +496,19 @@ export async function GET(_req: NextRequest) {
             selectedOptionsDiv.appendChild(tag);
           });
 
-          var options = Array.isArray(state.section && state.section.options)
-            ? state.section.options
-            : [];
-          options.forEach(function (option) {
+          listDiv.innerHTML = "";
+          (keywords || []).forEach(function (k) {
+            var label = k.name_ar || k.slug || ("#" + k.id);
             var btn = document.createElement("button");
-            btn.textContent = option;
+            btn.textContent = label;
             btn.className =
-              state.options.indexOf(option) >= 0 ? "selected" : "";
+              state.options.indexOf(label) >= 0 ? "selected" : "";
             btn.onclick = function () {
-              if (state.options.indexOf(option) < 0) {
-                if (state.options.length < maxParts) state.options.push(option);
+              if (state.options.indexOf(label) < 0) {
+                if (state.options.length < maxParts) state.options.push(label);
               } else {
                 state.options = state.options.filter(function (x) {
-                  return x !== option;
+                  return x !== label;
                 });
               }
               renderStep(4);
@@ -538,82 +517,81 @@ export async function GET(_req: NextRequest) {
           });
 
           confirmBtn.onclick = async function () {
-            var carNodeRaw = getRawCarNode(state.type);
-            var carMeta = (carNodeRaw && carNodeRaw._meta) || {};
-            var yearNode = state.model;
-            var sectionObj = state.section;
-            var brandMeta = state.brand || {};
+            var brandObj = state.brand;
+            var modelRow = state.type;
+            var yearRow = state.model;
+            var sectionRow = state.section;
 
-            if (
-              !brandMeta.id ||
-              !carMeta.id ||
-              !carMeta.slug ||
-              !yearNode ||
-              !yearNode.id ||
-              !sectionObj ||
-              !sectionObj.id
-            ) {
-              alert(
-                "ناقص معرّفات: تأكد من اختيار الشركة والسيارة والسنة والقسم وأن الـ slug موجود."
-              );
+            if (!brandObj || !modelRow || !yearRow || !sectionRow) {
+              alert("حدد جميع الخيارات أولاً");
               return;
             }
 
-            var companyId = brandMeta.id;
-            var carSlug = (carMeta.slug || "").trim();
-            var categoryId = carMeta.id;
-            var modelId = yearNode.id;
-            var sectionId = sectionObj.id;
+            var carSlug =
+              (modelRow && modelRow.slug) ||
+              (brandObj && brandObj.slug) ||
+              "قطع-غيار";
+
+            var sallaCompanyId =
+              (brandObj && brandObj.salla_company_id) || brandObj.id;
+            var sallaCategoryId =
+              (modelRow && modelRow.salla_category_id) || modelRow.id;
+            var sallaYearId =
+              (yearRow && yearRow.salla_year_id) || yearRow.id;
+            var sallaSectionId =
+              (sectionRow && sectionRow.salla_section_id) || sectionRow.id;
+
+            var keywordLabels = (state.options || []).slice();
+            var keywordParam = "";
+            if (keywordLabels.length) {
+              keywordParam = encodeURIComponent(keywordLabels.join("||"));
+            }
+
+            var domain = await resolveStoreDomain(storeId);
 
             var url =
-              targetDomain +
+              domain +
               "/category/" +
               encodeURIComponent(carSlug) +
               "?filters[company]=" +
-              encodeURIComponent(companyId) +
+              encodeURIComponent(sallaCompanyId) +
               "&filters[category]=" +
-              encodeURIComponent(categoryId) +
+              encodeURIComponent(sallaCategoryId) +
               "&filters[category_id]=" +
-              encodeURIComponent(modelId) +
+              encodeURIComponent(sallaYearId) +
               "&filters[brand_id]=" +
-              encodeURIComponent(sectionId);
+              encodeURIComponent(sallaSectionId);
 
-            if (state.options && state.options.length) {
-              url +=
-                "&keyword=" + encodeURIComponent(state.options.join("||"));
+            if (keywordParam) {
+              url += "&keyword=" + keywordParam;
             }
 
-            if (url.indexOf("undefinedhttps://") === 0) {
-              url = url.replace("undefined", "");
-            }
+            var brandNumeric = Number(brandObj.id);
+            var modelNumeric = Number(modelRow.id);
+            var yearNumeric = Number(yearRow.id);
+            var sectionNumeric = Number(sectionRow.id);
 
-            try {
-              var brandNumeric = Number(companyId);
-              var modelNumeric = Number(categoryId);
-              var yearNumeric = Number(modelId);
-              var sectionNumeric = Number(sectionId);
-
-              logFilterEvent({
-                event_type: "search_submit_popup",
-                brand_id: !Number.isNaN(brandNumeric) ? brandNumeric : null,
-                model_id: !Number.isNaN(modelNumeric) ? modelNumeric : null,
-                year_id: !Number.isNaN(yearNumeric) ? yearNumeric : null,
-                section_id: !Number.isNaN(sectionNumeric) ? sectionNumeric : null,
-                keyword_ids: [],
-                meta: {
-                  page_url: window.location.href,
-                  target_url: url,
-                  from: "advanced_popup",
-                  has_keywords: state.options && state.options.length > 0,
-                  keyword_labels: state.options.slice(),
-                },
-              });
-            } catch (e) {}
+            logFilterEvent({
+              event_type: "search_submit_popup",
+              brand_id: !Number.isNaN(brandNumeric) ? brandNumeric : null,
+              model_id: !Number.isNaN(modelNumeric) ? modelNumeric : null,
+              year_id: !Number.isNaN(yearNumeric) ? yearNumeric : null,
+              section_id: !Number.isNaN(sectionNumeric) ? sectionNumeric : null,
+              keyword_ids: [],
+              meta: {
+                page_url: window.location.href,
+                target_url: url,
+                from: "advanced_popup",
+                has_keywords: keywordLabels.length > 0,
+                keyword_labels: keywordLabels,
+              },
+            });
 
             window.location.href = url;
           };
         }
 
+        // فلتر البحث في القائمة الحالية
         searchInput.oninput = function () {
           var val = this.value.trim();
           Array.prototype.forEach.call(listDiv.children, function (btn) {
@@ -621,14 +599,13 @@ export async function GET(_req: NextRequest) {
               !val || btn.textContent.indexOf(val) !== -1 ? "" : "none";
           });
         };
-
-        backBtn.style.display = step > 0 ? "" : "none";
       }
 
       openBtn.onclick = function () {
         openBtn.disabled = true;
         openBtn.textContent = "جار التحميل...";
         popup.classList.add("active");
+
         state = {
           brand: null,
           type: null,
@@ -636,16 +613,27 @@ export async function GET(_req: NextRequest) {
           section: null,
           options: [],
         };
-        loadData()
-          .then(function () {
-            renderStep(0);
+        brands = [];
+        models = [];
+        years = [];
+        sections = [];
+        keywords = [];
+        step = 0;
+        setPlaceholder("جاري تحميل الماركات...");
+
+        // مثل widgets.js: نجيب الماركات أولاً وبعدين نمشي step by step
+        loadBrands(storeId)
+          .then(function (b) {
+            brands = b || [];
+            if (!brands.length) {
+              setPlaceholder("لا توجد ماركات متاحة");
+            } else {
+              renderStep(0);
+            }
           })
           .catch(function (e) {
-            console.error(e);
-            alert(
-              "تعذر تحميل البيانات من /api/widget — تأكد من الإعدادات."
-            );
-            renderStep(0);
+            console.error("[widgets-mobile.js] loadBrands error:", e);
+            setPlaceholder("خطأ في تحميل الماركات");
           })
           .finally(function () {
             openBtn.disabled = false;
@@ -682,7 +670,7 @@ export async function GET(_req: NextRequest) {
       };
     }
 
-    // نشغله مباشرة على أي صفحة يتم تضمينه فيها
+    // نشغل بوب أب الجوال مباشرة
     buildAdvancedSearchButton({ config: {} });
 
   } catch (err) {
@@ -692,7 +680,8 @@ export async function GET(_req: NextRequest) {
 `;
 
   return new NextResponse(js, {
-    status: 200,
+    status:
+ 200,
     headers: {
       "content-type": "text/javascript; charset=utf-8",
       "cache-control": "no-store",
