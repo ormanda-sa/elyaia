@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets.js — Darb Filter Hero (stable + events)
+// widgets.js — Darb Filter Hero (stable + events + mobile popup)
 (function () {
   try {
     var script =
@@ -68,7 +68,6 @@ export async function GET(_req: NextRequest) {
     async function fetchJson(url, options) {
       var res = await fetch(url, {
         headers: { "Content-Type": "application/json" },
-        // لا نرسل كوكيز عشان نخفف مشاكل CORS
         credentials: "omit",
         ...(options || {}),
       });
@@ -203,6 +202,493 @@ export async function GET(_req: NextRequest) {
       }
     }
 
+    // =========== بوب اب للجوال ======= ADVANCED CAR PICKER (BUTTON + FULLSCREEN POPUP) ==================
+    function buildAdvancedSearchButton(widget) {
+      var cfg = widget.config || {};
+      var firestore = cfg.firestore || {};
+      var searchCfg = cfg.search || {};
+      var pos = cfg.position || {};
+
+      var projectId = firestore.projectId || "spare-parts-project-55319";
+      var apiKey =
+        firestore.apiKey || "AIzaSyB0qGrqutUtkFHKnyy7F73kyiDfcQhsDc";
+      var metaDoc = firestore.metaDoc || "SECTION_OPTIONS";
+
+      var maxParts = Number(searchCfg.maxParts || 5);
+      var targetDomain = (searchCfg.targetDomain || "https://darb.com.sa").replace(
+        /\/+$/,
+        ""
+      );
+
+      var buttonLabel =
+        typeof cfg.label === "string" ? cfg.label : "اختيار السيارة";
+
+      var base =
+        "https://firestore.googleapis.com/v1/projects/" +
+        projectId +
+        "/databases/(default)/documents/meta";
+      var docUrl = function (name) {
+        return base + "/" + name + "?key=" + apiKey;
+      };
+
+      function fromFsValue(v) {
+        if (!v) return null;
+        if ("stringValue" in v) return v.stringValue;
+        if ("integerValue" in v) return parseInt(v.integerValue, 10);
+        if ("doubleValue" in v) return v.doubleValue;
+        if ("booleanValue" in v) return !!v.booleanValue;
+        if ("nullValue" in v) return null;
+        if ("arrayValue" in v)
+          return (v.arrayValue.values || []).map(fromFsValue);
+        if ("mapValue" in v) {
+          var out = {};
+          var f = v.mapValue.fields || {};
+          for (var k in f) out[k] = fromFsValue(f[k]);
+          return out;
+        }
+        return v;
+      }
+
+      async function getDoc(name) {
+        var r = await fetch(docUrl(name));
+        if (!r.ok) throw new Error(name + ": " + r.status + " " + (await r.text()));
+        var j = await r.json();
+        return fromFsValue(j.fields && j.fields.value);
+      }
+
+      var SECTION_TREE = {};
+      var CATEGORIES = [];
+
+      async function loadData() {
+        var tree = await getDoc(metaDoc);
+        SECTION_TREE = tree && typeof tree === "object" ? tree : {};
+
+        var cats = [];
+        var entries = Object.entries(SECTION_TREE);
+        for (var i = 0; i < entries.length; i++) {
+          var brandKey = entries[i][0];
+          var brandNode = entries[i][1];
+          if (!brandNode || !brandNode._meta) continue;
+
+          var b = brandNode._meta;
+          var brandObj = {
+            id: b.id,
+            slug: (b.slug || "").trim(),
+            name: b.name,
+            children: [],
+          };
+
+          var order = Array.isArray(b.carOrder) ? b.carOrder.slice() : [];
+          var mapCarKeys = Object.keys(brandNode).filter(function (k) {
+            return k !== "_meta";
+          });
+          mapCarKeys.forEach(function (k) {
+            if (order.indexOf(k) === -1) order.push(k);
+          });
+
+          for (var j = 0; j < order.length; j++) {
+            var carKey = order[j];
+            var carNode = brandNode[carKey];
+            if (!carNode || !carNode._meta) continue;
+
+            var cm = carNode._meta;
+            var carObj = {
+              id: cm.id,
+              slug: (cm.slug || "").trim(),
+              name: cm.name,
+              children: [],
+            };
+
+            var yearsArr = Array.isArray(carNode.years) ? carNode.years : [];
+            yearsArr.forEach(function (yr) {
+              if (!yr || !yr.id) return;
+              carObj.children.push({
+                id: yr.id,
+                name: yr.name,
+                slug: yr.slug,
+              });
+            });
+
+            carObj.__brandKey = brandKey;
+            carObj.__carKey = carKey;
+
+            brandObj.children.push(carObj);
+          }
+
+          cats.push(brandObj);
+        }
+
+        CATEGORIES = cats;
+      }
+
+      var openBtn = document.createElement("button");
+      openBtn.className = "popup-open-btn";
+
+      if (buttonLabel && buttonLabel.trim()) {
+        openBtn.textContent = buttonLabel;
+      } else {
+        openBtn.innerHTML =
+          '<span class="popup-open-icon" aria-hidden="true">' +
+          '<svg viewBox="0 0 24 24" width="18" height="18">' +
+          '<path fill="currentColor" d="M4 5h16v2H4zm3 6h10v2H7zm3 6h4v2h-4z"></path>' +
+          "</svg>" +
+          "</span>";
+      }
+
+      document.body.appendChild(openBtn);
+
+      var popup = document.createElement("div");
+      popup.className = "fullpage-popup";
+      popup.innerHTML =
+        '<div class="popup-content">' +
+        '<div class="popup-progress"></div>' +
+        '<div class="popup-top-bar">' +
+        '<button class="popup-back" style="display:none">رجوع</button>' +
+        '<input class="popup-search" type="text" placeholder="بحث..." autocomplete="off">' +
+        '<button class="popup-close">×</button>' +
+        "</div>" +
+        '<div class="popup-crumbs"></div>' +
+        '<div class="popup-selected-options"></div>' +
+        '<div class="popup-list"></div>' +
+        '<button class="popup-confirm" style="display:none">تأكيد</button>' +
+        "</div>";
+      document.body.appendChild(popup);
+
+      var state = {
+        brand: null,
+        type: null,
+        model: null,
+        section: null,
+        options: [],
+      };
+      var step = 0;
+
+      var backBtn = popup.querySelector(".popup-back");
+      var closeBtn = popup.querySelector(".popup-close");
+      var searchInput = popup.querySelector(".popup-search");
+      var listDiv = popup.querySelector(".popup-list");
+      var crumbs = popup.querySelector(".popup-crumbs");
+      var confirmBtn = popup.querySelector(".popup-confirm");
+      var selectedOptionsDiv = popup.querySelector(".popup-selected-options");
+      var progressDiv = popup.querySelector(".popup-progress");
+      var stepsList = [
+        { label: "01" },
+        { label: "02" },
+        { label: "03" },
+        { label: "04" },
+        { label: "05" },
+      ];
+
+      function setProgressBar(currentStep) {
+        progressDiv.innerHTML = stepsList
+          .map(function (s, i) {
+            return (
+              '<div class="popup-step' +
+              (i < currentStep ? " done" : "") +
+              (i === currentStep ? " current" : "") +
+              '" data-step="' +
+              i +
+              '" ' +
+              (i < currentStep ? 'tabindex="0"' : "") +
+              ">" +
+              '<span class="step-num">' +
+              s.label +
+              "</span>" +
+              '<span class="checkmark">✓</span>' +
+              "</div>"
+            );
+          })
+          .join("");
+
+        Array.prototype.forEach.call(
+          progressDiv.querySelectorAll(".popup-step.done"),
+          function (el) {
+            el.onclick = function () {
+              var stepIdx = Number(el.getAttribute("data-step"));
+              if (stepIdx < step) {
+                if (stepIdx < 4) state.options = [];
+                if (stepIdx < 3) state.section = null;
+                if (stepIdx < 2) state.model = null;
+                if (stepIdx < 1) state.type = null;
+                renderStep(stepIdx);
+              }
+            };
+          }
+        );
+      }
+
+      function getRawCarNode(selectedType) {
+        if (
+          !selectedType ||
+          !selectedType.__brandKey ||
+          !selectedType.__carKey
+        )
+          return null;
+        var brandNode = SECTION_TREE[selectedType.__brandKey];
+        if (!brandNode) return null;
+        var carNode = brandNode[selectedType.__carKey];
+        return carNode && carNode._meta ? carNode : null;
+      }
+
+      function getSectionsOfSelectedCar() {
+        var rawCar = getRawCarNode(state.type);
+        var secs = Array.isArray(rawCar && rawCar.sections)
+          ? rawCar.sections
+          : [];
+        return secs.map(function (s) {
+          return {
+            id: s.id,
+            slug: s.slug,
+            name: s.name,
+            options: Array.isArray(s.options) ? s.options.slice() : [],
+          };
+        });
+      }
+
+      function renderStep(newStep) {
+        step = newStep;
+        setProgressBar(step);
+        listDiv.innerHTML = "";
+        searchInput.value = "";
+        confirmBtn.style.display = "none";
+        selectedOptionsDiv.style.display = "none";
+        selectedOptionsDiv.innerHTML = "";
+        crumbs.innerHTML = "";
+
+        if (state.brand)
+          crumbs.innerHTML += "🏢 " + (state.brand.name || "—") + " / ";
+        if (state.type) crumbs.innerHTML += (state.type.name || "—") + " / ";
+        if (state.model) crumbs.innerHTML += (state.model.name || "—") + " / ";
+        if (state.section)
+          crumbs.innerHTML += (state.section.name || "—") + " / ";
+
+        if (step === 0) {
+          CATEGORIES.forEach(function (brand) {
+            var btn = document.createElement("button");
+            btn.textContent = brand.name || "—";
+            if (state.brand && state.brand.id === brand.id)
+              btn.className = "selected";
+            btn.onclick = function () {
+              state.brand = brand;
+              state.type = null;
+              state.model = null;
+              state.section = null;
+              state.options = [];
+              renderStep(1);
+            };
+            listDiv.appendChild(btn);
+          });
+        } else if (step === 1) {
+          (state.brand && state.brand.children ? state.brand.children : []).forEach(
+            function (type) {
+              var btn = document.createElement("button");
+              btn.textContent = type.name;
+              if (state.type && state.type.id === type.id)
+                btn.className = "selected";
+              btn.onclick = function () {
+                state.type = type;
+                state.model = null;
+                state.section = null;
+                state.options = [];
+                renderStep(2);
+              };
+              listDiv.appendChild(btn);
+            }
+          );
+        } else if (step === 2) {
+          (state.type && state.type.children ? state.type.children : []).forEach(
+            function (model) {
+              var btn = document.createElement("button");
+              btn.textContent = model.name;
+              if (state.model && state.model.id === model.id)
+                btn.className = "selected";
+              btn.onclick = function () {
+                state.model = model;
+                state.section = null;
+                state.options = [];
+                renderStep(3);
+              };
+              listDiv.appendChild(btn);
+            }
+          );
+        } else if (step === 3) {
+          var sections = getSectionsOfSelectedCar();
+          sections.forEach(function (section) {
+            var btn = document.createElement("button");
+            btn.textContent = section.name;
+            if (state.section && state.section.id === section.id)
+              btn.className = "selected";
+            btn.onclick = function () {
+              state.section = section;
+              state.options = [];
+              renderStep(4);
+            };
+            listDiv.appendChild(btn);
+          });
+        } else if (step === 4) {
+          selectedOptionsDiv.style.display = "flex";
+          confirmBtn.style.display = "block";
+          selectedOptionsDiv.innerHTML = "";
+
+          (state.options || []).forEach(function (opt) {
+            var tag = document.createElement("span");
+            tag.className = "selected-tag";
+            tag.textContent = opt;
+            var remove = document.createElement("button");
+            remove.innerHTML = "×";
+            remove.onclick = function () {
+              state.options = state.options.filter(function (x) {
+                return x !== opt;
+              });
+              renderStep(4);
+            };
+            tag.appendChild(remove);
+            selectedOptionsDiv.appendChild(tag);
+          });
+
+          var options = Array.isArray(state.section && state.section.options)
+            ? state.section.options
+            : [];
+          options.forEach(function (option) {
+            var btn = document.createElement("button");
+            btn.textContent = option;
+            btn.className =
+              state.options.indexOf(option) >= 0 ? "selected" : "";
+            btn.onclick = function () {
+              if (state.options.indexOf(option) < 0) {
+                if (state.options.length < maxParts) state.options.push(option);
+              } else {
+                state.options = state.options.filter(function (x) {
+                  return x !== option;
+                });
+              }
+              renderStep(4);
+            };
+            listDiv.appendChild(btn);
+          });
+
+          confirmBtn.onclick = function () {
+            var carNodeRaw = getRawCarNode(state.type);
+            var carMeta = (carNodeRaw && carNodeRaw._meta) || {};
+            var yearNode = state.model;
+            var sectionObj = state.section;
+            var brandMeta = state.brand || {};
+
+            if (
+              !brandMeta.id ||
+              !carMeta.id ||
+              !carMeta.slug ||
+              !yearNode ||
+              !yearNode.id ||
+              !sectionObj ||
+              !sectionObj.id
+            ) {
+              alert(
+                "ناقص معرّفات: تأكد من اختيار الشركة والسيارة والسنة والقسم وأن الـ slug موجود."
+              );
+              return;
+            }
+
+            var companyId = brandMeta.id;
+            var carSlug = (carMeta.slug || "").trim();
+            var categoryId = carMeta.id;
+            var modelId = yearNode.id;
+            var sectionId = sectionObj.id;
+
+            var url =
+              targetDomain +
+              "/category/" +
+              encodeURIComponent(carSlug) +
+              "?filters[company]=" +
+              encodeURIComponent(companyId) +
+              "&filters[category]=" +
+              encodeURIComponent(categoryId) +
+              "&filters[category_id]=" +
+              encodeURIComponent(modelId) +
+              "&filters[brand_id]=" +
+              encodeURIComponent(sectionId);
+
+            if (state.options && state.options.length) {
+              url +=
+                "&keyword=" + encodeURIComponent(state.options.join("||"));
+            }
+
+            if (url.indexOf("undefinedhttps://") === 0) {
+              url = url.replace("undefined", "");
+            }
+
+            window.location.href = url;
+          };
+        }
+
+        searchInput.oninput = function () {
+          var val = this.value.trim();
+          Array.prototype.forEach.call(listDiv.children, function (btn) {
+            btn.style.display =
+              !val || btn.textContent.indexOf(val) !== -1 ? "" : "none";
+          });
+        };
+
+        backBtn.style.display = step > 0 ? "" : "none";
+      }
+
+      openBtn.onclick = function () {
+        openBtn.disabled = true;
+        openBtn.textContent = "جار التحميل...";
+        popup.classList.add("active");
+        state = {
+          brand: null,
+          type: null,
+          model: null,
+          section: null,
+          options: [],
+        };
+        loadData()
+          .then(function () {
+            renderStep(0);
+          })
+          .catch(function (e) {
+            console.error(e);
+            alert(
+              "تعذر تحميل SECTION_OPTIONS — تأكد من الوثيقة والصلاحيات."
+            );
+            renderStep(0);
+          })
+          .finally(function () {
+            openBtn.disabled = false;
+            openBtn.textContent = buttonLabel || "اختيار السيارة";
+          });
+      };
+
+      closeBtn.onclick = function () {
+        popup.classList.remove("active");
+      };
+
+      backBtn.onclick = function () {
+        if (step === 4) renderStep(3);
+        else if (step === 3) {
+          state.section = null;
+          state.options = [];
+          renderStep(2);
+        } else if (step === 2) {
+          state.model = null;
+          state.section = null;
+          state.options = [];
+          renderStep(1);
+        } else if (step === 1) {
+          state.type = null;
+          state.model = null;
+          state.section = null;
+          state.options = [];
+          renderStep(0);
+        } else popup.classList.remove("active");
+      };
+
+      popup.onclick = function (e) {
+        if (e.target === popup) popup.classList.remove("active");
+      };
+    }
+
     function buildFilterHeroDom(showBranding) {
       (async function () {
         await ensureChoicesAssets();
@@ -252,7 +738,6 @@ export async function GET(_req: NextRequest) {
 
         wrap.innerHTML = html;
 
-        // ==== نركّب الودجت تحت <header> مباشرة ====
         var headerEl = document.querySelector("header");
         if (headerEl && headerEl.parentNode) {
           if (headerEl.nextSibling) {
@@ -261,11 +746,9 @@ export async function GET(_req: NextRequest) {
             headerEl.parentNode.appendChild(wrap);
           }
         } else {
-          // لو ما فيه هيدر لأي سبب، نرجّعه لنهاية البودي زي قبل
           document.body.appendChild(wrap);
         }
 
-        // نحقن CSS بسيط للأخطاء + الزر المقفول
         var styleId = "darb-filter-style";
         if (!document.getElementById(styleId)) {
           var styleEl = document.createElement("style");
@@ -276,7 +759,6 @@ export async function GET(_req: NextRequest) {
           document.head.appendChild(styleEl);
         }
 
-        // إظهار/إخفاء رابط Darb حسب showBranding
         var link = wrap.querySelector("#darb-branding-link");
         if (link) {
           link.style.display = showBranding ? "inline-block" : "none";
@@ -306,7 +788,6 @@ export async function GET(_req: NextRequest) {
         var parts = wrap.querySelector("#parts");
         var filterBtn = wrap.querySelector("#filter-btn");
 
-        // نخلي مؤشر الماوس يوحي أنه زر
         if (filterBtn) {
           filterBtn.style.cursor = "pointer";
         }
@@ -347,7 +828,6 @@ export async function GET(_req: NextRequest) {
           setFieldError(section, !sectionId);
         }
 
-        // زر البحث: حالة "جاري التحميل..."
         function setButtonLoading(isLoading) {
           if (!filterBtn) return;
           if (isLoading) {
@@ -433,8 +913,6 @@ export async function GET(_req: NextRequest) {
           choicesInstance.setChoices(items, "value", "label", true);
         }
 
-        // 1) الماركات
-        // أولاً نحط حالة "جاري التحميل..."
         setChoicesData(companyChoices, [], "جاري التحميل...");
         company.disabled = true;
         companyChoices.disable();
@@ -447,7 +925,6 @@ export async function GET(_req: NextRequest) {
             company.disabled = false;
             companyChoices.enable();
           } else {
-            // ما فيه أي ماركات
             setChoicesData(companyChoices, [], "لا توجد خيارات");
             company.disabled = true;
             companyChoices.disable();
@@ -458,7 +935,6 @@ export async function GET(_req: NextRequest) {
           companyChoices.disable();
         }
 
-        // 2) الشركة → الموديل (+ event)
         company.addEventListener("change", async function () {
           var brandId = companyChoices.getValue(true);
 
@@ -497,7 +973,6 @@ export async function GET(_req: NextRequest) {
             });
           }
 
-          // حالة "جاري التحميل..." للموديلات
           setChoicesData(categoryChoices, [], "جاري التحميل...");
           category.disabled = true;
           categoryChoices.disable();
@@ -515,7 +990,6 @@ export async function GET(_req: NextRequest) {
               category.disabled = false;
               categoryChoices.enable();
             } else {
-              // ما فيه موديلات
               setChoicesData(categoryChoices, [], "لا توجد خيارات");
               category.disabled = true;
               categoryChoices.disable();
@@ -533,7 +1007,6 @@ export async function GET(_req: NextRequest) {
           updateFilterButtonState();
         });
 
-        // 3) الموديل → السنة (+ event)
         category.addEventListener("change", async function () {
           var categoryId = categoryChoices.getValue(true);
 
@@ -571,7 +1044,6 @@ export async function GET(_req: NextRequest) {
             });
           }
 
-          // حالة "جاري التحميل..." للسنوات
           setChoicesData(modelChoices, [], "جاري التحميل...");
           model.disabled = true;
           modelChoices.disable();
@@ -597,7 +1069,6 @@ export async function GET(_req: NextRequest) {
           updateFilterButtonState();
         });
 
-        // 4) السنة → القسم (+ event)
         model.addEventListener("change", async function () {
           var modelId = modelChoices.getValue(true);
 
@@ -632,7 +1103,6 @@ export async function GET(_req: NextRequest) {
             });
           }
 
-          // حالة "جاري التحميل..." للأقسام
           setChoicesData(sectionChoices, [], "جاري التحميل...");
           section.disabled = true;
           sectionChoices.disable();
@@ -666,7 +1136,6 @@ export async function GET(_req: NextRequest) {
           updateFilterButtonState();
         });
 
-        // 5) القسم → الكلمات (+ event section_select فقط)
         section.addEventListener("change", async function () {
           var sectionId = sectionChoices.getValue(true);
 
@@ -696,7 +1165,6 @@ export async function GET(_req: NextRequest) {
           var modelId = categoryChoices.getValue(true);
           var yearId = modelChoices.getValue(true);
 
-          // حالة "جاري التحميل..." للقطع
           partsChoices.setChoices(
             [
               {
@@ -740,7 +1208,6 @@ export async function GET(_req: NextRequest) {
               );
               partsChoices.enable();
             } else {
-              // لا توجد كلمات / قطع
               parts.disabled = true;
               partsChoices.setChoices(
                 [
@@ -757,7 +1224,6 @@ export async function GET(_req: NextRequest) {
               partsChoices.disable();
             }
 
-            // زر البحث يشتغل حسب حالة الفلاتر الأساسية
             updateFilterButtonState();
           } catch (e) {
             partsChoices.clearStore();
@@ -779,20 +1245,17 @@ export async function GET(_req: NextRequest) {
           }
         });
 
-        // ===== زر البحث =====
         filterBtn.addEventListener("click", async function () {
           var brandId   = companyChoices.getValue(true);
           var modelId   = categoryChoices.getValue(true);
           var yearId    = modelChoices.getValue(true);
           var sectionId = sectionChoices.getValue(true);
 
-          // لو النواقص موجودة → نلوّن الحقول الناقصة ونمنع الإرسال
           if (!brandId || !modelId || !yearId || !sectionId) {
             markMissingRequiredFields();
             return;
           }
 
-          // هنا نفعّل "جاري التحميل..."
           setButtonLoading(true);
 
           try {
@@ -913,17 +1376,13 @@ export async function GET(_req: NextRequest) {
     }
 
     function loadWidgets() {
-      // نخليه يشتغل في الصفحة الرئيسية فقط
       try {
         var path = window.location && window.location.pathname;
         if (path && path !== "/" && path !== "/index.html") {
-          return; // باقي الصفحات ما نركب عليها هذا الودجت
+          return;
         }
-      } catch (e) {
-        // لو صار أي خطأ نكمل عادي
-      }
+      } catch (e) {}
 
-      // هنا نقرر: نخفي، أو نظهر، أو نظهر مع حقوق
       var statusUrl =
         (PANEL_ORIGIN || "") +
         "/api/widget/subscription-status?store_id=" +
@@ -935,16 +1394,18 @@ export async function GET(_req: NextRequest) {
         })
         .then(function (data) {
           if (data && data.ok && data.suspended) {
-            // المتجر موقوف → لا نظهر الودجت
             return;
           }
 
           var showBranding = !!(data && data.ok && data.show_branding);
           buildFilterHeroDom(showBranding);
+
+          // نشغّل بوب أب الجوال بالـ defaults
+          buildAdvancedSearchButton({ config: {} });
         })
         .catch(function () {
-          // لو فيه مشكلة في الـ API → نكمّل بدون حقوق
           buildFilterHeroDom(false);
+          buildAdvancedSearchButton({ config: {} });
         });
     }
 
