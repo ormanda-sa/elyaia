@@ -859,20 +859,21 @@ export async function GET(_req: NextRequest) {
             var yearNumeric    = Number(yearId);
             var sectionNumeric = Number(sectionId);
 
-            logFilterEvent({
-              event_type: "search_submit",
-              brand_id:   !Number.isNaN(brandNumeric)   ? brandNumeric   : null,
-              model_id:   !Number.isNaN(modelNumeric)   ? modelNumeric   : null,
-              year_id:    !Number.isNaN(yearNumeric)    ? yearNumeric    : null,
-              section_id: !Number.isNaN(sectionNumeric) ? sectionNumeric : null,
-              keyword_ids: keywordIdsNumeric,
-              meta: {
-                page_url: window.location.href,
-                target_url: url,
-                has_keywords: keywordIdsNumeric.length > 0,
-                keyword_labels: keywordLabels,
-              },
-            });
+         await logFilterEvent({
+  event_type: "search_submit",
+  brand_id: !Number.isNaN(brandNumeric) ? brandNumeric : null,
+  model_id: !Number.isNaN(modelNumeric) ? modelNumeric : null,
+  year_id: !Number.isNaN(yearNumeric) ? yearNumeric : null,
+  section_id: !Number.isNaN(sectionNumeric) ? sectionNumeric : null,
+  keyword_ids: [],
+  meta: {
+    page_url: window.location.href,
+    target_url: url,
+    from: "advanced_popup",
+    has_keywords: keywordLabels.length > 0,
+    keyword_labels: keywordLabels,
+  },
+});
 
             window.location.href = url;
           } catch (err) {
