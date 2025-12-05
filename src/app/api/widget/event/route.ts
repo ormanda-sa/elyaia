@@ -27,7 +27,7 @@ type EventBody = {
   year_id?: number | null;
   section_id?: number | null;
   keyword_id?: number | null;
-  keyword_ids?: number[]; // 👈 جديد: لو أرسل أكثر من كلمة مرة وحدة
+  keyword_ids?: number[]; // لو أرسل أكثر من كلمة مرة وحدة
   meta?: Record<string, any> | null;
 };
 
@@ -61,7 +61,19 @@ export async function POST(req: NextRequest) {
       undefined;
     const userAgent = req.headers.get("user-agent") ?? undefined;
 
-    const json = (await req.json()) as Partial<EventBody>;
+    // نقرأ البودي الخام عشان نطبع الأسماء القديمة/الجديدة
+    const raw = (await req.json()) as any;
+
+    // ✅ تطبيع الأسماء بين الكود القديم (الموبايل) والجديد
+    if (raw.keywordId != null && raw.keyword_id == null) {
+      raw.keyword_id = raw.keywordId;
+    }
+
+    if (Array.isArray(raw.keywordIds) && raw.keyword_ids == null) {
+      raw.keyword_ids = raw.keywordIds;
+    }
+
+    const json = raw as Partial<EventBody>;
 
     if (!json.store_id || !json.session_key || !json.event_type) {
       return NextResponse.json(
@@ -91,7 +103,6 @@ export async function POST(req: NextRequest) {
       ...(meta || {}),
     };
 
-    // 👈 هنا السحر:
     // لو فيه keyword_ids (مصفوفة) نستخدمها، غير كذا نرجع لـ keyword_id العادي
     let ids: (number | null)[] = [];
 
@@ -101,7 +112,7 @@ export async function POST(req: NextRequest) {
       ids = [keyword_id]; // ممكن تكون null وهذا عادي للأحداث الثانية
     }
 
-    // للأمان: لو الحدث keyword_click وما فيه ولا كلمة، نرجع خطأ
+    // للأمان: لو الحدث keyword_click وما فيه ولا كلمة، نرجع خطأ واضح
     if (event_type === "keyword_click" && ids.every((id) => id == null)) {
       return NextResponse.json(
         { error: "keyword_click requires at least one keyword_id" },
