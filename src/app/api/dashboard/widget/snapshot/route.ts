@@ -1,62 +1,100 @@
-// src/app/api/widget-data/[storeId]/route.ts
+// src/app/api/dashboard/widget/snapshot/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseServerClient } from "@/lib/supabaseServer";
+import { getCurrentStoreId } from "@/lib/currentStore";
 
 export const runtime = "nodejs";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+type SnapshotPayload = {
+  store_id: string;
+  brands: any[];
+  models: any[];
+  years: any[];
+  sections: any[];
+  keywords: any[];
+};
 
-if (!supabaseUrl || !serviceKey) {
-  throw new Error("Supabase env vars are missing");
-}
+export async function POST(_req: NextRequest) {
+  const supabase = getSupabaseServerClient();
 
-const supabase = createClient(supabaseUrl, serviceKey, {
-  auth: { persistSession: false },
-});
-
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ storeId: string }> },
-) {
-  // Next.js صار يمرر params كـ Promise
-  const resolved = await params;
-  const raw = resolved.storeId; // مثال: "STORE_ID" أو "STORE_ID.json"
-  const storeId = raw.replace(/\.json$/i, "");
+  // نجيب المتجر الحالي من السيشن (صاحب المتجر)
+  const storeId = await getCurrentStoreId();
 
   if (!storeId) {
     return NextResponse.json(
-      { error: "store_id is required" },
-      { status: 400 },
+      { error: "UNAUTHORIZED" },
+      { status: 401 },
     );
   }
 
   try {
-    const { data, error } = await supabase
-      .from("widget_snapshots")
-      .select("data")
-      .eq("store_id", storeId)
-      .single();
+    // نجيب كل بيانات الفلتر من جداول filter_*
+    const [
+      brandsResult,
+      modelsResult,
+      yearsResult,
+      sectionsResult,
+      keywordsResult,
+    ] = await Promise.all([
+      supabase.from("filter_brands").select("*").eq("store_id", storeId),
+      supabase.from("filter_models").select("*").eq("store_id", storeId),
+      supabase.from("filter_years").select("*").eq("store_id", storeId),
+      supabase.from("filter_sections").select("*").eq("store_id", storeId),
+      supabase.from("filter_keywords").select("*").eq("store_id", storeId),
+    ]);
 
-    if (error || !data) {
-      console.error("[WIDGET_DATA_NOT_FOUND]", error);
+    const firstError =
+      brandsResult.error ||
+      modelsResult.error ||
+      yearsResult.error ||
+      sectionsResult.error ||
+      keywordsResult.error;
+
+    if (firstError) {
+      console.error("[DASHBOARD_WIDGET_SNAPSHOT_ERROR]", firstError);
       return NextResponse.json(
-        { error: "Snapshot not found" },
-        { status: 404 },
+        { error: "Failed to build snapshot" },
+        { status: 500 },
       );
     }
 
-    const payload = data.data; // نفس الـ JSON اللي خزّناه في widget_snapshots.data
+    const snapshot: SnapshotPayload = {
+      store_id: storeId,
+      brands: brandsResult.data ?? [],
+      models: modelsResult.data ?? [],
+      years: yearsResult.data ?? [],
+      sections: sectionsResult.data ?? [],
+      keywords: keywordsResult.data ?? [],
+    };
 
-    return new NextResponse(JSON.stringify(payload), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "s-maxage=300, stale-while-revalidate=600",
+    const now = new Date().toISOString();
+
+    // نخزن الـ JSON في جدول widget_snapshots
+    const { error: upsertError } = await supabase
+      .from("widget_snapshots")
+      .upsert({
+        store_id: storeId,
+        data: snapshot,
+        updated_at: now,
+      });
+
+    if (upsertError) {
+      console.error("[WIDGET_SNAPSHOT_UPSERT_ERROR]", upsertError);
+      return NextResponse.json(
+        { error: "Failed to save snapshot" },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        ok: true,
+        updated_at: now,
       },
-    });
+      { status: 200 },
+    );
   } catch (err) {
-    console.error("[WIDGET_DATA_UNEXPECTED]", err);
+    console.error("[DASHBOARD_WIDGET_SNAPSHOT_UNEXPECTED]", err);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 },

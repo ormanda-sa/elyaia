@@ -1,4 +1,4 @@
-// src/app/widget-data/[storeId]/route.ts
+// src/app/api/widget-data/[storeId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -17,9 +17,11 @@ const supabase = createClient(supabaseUrl, serviceKey, {
 
 export async function GET(
   _req: NextRequest,
-  ctx: { params: { storeId: string } },
+  context: { params: Promise<{ storeId: string }> },
 ) {
-  const raw = ctx.params.storeId; // "STORE_ID" أو "STORE_ID.json"
+  // Next.js (بالنسخ الجديدة) يمرّر params كـ Promise
+  const { storeId: raw } = await context.params; // مثال: "STORE_ID" أو "STORE_ID.json"
+
   const storeId = raw.replace(/\.json$/i, "");
 
   if (!storeId) {
@@ -44,7 +46,7 @@ export async function GET(
       );
     }
 
-    const payload = data.data; // نفس الـ JSON اللي خزّناه
+    const payload = data.data; // نفس JSON اللي خزّناه في widget_snapshots.data
 
     return new NextResponse(JSON.stringify(payload), {
       status: 200,
