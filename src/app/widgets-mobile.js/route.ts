@@ -3,10 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets-mobile.js — Darb Advanced Car Picker (DB-based)
+// widgets-mobile.js — Advanced Car Picker (DB-based, no Firestore)
 (function () {
   try {
-    // نحدد السكربت الحالي + storeId + secret + PANEL_ORIGIN + API_BASE
     var script =
       document.currentScript ||
       (function () {
@@ -171,7 +170,6 @@ export async function GET(_req: NextRequest) {
       var searchCfg = cfg.search || {};
       var pos = cfg.position || {};
 
-      // Firestore انشطب — ما نستخدمه
       var maxParts = Number(searchCfg.maxParts || 5);
       var targetDomain = (searchCfg.targetDomain || "https://darb.com.sa").replace(
         /\/+$/,
@@ -181,24 +179,22 @@ export async function GET(_req: NextRequest) {
       var buttonLabel =
         typeof cfg.label === "string" ? cfg.label : "اختيار السيارة";
 
-      // 👇 بدل SECTION_OPTIONS من فايربيس → نبني الشجرة من API قاعدة بياناتك
+      // بديل SECTION_TREE من Firestore → نبنيه من API قاعدة البيانات
       var SECTION_TREE = {};
       var CATEGORIES = [];
-      var ALL_SECTIONS = [];
 
       async function loadData() {
-        // 1) حمل الأقسام مرة واحدة
-        ALL_SECTIONS = await loadSections(storeId);
-
-        var brands = await loadBrands(storeId);
         SECTION_TREE = {};
         CATEGORIES = [];
+
+        var allSections = await loadSections(storeId);
+        var brands = await loadBrands(storeId);
 
         for (var i = 0; i < brands.length; i++) {
           var b = brands[i];
           var brandKey = String(b.id);
 
-          var brandNode: any = {
+          var brandNode = {
             _meta: {
               id: b.id,
               slug: (b.slug || "").trim(),
@@ -229,7 +225,7 @@ export async function GET(_req: NextRequest) {
             };
 
             var years = await loadYears(storeId, m.id);
-            var yearsArr = (years || []).map(function (yr: any) {
+            var yearsArr = (years || []).map(function (yr) {
               return {
                 id: yr.id,
                 name: String(yr.year),
@@ -237,13 +233,12 @@ export async function GET(_req: NextRequest) {
               };
             });
 
-            // نركّب sections بدون options (بنجيبها لاحقاً من /keywords)
-            var mappedSections = (ALL_SECTIONS || []).map(function (s: any) {
+            var mappedSections = (allSections || []).map(function (s) {
               return {
                 id: s.id,
                 slug: (s.slug || "").trim(),
                 name: s.name_ar || s.name || "",
-                options: [], // بنعبيها عند اختيار القسم
+                options: [], // نملأها لاحقاً من /keywords
               };
             });
 
@@ -253,14 +248,13 @@ export async function GET(_req: NextRequest) {
               sections: mappedSections,
             };
 
-            var carObj: any = {
+            var carObj = {
               id: carMeta.id,
               slug: carMeta.slug,
               name: carMeta.name,
               children: yearsArr.slice(),
             };
 
-            // نحتاج brandKey & carKey عشان نرجع لنفس الـ node لاحقاً
             carObj.__brandKey = brandKey;
             carObj.__carKey = carKey;
 
@@ -299,7 +293,7 @@ export async function GET(_req: NextRequest) {
         });
       }
 
-      // ============ UI + منطق (نفس سكربت اختيار السيارة تقريباً) ============
+      // ============ UI + منطق (نفس سكربت اختيار السيارة) ============
 
       var openBtn = document.createElement("button");
       openBtn.className = "popup-open-btn";
@@ -475,17 +469,11 @@ export async function GET(_req: NextRequest) {
               state.section = section;
               state.options = [];
 
-              // هنا التغيير الوحيد الحقيقي: نجيب options (القطع) من API بدل ما تكون جاهزة من Firestore
               try {
                 var brandId = state.brand.id;
                 var modelId = state.type.id;
                 var yearId = state.model.id;
                 var sectionId = section.id;
-
-                var yearNumeric = Number(yearId);
-                if (!Number.isNaN(yearNumeric)) {
-                  // لو تحب تضيف event تاني هنا
-                }
 
                 var kws = await loadKeywords(
                   storeId,
@@ -694,7 +682,7 @@ export async function GET(_req: NextRequest) {
       };
     }
 
-    // نشغل البوب أب مباشرة زي السابق
+    // نشغله مباشرة على أي صفحة يتم تضمينه فيها
     buildAdvancedSearchButton({ config: {} });
 
   } catch (err) {
