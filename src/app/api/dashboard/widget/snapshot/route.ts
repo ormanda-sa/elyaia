@@ -28,7 +28,7 @@ export async function POST(_req: NextRequest) {
   }
 
   try {
-    // نجيب كل بيانات الفلتر من جداول filter_*
+    // نجيب كل بيانات الفلتر من جداول filter_* مع ترتيب حسب sort_order ثم id
     const [
       brandsResult,
       modelsResult,
@@ -36,11 +36,40 @@ export async function POST(_req: NextRequest) {
       sectionsResult,
       keywordsResult,
     ] = await Promise.all([
-      supabase.from("filter_brands").select("*").eq("store_id", storeId),
-      supabase.from("filter_models").select("*").eq("store_id", storeId),
-      supabase.from("filter_years").select("*").eq("store_id", storeId),
-      supabase.from("filter_sections").select("*").eq("store_id", storeId),
-      supabase.from("filter_keywords").select("*").eq("store_id", storeId),
+      supabase
+        .from("filter_brands")
+        .select("*")
+        .eq("store_id", storeId)
+        .order("sort_order", { ascending: true })
+        .order("id", { ascending: true }),
+
+      supabase
+        .from("filter_models")
+        .select("*")
+        .eq("store_id", storeId)
+        .order("sort_order", { ascending: true })
+        .order("id", { ascending: true }),
+
+      supabase
+        .from("filter_years")
+        .select("*")
+        .eq("store_id", storeId)
+        .order("sort_order", { ascending: true })
+        .order("id", { ascending: true }),
+
+      supabase
+        .from("filter_sections")
+        .select("*")
+        .eq("store_id", storeId)
+        .order("sort_order", { ascending: true })
+        .order("id", { ascending: true }),
+
+      supabase
+        .from("filter_keywords")
+        .select("*")
+        .eq("store_id", storeId)
+        .order("sort_order", { ascending: true })
+        .order("id", { ascending: true }),
     ]);
 
     const firstError =
