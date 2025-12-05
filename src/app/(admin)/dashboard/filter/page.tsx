@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ModelsBulkImportDialog } from "./_components/ModelsBulkImportDialog";
 import { YearsBulkImportDialog } from "./_components/YearsBulkImportDialog";
 import { KeywordsBulkImportDialog } from "./_components/KeywordsBulkImportDialog";
+ import { SnapshotButton } from "./_components/SnapshotButton";
 
 import {
   AlertDialog,
@@ -795,28 +796,40 @@ function FilterSettingsInner() {
           )}
         </CardHeader>
 
-        <CardContent className="px-0 pt-0">
-          <div className="mb-3 flex items_center justify-between gap-2">
-            <div className="text-[11px] text-slate-500">
-              {selectedModel && (
-                <>
-                  الموديل الحالي:{" "}
-                  <span className="font-semibold text-slate-900">
-                    {selectedModel.name_ar}
-                  </span>
-                </>
-              )}
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              className="rounded-full"
-              onClick={reloadAll}
-              disabled={globalLoading}
-            >
-              {globalLoading ? "جارٍ التحديث..." : "إعادة تحميل البيانات"}
-            </Button>
-          </div>
+<CardContent className="px-0 pt-0">
+  <div className="mb-3 flex items_center justify-between gap-2">
+    <div className="text-[11px] text-slate-500">
+      {selectedModel && (
+        <>
+          الموديل الحالي:{" "}
+          <span className="font-semibold text-slate-900">
+            {selectedModel.name_ar}
+          </span>
+        </>
+      )}
+    </div>
+    <Button
+      type="button"
+      size="sm"
+      className="rounded-full"
+      onClick={reloadAll}
+      disabled={globalLoading}
+    >
+      {globalLoading ? "جارٍ التحديث..." : "إعادة تحميل البيانات"}
+    </Button>
+  </div>
+
+  {/* بلوك إدارة بيانات الودجت + زر التوليد */}
+  <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+    <h2 className="text-sm font-semibold text-slate-900">
+      بيانات الودجت (ملف JSON)
+    </h2>
+    <p className="text-xs text-slate-600">
+      بعد ما تعدّل الشركات أو الموديلات أو السنوات أو الأقسام أو الكلمات،
+      اضغط الزر عشان نحدّث ملف JSON اللي تستخدمه سكربتات الودجت في متجرك.
+    </p>
+    <SnapshotButton />
+  </div>
 
           <Tabs
             dir="rtl"
