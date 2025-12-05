@@ -27,14 +27,17 @@ type EventBody = {
   year_id?: number | null;
   section_id?: number | null;
   keyword_id?: number | null;
-  keyword_ids?: number[]; // لو أرسل أكثر من كلمة مرة وحدة
+  keyword_ids?: number[];
   meta?: Record<string, any> | null;
 };
 
 export async function POST(req: NextRequest) {
   try {
-    // 🔒 حماية بسيطة بالسر من الهيدر + env
-    const secret = req.headers.get("x-widget-secret");
+    // نسمح للسر يجينا من الهيدر أو من الـ query (عشان sendBeacon)
+    const url = new URL(req.url);
+    const qsSecret = url.searchParams.get("secret");
+    const headerSecret = req.headers.get("x-widget-secret");
+    const secret = headerSecret ?? qsSecret;
 
     if (!eventSecret) {
       console.error("WIDGET_EVENT_SECRET is NOT set in env");
@@ -48,7 +51,9 @@ export async function POST(req: NextRequest) {
       console.error(
         "Invalid widget event secret",
         "header=",
-        secret,
+        headerSecret,
+        "query=",
+        qsSecret,
         "env=",
         eventSecret,
       );
@@ -61,14 +66,19 @@ export async function POST(req: NextRequest) {
       undefined;
     const userAgent = req.headers.get("user-agent") ?? undefined;
 
-    // نقرأ البودي الخام عشان نطبع الأسماء القديمة/الجديدة
+    // نقرأ البودي الخام
     const raw = (await req.json()) as any;
 
-    // ✅ تطبيع الأسماء بين الكود القديم (الموبايل) والجديد
+    // تطبيع أسماء الحقول بين القديم والجديد (احتياط للجوال / كود قديم)
+    if (raw.storeId != null && raw.store_id == null) {
+      raw.store_id = raw.storeId;
+    }
+    if (raw.sessionKey != null && raw.session_key == null) {
+      raw.session_key = raw.sessionKey;
+    }
     if (raw.keywordId != null && raw.keyword_id == null) {
       raw.keyword_id = raw.keywordId;
     }
-
     if (Array.isArray(raw.keywordIds) && raw.keyword_ids == null) {
       raw.keyword_ids = raw.keywordIds;
     }
@@ -95,7 +105,6 @@ export async function POST(req: NextRequest) {
       meta = null,
     } = json;
 
-    // نبني meta وحدة
     const finalMeta = {
       session_key,
       ip,
@@ -103,16 +112,14 @@ export async function POST(req: NextRequest) {
       ...(meta || {}),
     };
 
-    // لو فيه keyword_ids (مصفوفة) نستخدمها، غير كذا نرجع لـ keyword_id العادي
     let ids: (number | null)[] = [];
 
     if (Array.isArray(keyword_ids) && keyword_ids.length > 0) {
       ids = keyword_ids;
     } else {
-      ids = [keyword_id]; // ممكن تكون null وهذا عادي للأحداث الثانية
+      ids = [keyword_id];
     }
 
-    // للأمان: لو الحدث keyword_click وما فيه ولا كلمة، نرجع خطأ واضح
     if (event_type === "keyword_click" && ids.every((id) => id == null)) {
       return NextResponse.json(
         { error: "keyword_click requires at least one keyword_id" },
@@ -120,7 +127,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // نبني صفوف الإدخال
     const rows = ids.map((kid) => ({
       store_id,
       event_type,
