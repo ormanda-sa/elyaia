@@ -113,7 +113,8 @@ export async function GET(_req: NextRequest) {
       }
     }
 
-        function logFilterEvent(payload) {
+    // === التعديل المهم هنا ===
+    function logFilterEvent(payload) {
       try {
         if (!WIDGET_SECRET) return;
 
@@ -124,10 +125,10 @@ export async function GET(_req: NextRequest) {
         };
         var bodyJson = JSON.stringify(bodyObj);
 
-        // نجهز رابط الـ API مع السر في الـ query (عشان sendBeacon)
+        // نضيف السر كـ query عشان sendBeacon
         var url = API_BASE + "/event?secret=" + encodeURIComponent(WIDGET_SECRET);
 
-        // لو الحدث هو search_submit (أو search_submit_popup) نستخدم sendBeacon
+        // أحداث الإرسال (مع تغيير الصفحة) نستخدم لها sendBeacon
         if (
           payload.event_type === "search_submit" ||
           payload.event_type === "search_submit_popup"
@@ -147,7 +148,7 @@ export async function GET(_req: NextRequest) {
           return;
         }
 
-        // باقي الأحداث العادية (brand/model/year/section/...) → fetch عادي fire-and-forget
+        // باقي الأحداث العادية (brand / model / year / section / ...) → fetch عادي fire-and-forget
         fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -158,7 +159,6 @@ export async function GET(_req: NextRequest) {
         // نسكت
       }
     }
-
 
     async function resolveStoreDomain(storeId) {
       try {
@@ -707,8 +707,7 @@ export async function GET(_req: NextRequest) {
 `;
 
   return new NextResponse(js, {
-    status:
- 200,
+    status: 200,
     headers: {
       "content-type": "text/javascript; charset=utf-8",
       "cache-control": "no-store",
