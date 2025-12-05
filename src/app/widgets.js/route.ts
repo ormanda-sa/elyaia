@@ -68,7 +68,7 @@ export async function GET(_req: NextRequest) {
     async function fetchJson(url, options) {
       var res = await fetch(url, {
         headers: { "Content-Type": "application/json" },
-        // أهم تعديل: لا نرسل credentials عشان CORS
+        // لا نرسل كوكيز عشان نخفف مشاكل CORS
         credentials: "omit",
         ...(options || {}),
       });
@@ -251,7 +251,19 @@ export async function GET(_req: NextRequest) {
     </div>';
 
         wrap.innerHTML = html;
-        document.body.appendChild(wrap);
+
+        // ==== نركّب الودجت تحت <header> مباشرة ====
+        var headerEl = document.querySelector("header");
+        if (headerEl && headerEl.parentNode) {
+          if (headerEl.nextSibling) {
+            headerEl.parentNode.insertBefore(wrap, headerEl.nextSibling);
+          } else {
+            headerEl.parentNode.appendChild(wrap);
+          }
+        } else {
+          // لو ما فيه هيدر لأي سبب، نرجّعه لنهاية البودي زي قبل
+          document.body.appendChild(wrap);
+        }
 
         // إظهار/إخفاء رابط Darb حسب showBranding
         var link = wrap.querySelector("#darb-branding-link");
@@ -564,6 +576,10 @@ export async function GET(_req: NextRequest) {
             setChoicesData(
               sectionChoices,
               [],
+
+
+
+
               "خطأ في تحميل الأقسام"
             );
             section.disabled = true;
@@ -804,6 +820,16 @@ export async function GET(_req: NextRequest) {
     }
 
     function loadWidgets() {
+      // نخليه يشتغل في الصفحة الرئيسية فقط
+      try {
+        var path = window.location && window.location.pathname;
+        if (path && path !== "/" && path !== "/index.html") {
+          return; // باقي الصفحات ما نركب عليها هذا الودجت
+        }
+      } catch (e) {
+        // لو صار أي خطأ نكمل عادي
+      }
+
       // هنا نقرر: نخفي، أو نظهر، أو نظهر مع حقوق
       var statusUrl =
         (PANEL_ORIGIN || "") +
