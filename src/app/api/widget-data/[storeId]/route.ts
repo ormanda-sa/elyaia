@@ -4,24 +4,11 @@ import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-if (!supabaseUrl || !serviceKey) {
-  throw new Error("Supabase env vars are missing");
-}
-
-const supabase = createClient(supabaseUrl, serviceKey, {
-  auth: { persistSession: false },
-});
-
 export async function GET(
   _req: NextRequest,
   context: { params: Promise<{ storeId: string }> },
 ) {
-  // Next.js (بالنسخ الجديدة) يمرّر params كـ Promise
-  const { storeId: raw } = await context.params; // مثال: "STORE_ID" أو "STORE_ID.json"
-
+  const { storeId: raw } = await context.params; // "STORE_ID" أو "STORE_ID.json"
   const storeId = raw.replace(/\.json$/i, "");
 
   if (!storeId) {
@@ -30,6 +17,21 @@ export async function GET(
       { status: 400 },
     );
   }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceKey) {
+    console.error("[WIDGET_DATA_ENV_ERROR] Missing Supabase env vars");
+    return NextResponse.json(
+      { error: "Supabase env vars are missing" },
+      { status: 500 },
+    );
+  }
+
+  const supabase = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false },
+  });
 
   try {
     const { data, error } = await supabase
@@ -46,7 +48,7 @@ export async function GET(
       );
     }
 
-    const payload = data.data; // نفس JSON اللي خزّناه في widget_snapshots.data
+    const payload = data.data;
 
     return new NextResponse(JSON.stringify(payload), {
       status: 200,
