@@ -265,6 +265,17 @@ export async function GET(_req: NextRequest) {
           document.body.appendChild(wrap);
         }
 
+        // نحقن CSS بسيط للأخطاء + الزر المقفول
+        var styleId = "darb-filter-style";
+        if (!document.getElementById(styleId)) {
+          var styleEl = document.createElement("style");
+          styleEl.id = styleId;
+          styleEl.textContent =
+            ".widgets-filter-hero-wrap select.df-field-error{border-color:#ef4444 !important;outline:0;}" +
+            ".widgets-filter-hero-wrap .hero-search-btn[disabled]{opacity:.6;cursor:not-allowed;}";
+          document.head.appendChild(styleEl);
+        }
+
         // إظهار/إخفاء رابط Darb حسب showBranding
         var link = wrap.querySelector("#darb-branding-link");
         if (link) {
@@ -302,6 +313,39 @@ export async function GET(_req: NextRequest) {
 
         var currentCategory = null;
         var currentModel = null;
+
+        function setFieldError(selectEl, hasError) {
+          if (!selectEl) return;
+          if (hasError) {
+            selectEl.classList.add("df-field-error");
+          } else {
+            selectEl.classList.remove("df-field-error");
+          }
+        }
+
+        function updateFilterButtonState() {
+          var brandId   = companyChoices && companyChoices.getValue(true);
+          var modelId   = categoryChoices && categoryChoices.getValue(true);
+          var yearId    = modelChoices && modelChoices.getValue(true);
+          var sectionId = sectionChoices && sectionChoices.getValue(true);
+
+          var ready = !!(brandId && modelId && yearId && sectionId);
+          if (filterBtn) {
+            filterBtn.disabled = !ready;
+          }
+        }
+
+        function markMissingRequiredFields() {
+          var brandId   = companyChoices.getValue(true);
+          var modelId   = categoryChoices.getValue(true);
+          var yearId    = modelChoices.getValue(true);
+          var sectionId = sectionChoices.getValue(true);
+
+          setFieldError(company, !brandId);
+          setFieldError(category, !modelId);
+          setFieldError(model, !yearId);
+          setFieldError(section, !sectionId);
+        }
 
         function initChoices(selectEl, placeholder) {
           return new Choices(selectEl, {
@@ -400,6 +444,10 @@ export async function GET(_req: NextRequest) {
         company.addEventListener("change", async function () {
           var brandId = companyChoices.getValue(true);
 
+          if (brandId) {
+            setFieldError(company, false);
+          }
+
           setChoicesData(categoryChoices, [], "اختر الموديل");
           setChoicesData(modelChoices, [], "اختر السنة");
           setChoicesData(sectionChoices, [], "اختر القسم");
@@ -419,6 +467,7 @@ export async function GET(_req: NextRequest) {
             modelChoices.disable();
             sectionChoices.disable();
             partsChoices.disable();
+            updateFilterButtonState();
             return;
           }
 
@@ -462,11 +511,17 @@ export async function GET(_req: NextRequest) {
             category.disabled = true;
             categoryChoices.disable();
           }
+
+          updateFilterButtonState();
         });
 
         // 3) الموديل → السنة (+ event)
         category.addEventListener("change", async function () {
           var categoryId = categoryChoices.getValue(true);
+
+          if (categoryId) {
+            setFieldError(category, false);
+          }
 
           setChoicesData(modelChoices, [], "اختر السنة");
           setChoicesData(sectionChoices, [], "اختر القسم");
@@ -486,6 +541,7 @@ export async function GET(_req: NextRequest) {
             modelChoices.disable();
             sectionChoices.disable();
             partsChoices.disable();
+            updateFilterButtonState();
             return;
           }
 
@@ -519,11 +575,17 @@ export async function GET(_req: NextRequest) {
             model.disabled = true;
             modelChoices.disable();
           }
+
+          updateFilterButtonState();
         });
 
         // 4) السنة → القسم (+ event)
         model.addEventListener("change", async function () {
           var modelId = modelChoices.getValue(true);
+
+          if (modelId) {
+            setFieldError(model, false);
+          }
 
           setChoicesData(sectionChoices, [], "اختر القسم");
           partsChoices.clearStore();
@@ -540,6 +602,7 @@ export async function GET(_req: NextRequest) {
           if (!modelId) {
             sectionChoices.disable();
             partsChoices.disable();
+            updateFilterButtonState();
             return;
           }
 
@@ -576,20 +639,22 @@ export async function GET(_req: NextRequest) {
             setChoicesData(
               sectionChoices,
               [],
-
-
-
-
               "خطأ في تحميل الأقسام"
             );
             section.disabled = true;
             sectionChoices.disable();
           }
+
+          updateFilterButtonState();
         });
 
         // 5) القسم → الكلمات (+ event section_select فقط)
         section.addEventListener("change", async function () {
           var sectionId = sectionChoices.getValue(true);
+
+          if (sectionId) {
+            setFieldError(section, false);
+          }
 
           partsChoices.clearStore();
           parts.disabled = true;
@@ -597,6 +662,7 @@ export async function GET(_req: NextRequest) {
 
           if (!sectionId) {
             partsChoices.disable();
+            updateFilterButtonState();
             return;
           }
 
@@ -673,8 +739,8 @@ export async function GET(_req: NextRequest) {
               partsChoices.disable();
             }
 
-            // زر البحث يشتغل حتى لو ما فيه كلمات
-            filterBtn.disabled = false;
+            // زر البحث يشتغل حسب حالة الفلاتر الأساسية
+            updateFilterButtonState();
           } catch (e) {
             partsChoices.clearStore();
             partsChoices.setChoices(
@@ -691,7 +757,7 @@ export async function GET(_req: NextRequest) {
             );
             parts.disabled = true;
             partsChoices.disable();
-            filterBtn.disabled = false;
+            updateFilterButtonState();
           }
         });
 
@@ -702,8 +768,9 @@ export async function GET(_req: NextRequest) {
           var yearId    = modelChoices.getValue(true);
           var sectionId = sectionChoices.getValue(true);
 
+          // لو النواقص موجودة → نلوّن الحقول الناقصة ونمنع الإرسال
           if (!brandId || !modelId || !yearId || !sectionId) {
-            alert("حدد كل الفلاتر أولاً");
+            markMissingRequiredFields();
             return;
           }
 
