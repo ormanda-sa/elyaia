@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets.allPage.js — Darb Inline Filter for all pages except home
+// widgets.allPage.js — Darb Filter (same logic/style as widgets.js, for all pages except home)
 (function () {
   try {
     var script =
@@ -31,7 +31,40 @@ export async function GET(_req: NextRequest) {
 
     var API_BASE = (PANEL_ORIGIN || "") + "/api/widget";
 
-    // ========== Helpers ==========
+    // ========== Helpers (نفس widgets.js) ==========
+
+    function ensureChoicesAssets() {
+      return new Promise(function (resolve) {
+        if (window.Choices) return resolve();
+
+        if (!document.querySelector('link[data-choices-css="1"]')) {
+          var link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href =
+            "https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css";
+          link.setAttribute("data-choices-css", "1");
+          document.head.appendChild(link);
+        }
+
+        if (!document.querySelector('script[data-choices-js="1"]')) {
+          var s = document.createElement("script");
+          s.src =
+            "https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js";
+          s.async = true;
+          s.defer = true;
+          s.setAttribute("data-choices-js", "1");
+          s.onload = function () {
+            resolve();
+          };
+          s.onerror = function () {
+            resolve();
+          };
+          document.head.appendChild(s);
+        } else {
+          resolve();
+        }
+      });
+    }
 
     async function fetchJson(url, options) {
       var res = await fetch(url, {
@@ -138,7 +171,7 @@ export async function GET(_req: NextRequest) {
     async function resolveStoreDomain(storeId) {
       try {
         var data = await fetchJson(
-          API_BASE + "/store-domain?store_id=" + encodeURIComponent(storeId)
+        API_BASE + "/store-domain?store_id=" + encodeURIComponent(storeId)
         );
 
         var domain = (data && data.domain) || "";
@@ -198,29 +231,35 @@ export async function GET(_req: NextRequest) {
       return result;
     }
 
-    // ========== Build All-Page Filter ==========
+    // ========== Build Inline Filter (نفس الفورم حق الهيرو) ==========
 
-    function buildAllPageFilter(showBranding) {
+    function buildAllPageFilter() {
       (async function () {
-        // ما نستخدم Choices هنا → select عادي
-        var wrap = document.createElement("div");
-        wrap.className = "darb-ap-filter-wrap";
+        await ensureChoicesAssets();
 
-        var html =
-          '<div class="darb-ap-filter">' +
-          '<form id="darb-ap-form" class="darb-ap-form" dir="rtl">' +
-          '<select id="darb-ap-brand" class="darb-ap-select" disabled></select>' +
-          '<select id="darb-ap-model" class="darb-ap-select" disabled></select>' +
-          '<select id="darb-ap-year" class="darb-ap-select" disabled></select>' +
-          '<select id="darb-ap-section" class="darb-ap-select" disabled></select>' +
-          '<select id="darb-ap-keywords" class="darb-ap-select" multiple disabled></select>' +
-          '<button type="button" id="darb-ap-btn" class="darb-ap-btn" disabled>بحث</button>' +
-          "</form>" +
-          "</div>";
+        var wrap = document.createElement("div");
+        wrap.className = "widgets-filter-hero-wrap darb-inline-filter";
+
+        // نفس فورم الهيرو بدون الخلفية والنصوص
+        var html = '\\
+      <div class="X1">\\
+        <div class="hero-filters-wrapper">\\
+          <form id="filters-form-ap" onsubmit="return false;" dir="rtl" class="hero-filters-form">\\
+            <select id="company-ap"></select>\\
+            <select id="category-ap" disabled></select>\\
+            <select id="model-ap" disabled></select>\\
+            <select id="section-ap" disabled></select>\\
+            <select id="parts-ap" multiple disabled></select>\\
+            <button id="filter-btn-ap" type="button" class="hero-search-btn">\\
+              بحث <span style="font-size:18px;vertical-align:middle;">&#8594;</span>\\
+            </button>\\
+          </form>\\
+        </div>\\
+      </div>';
 
         wrap.innerHTML = html;
 
-        // نحطه تحت <header> لو موجود، وإلا في أعلى البودي
+        // نحطه تحت <header> لو فيه، وإلا أعلى البودي
         var headerEl = document.querySelector("header");
         if (headerEl && headerEl.parentNode) {
           if (headerEl.nextSibling) {
@@ -232,80 +271,65 @@ export async function GET(_req: NextRequest) {
           document.body.insertBefore(wrap, document.body.firstChild);
         }
 
-        // CSS كلاسيكي بكلاسات جديدة
-        var styleId = "darb-ap-filter-style";
+        // CSS خفيف لتصغير الهيرو وإلغاء الخلفيات
+        var styleId = "darb-inline-filter-style";
         if (!document.getElementById(styleId)) {
           var styleEl = document.createElement("style");
           styleEl.id = styleId;
           styleEl.textContent =
-            ".darb-ap-filter-wrap{padding:8px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb;}" +
-            ".darb-ap-filter{max-width:1200px;margin:0 auto;}" +
-            ".darb-ap-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}" +
-            ".darb-ap-select{min-width:140px;flex:1 1 140px;padding:6px 8px;border-radius:6px;border:1px solid #d1d5db;background:#fff;font-size:13px;}" +
-            ".darb-ap-select:disabled{background:#f3f4f6;color:#9ca3af;}" +
-            ".darb-ap-select.darb-ap-error{border-color:#ef4444;}" +
-            ".darb-ap-btn{padding:7px 14px;border-radius:999px;border:none;background:#16a34a;color:#f9fafb;font-size:14px;font-weight:600;cursor:pointer;}" +
-            ".darb-ap-btn[disabled]{opacity:.5;cursor:not-allowed;}" +
-            "@media (max-width:768px){.darb-ap-form{flex-direction:column;align-items:stretch;}.darb-ap-select{flex:1 1 100%;}}" ;
+            ".widgets-filter-hero-wrap.darb-inline-filter{margin:8px auto 12px auto;max-width:1200px;background:transparent;padding:0;}" +
+            ".widgets-filter-hero-wrap.darb-inline-filter .hero-section{background:none;box-shadow:none;}" +
+            ".widgets-filter-hero-wrap.darb-inline-filter .hero-title-filter{display:none;}" +
+            ".widgets-filter-hero-wrap.darb-inline-filter .hero-bg-img{display:none;}" +
+            ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-wrapper{padding:0;}" +
+            "@media(max-width:768px){.widgets-filter-hero-wrap.darb-inline-filter{padding:0 8px;}}";
           document.head.appendChild(styleEl);
         }
 
-        var brandSelect = document.getElementById("darb-ap-brand");
-        var modelSelect = document.getElementById("darb-ap-model");
-        var yearSelect = document.getElementById("darb-ap-year");
-        var sectionSelect = document.getElementById("darb-ap-section");
-        var keywordsSelect = document.getElementById("darb-ap-keywords");
-        var searchBtn = document.getElementById("darb-ap-btn");
+        var company = wrap.querySelector("#company-ap");
+        var category = wrap.querySelector("#category-ap");
+        var model = wrap.querySelector("#model-ap");
+        var section = wrap.querySelector("#section-ap");
+        var parts = wrap.querySelector("#parts-ap");
+        var filterBtn = wrap.querySelector("#filter-btn-ap");
 
-        function setOptions(selectEl, list, placeholder, labelKey) {
-          while (selectEl.firstChild) selectEl.removeChild(selectEl.firstChild);
-          var opt = document.createElement("option");
-          opt.value = "";
-          opt.textContent = placeholder;
-          selectEl.appendChild(opt);
+        if (filterBtn) {
+          filterBtn.style.cursor = "pointer";
+        }
 
-          (list || []).forEach(function (item) {
-            var label =
-              (labelKey && item[labelKey]) ||
-              item.year ||
-              item.name_ar ||
-              item.name ||
-              ("#" + item.id);
-            var o = document.createElement("option");
-            o.value = String(item.id);
-            o.textContent = label;
-            selectEl.appendChild(o);
+        function initChoices(selectEl, placeholder) {
+          return new Choices(selectEl, {
+            searchEnabled: true,
+            shouldSort: false,
+            itemSelectText: "",
+            noResultsText: "لا توجد نتائج",
+            placeholderValue: placeholder,
+            searchPlaceholderValue: "بحث...",
           });
         }
 
-        function clearError(el) {
-          el.classList.remove("darb-ap-error");
-        }
+        var companyChoices = initChoices(company, "اختر الماركة");
+        var categoryChoices = initChoices(category, "اختر الموديل");
+        var modelChoices = initChoices(model, "اختر السنة");
+        var sectionChoices = initChoices(section, "اختر القسم");
+        var partsChoices = new Choices(parts, {
+          removeItemButton: true,
+          maxItemCount: 5,
+          placeholder: true,
+          placeholderValue: "بحث أو اختيار القطع...",
+          searchPlaceholderValue: "بحث عن القطعة...",
+          shouldSort: false,
+          searchEnabled: true,
+          noResultsText: "لا توجد نتائج",
+          itemSelectText: "اختر",
+        });
 
-        function setError(el) {
-          el.classList.add("darb-ap-error");
-        }
-
-        function updateSearchButtonState() {
-          var brandId = brandSelect.value;
-          var modelId = modelSelect.value;
-          var yearId = yearSelect.value;
-          var sectionId = sectionSelect.value;
-          var ready = !!(brandId && modelId && yearId && sectionId);
-          searchBtn.disabled = !ready;
-        }
-
-        function markMissing() {
-          var brandId = brandSelect.value;
-          var modelId = modelSelect.value;
-          var yearId = yearSelect.value;
-          var sectionId = sectionSelect.value;
-
-          if (!brandId) setError(brandSelect); else clearError(brandSelect);
-          if (!modelId) setError(modelSelect); else clearError(modelSelect);
-          if (!yearId) setError(yearSelect); else clearError(yearSelect);
-          if (!sectionId) setError(sectionSelect); else clearError(sectionSelect);
-        }
+        company.disabled = true;
+        category.disabled = true;
+        model.disabled = true;
+        section.disabled = true;
+        parts.disabled = true;
+        filterBtn.disabled = true;
 
         var brands = [];
         var models = [];
@@ -313,50 +337,103 @@ export async function GET(_req: NextRequest) {
         var sections = [];
         var keywords = [];
 
-        // 1) تحميل الماركات أولاً
-        setOptions(brandSelect, [], "جاري تحميل الماركات...", "name_ar");
-        brandSelect.disabled = true;
-        modelSelect.disabled = true;
-        yearSelect.disabled = true;
-        sectionSelect.disabled = true;
-        keywordsSelect.disabled = true;
-        searchBtn.disabled = true;
+        function setFieldError(selectEl, hasError) {
+          if (!selectEl) return;
+          if (hasError) {
+            selectEl.classList.add("df-field-error");
+          } else {
+            selectEl.classList.remove("df-field-error");
+          }
+        }
+
+        function updateFilterButtonState() {
+          var brandId = companyChoices.getValue(true);
+          var modelId = categoryChoices.getValue(true);
+          var yearId = modelChoices.getValue(true);
+          var sectionId = sectionChoices.getValue(true);
+
+          var ready = !!(brandId && modelId && yearId && sectionId);
+          filterBtn.disabled = !ready;
+        }
+
+        function markMissingRequiredFields() {
+          var brandId = companyChoices.getValue(true);
+          var modelId = categoryChoices.getValue(true);
+          var yearId = modelChoices.getValue(true);
+          var sectionId = sectionChoices.getValue(true);
+
+          setFieldError(company, !brandId);
+          setFieldError(category, !modelId);
+          setFieldError(model, !yearId);
+          setFieldError(section, !sectionId);
+        }
+
+        function setChoicesData(choicesInstance, list, placeholder, labelKey) {
+          var items = [
+            {
+              value: "",
+              label: placeholder,
+              selected: true,
+            },
+          ].concat(
+            (list || []).map(function (item) {
+              var label =
+                (labelKey && item[labelKey]) ||
+                item.year ||
+                item.name_ar ||
+                item.name ||
+                ("#" + item.id);
+
+              return {
+                value: String(item.id),
+                label: label,
+                selected: false,
+              };
+            })
+          );
+
+          choicesInstance.clearStore();
+          choicesInstance.setChoices(items, "value", "label", true);
+        }
+
+        // ===== تحميل الماركات (نفس widgets.js) =====
+        setChoicesData(companyChoices, [], "جاري تحميل الماركات...", "name_ar");
+        company.disabled = true;
+        companyChoices.disable();
 
         try {
           brands = await loadBrands(storeId);
           if (brands.length > 0) {
-            setOptions(brandSelect, brands, "اختر الماركة", "name_ar");
-            brandSelect.disabled = false;
+            setChoicesData(companyChoices, brands, "اختر الماركة", "name_ar");
+            company.disabled = false;
+            companyChoices.enable();
           } else {
-            setOptions(brandSelect, [], "لا توجد ماركات", "name_ar");
+            setChoicesData(companyChoices, [], "لا توجد ماركات", "name_ar");
           }
         } catch (e) {
-          console.error("[widgets.allPage] loadBrands error:", e);
-          setOptions(brandSelect, [], "خطأ في تحميل الماركات", "name_ar");
+          setChoicesData(companyChoices, [], "خطأ في تحميل الماركات", "name_ar");
         }
 
-        // 2) تغيّر الماركة → نجيب الموديلات
-        brandSelect.addEventListener("change", async function () {
-          var brandId = brandSelect.value;
-          clearError(brandSelect);
+        // 2) الشركة → الموديل
+        company.addEventListener("change", async function () {
+          var brandId = companyChoices.getValue(true);
 
-          setOptions(modelSelect, [], "اختر الموديل", "name_ar");
-          setOptions(yearSelect, [], "اختر السنة", "year");
-          setOptions(sectionSelect, [], "اختر القسم", "name_ar");
-          keywordsSelect.innerHTML = "";
-          modelSelect.disabled = true;
-          yearSelect.disabled = true;
-          sectionSelect.disabled = true;
-          keywordsSelect.disabled = true;
-          searchBtn.disabled = true;
+          setChoicesData(categoryChoices, [], "اختر الموديل", "name_ar");
+          setChoicesData(modelChoices, [], "اختر السنة", "year");
+          setChoicesData(sectionChoices, [], "اختر القسم", "name_ar");
+          partsChoices.clearStore();
 
-          models = [];
-          years = [];
-          sections = [];
-          keywords = [];
+          category.disabled = true;
+          model.disabled = true;
+          section.disabled = true;
+          parts.disabled = true;
+          filterBtn.disabled = true;
 
           if (!brandId) {
-            updateSearchButtonState();
+            categoryChoices.disable();
+            modelChoices.disable();
+            sectionChoices.disable();
+            partsChoices.disable();
             return;
           }
 
@@ -368,48 +445,56 @@ export async function GET(_req: NextRequest) {
             });
           }
 
-          setOptions(modelSelect, [], "جاري تحميل الموديلات...", "name_ar");
-          modelSelect.disabled = true;
+          setChoicesData(categoryChoices, [], "جاري التحميل...", "name_ar");
+          category.disabled = true;
+          categoryChoices.disable();
 
           try {
             models = await loadModels(storeId, brandId);
             if (models.length > 0) {
-              setOptions(modelSelect, models, "اختر الموديل", "name_ar");
-              modelSelect.disabled = false;
+              setChoicesData(categoryChoices, models, "اختر الموديل", "name_ar");
+              category.disabled = false;
+              categoryChoices.enable();
             } else {
-              setOptions(modelSelect, [], "لا توجد موديلات", "name_ar");
+              setChoicesData(categoryChoices, [], "لا توجد موديلات", "name_ar");
+              category.disabled = true;
+              categoryChoices.disable();
             }
           } catch (e) {
-            console.error("[widgets.allPage] loadModels error:", e);
-            setOptions(modelSelect, [], "خطأ في تحميل الموديلات", "name_ar");
+            setChoicesData(
+              categoryChoices,
+              [],
+              "خطأ في تحميل الموديلات",
+              "name_ar"
+            );
+            category.disabled = true;
+            categoryChoices.disable();
           }
 
-          updateSearchButtonState();
+          updateFilterButtonState();
         });
 
-        // 3) تغيّر الموديل → نجيب السنوات
-        modelSelect.addEventListener("change", async function () {
-          var modelId = modelSelect.value;
-          clearError(modelSelect);
+        // 3) الموديل → السنة
+        category.addEventListener("change", async function () {
+          var categoryId = categoryChoices.getValue(true);
 
-          setOptions(yearSelect, [], "اختر السنة", "year");
-          setOptions(sectionSelect, [], "اختر القسم", "name_ar");
-          keywordsSelect.innerHTML = "";
-          yearSelect.disabled = true;
-          sectionSelect.disabled = true;
-          keywordsSelect.disabled = true;
-          searchBtn.disabled = true;
+          setChoicesData(modelChoices, [], "اختر السنة", "year");
+          setChoicesData(sectionChoices, [], "اختر القسم", "name_ar");
+          partsChoices.clearStore();
 
-          years = [];
-          sections = [];
-          keywords = [];
+          model.disabled = true;
+          section.disabled = true;
+          parts.disabled = true;
+          filterBtn.disabled = true;
 
-          if (!modelId) {
-            updateSearchButtonState();
+          if (!categoryId) {
+            modelChoices.disable();
+            sectionChoices.disable();
+            partsChoices.disable();
             return;
           }
 
-          var modelNumeric = Number(modelId);
+          var modelNumeric = Number(categoryId);
           if (!Number.isNaN(modelNumeric)) {
             logFilterEvent({
               event_type: "model_select",
@@ -417,45 +502,48 @@ export async function GET(_req: NextRequest) {
             });
           }
 
-          setOptions(yearSelect, [], "جاري تحميل السنوات...", "year");
-          yearSelect.disabled = true;
+          setChoicesData(modelChoices, [], "جاري التحميل...", "year");
+          model.disabled = true;
+          modelChoices.disable();
 
           try {
-            years = await loadYears(storeId, modelId);
+            years = await loadYears(storeId, categoryId);
             if (years.length > 0) {
-              setOptions(yearSelect, years, "اختر السنة", "year");
-              yearSelect.disabled = false;
+              setChoicesData(modelChoices, years, "اختر السنة", "year");
+              model.disabled = false;
+              modelChoices.enable();
             } else {
-              setOptions(yearSelect, [], "لا توجد سنوات", "year");
+              setChoicesData(modelChoices, [], "لا توجد سنوات", "year");
+              model.disabled = true;
+              modelChoices.disable();
             }
           } catch (e) {
-            console.error("[widgets.allPage] loadYears error:", e);
-            setOptions(yearSelect, [], "خطأ في تحميل السنوات", "year");
+            setChoicesData(modelChoices, [], "خطأ في تحميل السنوات", "year");
+            model.disabled = true;
+            modelChoices.disable();
           }
 
-          updateSearchButtonState();
+          updateFilterButtonState();
         });
 
-        // 4) تغيّر السنة → نجيب الأقسام
-        yearSelect.addEventListener("change", async function () {
-          var yearId = yearSelect.value;
-          clearError(yearSelect);
+        // 4) السنة → القسم
+        model.addEventListener("change", async function () {
+          var modelId = modelChoices.getValue(true);
 
-          setOptions(sectionSelect, [], "اختر القسم", "name_ar");
-          keywordsSelect.innerHTML = "";
-          sectionSelect.disabled = true;
-          keywordsSelect.disabled = true;
-          searchBtn.disabled = true;
+          setChoicesData(sectionChoices, [], "اختر القسم", "name_ar");
+          partsChoices.clearStore();
 
-          sections = [];
-          keywords = [];
+          section.disabled = true;
+          parts.disabled = true;
+          filterBtn.disabled = true;
 
-          if (!yearId) {
-            updateSearchButtonState();
+          if (!modelId) {
+            sectionChoices.disable();
+            partsChoices.disable();
             return;
           }
 
-          var yearNumeric = Number(yearId);
+          var yearNumeric = Number(modelId);
           if (!Number.isNaN(yearNumeric)) {
             logFilterEvent({
               event_type: "year_select",
@@ -463,38 +551,45 @@ export async function GET(_req: NextRequest) {
             });
           }
 
-          setOptions(sectionSelect, [], "جاري تحميل الأقسام...", "name_ar");
-          sectionSelect.disabled = true;
+          setChoicesData(sectionChoices, [], "جاري التحميل...", "name_ar");
+          section.disabled = true;
+          sectionChoices.disable();
 
           try {
             sections = await loadSections(storeId);
             if (sections.length > 0) {
-              setOptions(sectionSelect, sections, "اختر القسم", "name_ar");
-              sectionSelect.disabled = false;
+              setChoicesData(sectionChoices, sections, "اختر القسم", "name_ar");
+              section.disabled = false;
+              sectionChoices.enable();
             } else {
-              setOptions(sectionSelect, [], "لا توجد أقسام", "name_ar");
+              setChoicesData(sectionChoices, [], "لا توجد أقسام", "name_ar");
+              section.disabled = true;
+              sectionChoices.disable();
             }
           } catch (e) {
-            console.error("[widgets.allPage] loadSections error:", e);
-            setOptions(sectionSelect, [], "خطأ في تحميل الأقسام", "name_ar");
+            setChoicesData(
+              sectionChoices,
+              [],
+              "خطأ في تحميل الأقسام",
+              "name_ar"
+            );
+            section.disabled = true;
+            sectionChoices.disable();
           }
 
-          updateSearchButtonState();
+          updateFilterButtonState();
         });
 
-        // 5) تغيّر القسم → نجيب الكلمات
-        sectionSelect.addEventListener("change", async function () {
-          var sectionId = sectionSelect.value;
-          clearError(sectionSelect);
+        // 5) القسم → الكلمات
+        section.addEventListener("change", async function () {
+          var sectionId = sectionChoices.getValue(true);
 
-          keywordsSelect.innerHTML = "";
-          keywordsSelect.disabled = true;
-          searchBtn.disabled = true;
-
-          keywords = [];
+          partsChoices.clearStore();
+          parts.disabled = true;
+          filterBtn.disabled = true;
 
           if (!sectionId) {
-            updateSearchButtonState();
+            partsChoices.disable();
             return;
           }
 
@@ -506,16 +601,24 @@ export async function GET(_req: NextRequest) {
             });
           }
 
-          var brandId = brandSelect.value;
-          var modelId = modelSelect.value;
-          var yearId = yearSelect.value;
+          var brandId = companyChoices.getValue(true);
+          var modelId = categoryChoices.getValue(true);
+          var yearId = modelChoices.getValue(true);
 
-          // نحط placeholder بسيط
-          var loadingOpt = document.createElement("option");
-          loadingOpt.value = "";
-          loadingOpt.textContent = "جاري تحميل الكلمات...";
-          keywordsSelect.appendChild(loadingOpt);
-          keywordsSelect.disabled = true;
+          partsChoices.setChoices(
+            [
+              {
+                value: "",
+                label: "جاري التحميل...",
+                selected: true,
+              },
+            ],
+            "value",
+            "label",
+            true
+          );
+          parts.disabled = true;
+          partsChoices.disable();
 
           try {
             keywords = await loadKeywords(
@@ -526,55 +629,74 @@ export async function GET(_req: NextRequest) {
               sectionId
             );
 
-            keywordsSelect.innerHTML = "";
+            partsChoices.clearStore();
 
             if ((keywords || []).length > 0) {
-              (keywords || []).forEach(function (k) {
-                var label = k.name_ar || k.slug || ("#" + k.id);
-                var o = document.createElement("option");
-                o.value = String(k.id);
-                o.textContent = label;
-                keywordsSelect.appendChild(o);
-              });
-              keywordsSelect.disabled = false;
+              parts.disabled = false;
+              partsChoices.setChoices(
+                (keywords || []).map(function (k) {
+                  var label = k.name_ar || k.slug || ("#" + k.id);
+                  return {
+                    value: String(k.id),
+                    label: label,
+                    selected: false,
+                  };
+                }),
+                "value",
+                "label",
+                true
+              );
+              partsChoices.enable();
             } else {
-              var opt = document.createElement("option");
-              opt.value = "";
-              opt.textContent = "لا توجد كلمات محددة";
-              keywordsSelect.appendChild(opt);
-              keywordsSelect.disabled = true;
+              parts.disabled = true;
+              partsChoices.setChoices(
+                [
+                  {
+                    value: "",
+                    label: "لا توجد خيارات",
+                    selected: true,
+                  },
+                ],
+                "value",
+                "label",
+                true
+              );
+              partsChoices.disable();
             }
+
+            updateFilterButtonState();
           } catch (e) {
-            console.error("[widgets.allPage] loadKeywords error:", e);
-            keywordsSelect.innerHTML = "";
-            var optErr = document.createElement("option");
-            optErr.value = "";
-            optErr.textContent = "خطأ في تحميل الكلمات";
-            keywordsSelect.appendChild(optErr);
-            keywordsSelect.disabled = true;
+            partsChoices.clearStore();
+            partsChoices.setChoices(
+              [
+                {
+                  value: "",
+                  label: "خطأ في تحميل الكلمات",
+                  selected: true,
+                },
+              ],
+              "value",
+              "label",
+              true
+            );
+            parts.disabled = true;
+            partsChoices.disable();
+            updateFilterButtonState();
           }
-
-          updateSearchButtonState();
-        });
-
-        // تغيير الكلمات (multi-select، بس نستخدمها في الـ URL)
-        keywordsSelect.addEventListener("change", function () {
-          clearError(keywordsSelect);
         });
 
         // ===== زر البحث =====
-        searchBtn.addEventListener("click", async function () {
-          var brandId = brandSelect.value;
-          var modelId = modelSelect.value;
-          var yearId = yearSelect.value;
-          var sectionId = sectionSelect.value;
+        filterBtn.addEventListener("click", async function () {
+          var brandId = companyChoices.getValue(true);
+          var modelId = categoryChoices.getValue(true);
+          var yearId = modelChoices.getValue(true);
+          var sectionId = sectionChoices.getValue(true);
 
           if (!brandId || !modelId || !yearId || !sectionId) {
-            markMissing();
+            markMissingRequiredFields();
             return;
           }
 
-          // نجيب الكائنات عشان نعرف السلاجات و IDs تبع سلة
           var brandObj =
             brands.find(function (b) {
               return String(b.id) === String(brandId);
@@ -609,20 +731,23 @@ export async function GET(_req: NextRequest) {
           var sallaSectionId =
             (sectionRow && sectionRow.salla_section_id) || sectionId;
 
-          // الكلمات المختارة → لابل فقط
-          var selectedKeywordIds = Array.prototype.slice
-            .call(keywordsSelect.selectedOptions || [])
-            .map(function (o) {
-              return o.value;
+          var selectedKeywordIds = partsChoices.getValue(true) || [];
+          if (!Array.isArray(selectedKeywordIds)) {
+            selectedKeywordIds = [selectedKeywordIds];
+          }
+
+          var keywordIdsNumeric = selectedKeywordIds
+            .map(function (v) {
+              return Number(v);
             })
             .filter(function (v) {
-              return v;
+              return !Number.isNaN(v);
             });
 
           var keywordLabels = [];
-          selectedKeywordIds.forEach(function (id) {
+          keywordIdsNumeric.forEach(function (id) {
             var k = (keywords || []).find(function (kw) {
-              return String(kw.id) === String(id);
+              return Number(kw.id) === id;
             });
             if (k) {
               keywordLabels.push(k.name_ar || k.slug || ("#" + k.id));
@@ -658,14 +783,13 @@ export async function GET(_req: NextRequest) {
           var yearNumeric = Number(yearId);
           var sectionNumeric = Number(sectionId);
 
-          // نفس الأحداث
           logFilterEvent({
             event_type: "search_submit",
             brand_id: !Number.isNaN(brandNumeric) ? brandNumeric : null,
             model_id: !Number.isNaN(modelNumeric) ? modelNumeric : null,
             year_id: !Number.isNaN(yearNumeric) ? yearNumeric : null,
             section_id: !Number.isNaN(sectionNumeric) ? sectionNumeric : null,
-            keyword_ids: [],
+            keyword_ids: keywordIdsNumeric,
             meta: {
               page_url: window.location.href,
               target_url: url,
@@ -678,112 +802,113 @@ export async function GET(_req: NextRequest) {
           window.location.href = url;
         });
 
-        // 6) Prefill من الـ URL الحالي (best effort)
-        var urlInfo = parseCurrentUrlFilters();
+        // ===== Prefill من الـ URL (best effort) =====
+        (function prefillFromUrl() {
+          var info = parseCurrentUrlFilters();
+          if (
+            !info ||
+            (!info.pathSlug &&
+              !info.sCompany &&
+              !info.sCategory &&
+              !info.sYear &&
+              !info.sSection &&
+              !(info.keywordLabels && info.keywordLabels.length))
+          ) {
+            return;
+          }
 
-        // نحاول نطبق الموجود في URL خطوة خطوة بدون ما نعلق
-        try {
-          // نحدد البراند
+          // نحاول نطبّق: brand → model → year → section
+          // 1) brand
           var preBrand = null;
-          if (urlInfo.sCompany) {
+          if (info.sCompany) {
             preBrand = brands.find(function (b) {
               return (
-                String(b.salla_company_id) === String(urlInfo.sCompany) ||
-                String(b.id) === String(urlInfo.sCompany)
+                String(b.salla_company_id) === String(info.sCompany) ||
+                String(b.id) === String(info.sCompany)
               );
             });
           }
-          if (!preBrand && urlInfo.pathSlug) {
+          if (!preBrand && info.pathSlug) {
             preBrand = brands.find(function (b) {
-              return String(b.slug) === String(urlInfo.pathSlug);
+              return String(b.slug) === String(info.pathSlug);
             });
           }
+          if (!preBrand) return;
 
-          if (!preBrand) {
-            return; // لا نعرف البراند → نخليها فاضية
-          }
+          companyChoices.setChoiceByValue(String(preBrand.id));
+          company.dispatchEvent(new Event("change"));
 
-          // نطبق البراند
-          brandSelect.value = String(preBrand.id);
-          brandSelect.dispatchEvent(new Event("change"));
-
-          // ننتظر شوية عشان models تنجاب (شبكة)
-          setTimeout(async function () {
+          // نكمل على شكل steps مع delays بسيطة عشان الطلبات ترجع
+          setTimeout(function () {
             if (!models.length) return;
 
             var preModel = null;
-
-            if (urlInfo.sCategory) {
+            if (info.sCategory) {
               preModel = models.find(function (m) {
                 return (
-                  String(m.salla_category_id) === String(urlInfo.sCategory) ||
-                  String(m.id) === String(urlInfo.sCategory)
+                  String(m.salla_category_id) === String(info.sCategory) ||
+                  String(m.id) === String(info.sCategory)
                 );
               });
             }
-
-            // لو ما فيه category بس فيه pathSlug وما كان براند → ممكن يكون موديل
-            if (!preModel && urlInfo.pathSlug) {
+            if (!preModel && info.pathSlug) {
               preModel = models.find(function (m) {
-                return String(m.slug) === String(urlInfo.pathSlug);
+                return String(m.slug) === String(info.pathSlug);
               });
             }
-
             if (!preModel) return;
 
-            modelSelect.value = String(preModel.id);
-            modelSelect.dispatchEvent(new Event("change"));
+            categoryChoices.setChoiceByValue(String(preModel.id));
+            category.dispatchEvent(new Event("change"));
 
-            setTimeout(async function () {
+            setTimeout(function () {
               if (!years.length) return;
 
               var preYear = null;
-
-              if (urlInfo.sYear) {
+              if (info.sYear) {
                 preYear = years.find(function (y) {
                   return (
-                    String(y.salla_year_id) === String(urlInfo.sYear) ||
-                    String(y.id) === String(urlInfo.sYear)
+                    String(y.salla_year_id) === String(info.sYear) ||
+                    String(y.id) === String(info.sYear)
                   );
                 });
               }
-
-              if (!preYear && urlInfo.pathSlug) {
+              if (!preYear && info.pathSlug) {
                 preYear = years.find(function (y) {
-                  return String(y.slug) === String(urlInfo.pathSlug);
+                  return String(y.slug) === String(info.pathSlug);
                 });
               }
-
               if (!preYear) return;
 
-              yearSelect.value = String(preYear.id);
-              yearSelect.dispatchEvent(new Event("change"));
+              modelChoices.setChoiceByValue(String(preYear.id));
+              model.dispatchEvent(new Event("change"));
 
-              setTimeout(async function () {
+              setTimeout(function () {
                 if (!sections.length) return;
-
                 var preSection = null;
-                if (urlInfo.sSection) {
+                if (info.sSection) {
                   preSection = sections.find(function (s) {
                     return (
-                      String(s.salla_section_id) === String(urlInfo.sSection) ||
-                      String(s.id) === String(urlInfo.sSection)
+                      String(s.salla_section_id) === String(info.sSection) ||
+                      String(s.id) === String(info.sSection)
                     );
                   });
                 }
-
                 if (!preSection) return;
 
-                sectionSelect.value = String(preSection.id);
-                sectionSelect.dispatchEvent(new Event("change"));
+                sectionChoices.setChoiceByValue(String(preSection.id));
+                section.dispatchEvent(new Event("change"));
 
-                // لو فيه keyword في الرابط: نخزّنه، بس تطبيقه يعتمد على تحميل keywords
-                if (urlInfo.keywordLabels && urlInfo.keywordLabels.length) {
+                // الكلمات من keyword
+                if (
+                  info.keywordLabels &&
+                  info.keywordLabels.length &&
+                  keywords &&
+                  keywords.length
+                ) {
                   setTimeout(function () {
-                    if (!(keywords && keywords.length)) return;
-                    // نحاول نطابق بالاسم
                     var selectedIds = [];
-                    urlInfo.keywordLabels.forEach(function (label) {
+                    info.keywordLabels.forEach(function (label) {
                       var k = keywords.find(function (kw) {
                         var name = kw.name_ar || kw.slug || ("#" + kw.id);
                         return name === label;
@@ -793,21 +918,14 @@ export async function GET(_req: NextRequest) {
                       }
                     });
                     if (!selectedIds.length) return;
-                    Array.prototype.forEach.call(
-                      keywordsSelect.options,
-                      function (opt) {
-                        opt.selected =
-                          selectedIds.indexOf(String(opt.value)) !== -1;
-                      }
-                    );
-                  }, 700);
+                    partsChoices.removeActiveItems();
+                    partsChoices.setChoiceByValue(selectedIds);
+                  }, 400);
                 }
-              }, 700);
-            }, 700);
+              }, 500);
+            }, 500);
           }, 500);
-        } catch (e) {
-          console.error("[widgets.allPage] prefill error:", e);
-        }
+        })();
       })();
     }
 
@@ -816,7 +934,7 @@ export async function GET(_req: NextRequest) {
         var path = window.location && window.location.pathname;
         if (!path) return;
         if (path === "/" || path === "/index.html") {
-          // الصفحة الرئيسية لها widgets.js الخاص فيها
+          // الصفحة الرئيسية → لها widgets.js
           return;
         }
       } catch (e) {
@@ -836,14 +954,12 @@ export async function GET(_req: NextRequest) {
         })
         .then(function (data) {
           if (data && data.ok && data.suspended) {
-            // المتجر موقوف → لا نظهر الفلتر
             return;
           }
-          var showBranding = !!(data && data.ok && data.show_branding);
-          buildAllPageFilter(showBranding);
+          buildAllPageFilter();
         })
         .catch(function () {
-          buildAllPageFilter(false);
+          buildAllPageFilter();
         });
     }
 
