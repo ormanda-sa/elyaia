@@ -63,7 +63,7 @@ export default function SidebarWidget() {
   const snippet = `<script>
   (function () {
     var s = document.createElement('script');
-    s.src = "/widgets.js";
+    s.src = "https://elyaia.vercel.app/widgets.js";
     s.async = true;
 
     s.setAttribute("data-store-id", "${info.store_id}");
