@@ -568,7 +568,7 @@ export async function GET(_req: NextRequest) {
             listDiv.appendChild(btn);
           });
 
-          confirmBtn.onclick = async function () {
+                    confirmBtn.onclick = async function () {
             var brandObj = state.brand;
             var modelRow = state.type;
             var yearRow = state.model;
@@ -593,7 +593,21 @@ export async function GET(_req: NextRequest) {
             var sallaSectionId =
               (sectionRow && sectionRow.salla_section_id) || sectionRow.id;
 
+            // state.options = labels (نفس ما هو)
             var keywordLabels = (state.options || []).slice();
+
+            // نطلع IDs بناءً على labels + مصفوفة keywords الحالية
+            var keywordIdsNumeric = [];
+            (keywords || []).forEach(function (k) {
+              var label = k.name_ar || k.slug || ("#" + k.id);
+              if (keywordLabels.indexOf(label) !== -1) {
+                var numId = Number(k.id);
+                if (!Number.isNaN(numId)) {
+                  keywordIdsNumeric.push(numId);
+                }
+              }
+            });
+
             var keywordParam = "";
             if (keywordLabels.length) {
               keywordParam = encodeURIComponent(keywordLabels.join("||"));
@@ -629,18 +643,19 @@ export async function GET(_req: NextRequest) {
               model_id: !Number.isNaN(modelNumeric) ? modelNumeric : null,
               year_id: !Number.isNaN(yearNumeric) ? yearNumeric : null,
               section_id: !Number.isNaN(sectionNumeric) ? sectionNumeric : null,
-              keyword_ids: [],
+              keyword_ids: keywordIdsNumeric, // ← IDs الفعلية للكلمات
               meta: {
                 page_url: window.location.href,
                 target_url: url,
                 from: "advanced_popup",
                 has_keywords: keywordLabels.length > 0,
-                keyword_labels: keywordLabels,
+                keyword_labels: keywordLabels, // ← الأسماء (حتى لو أكثر من كلمة)
               },
             });
 
             window.location.href = url;
           };
+
         }
 
         // فلتر البحث في القائمة الحالية
