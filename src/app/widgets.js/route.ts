@@ -68,7 +68,8 @@ export async function GET(_req: NextRequest) {
     async function fetchJson(url, options) {
       var res = await fetch(url, {
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        // أهم تعديل: لا نرسل credentials عشان CORS
+        credentials: "omit",
         ...(options || {}),
       });
       if (!res.ok) throw new Error("Request failed: " + res.status);
