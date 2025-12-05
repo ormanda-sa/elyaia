@@ -113,25 +113,52 @@ export async function GET(_req: NextRequest) {
       }
     }
 
-    async function logFilterEvent(payload) {
+        function logFilterEvent(payload) {
       try {
         if (!WIDGET_SECRET) return;
-        await fetch(API_BASE + "/event", {
+
+        var bodyObj = {
+          store_id: storeId,
+          session_key: getFilterSessionKey(),
+          ...payload,
+        };
+        var bodyJson = JSON.stringify(bodyObj);
+
+        // نجهز رابط الـ API مع السر في الـ query (عشان sendBeacon)
+        var url = API_BASE + "/event?secret=" + encodeURIComponent(WIDGET_SECRET);
+
+        // لو الحدث هو search_submit (أو search_submit_popup) نستخدم sendBeacon
+        if (
+          payload.event_type === "search_submit" ||
+          payload.event_type === "search_submit_popup"
+        ) {
+          if (navigator.sendBeacon) {
+            var blob = new Blob([bodyJson], { type: "application/json" });
+            navigator.sendBeacon(url, blob);
+            return;
+          }
+          // لو ما فيه sendBeacon (متصفح قديم) نستخدم fetch مع keepalive
+          fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: bodyJson,
+            keepalive: true,
+          });
+          return;
+        }
+
+        // باقي الأحداث العادية (brand/model/year/section/...) → fetch عادي fire-and-forget
+        fetch(url, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-widget-secret": WIDGET_SECRET,
-          },
-          body: JSON.stringify({
-            store_id: storeId,
-            session_key: getFilterSessionKey(),
-            ...payload,
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: bodyJson,
+          keepalive: true,
         });
       } catch (e) {
         // نسكت
       }
     }
+
 
     async function resolveStoreDomain(storeId) {
       try {
