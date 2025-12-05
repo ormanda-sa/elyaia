@@ -282,6 +282,11 @@ export async function GET(_req: NextRequest) {
         var parts = wrap.querySelector("#parts");
         var filterBtn = wrap.querySelector("#filter-btn");
 
+        // نخلي مؤشر الماوس يوحي أنه زر
+        if (filterBtn) {
+          filterBtn.style.cursor = "pointer";
+        }
+
         var currentCategory = null;
         var currentModel = null;
 
@@ -354,13 +359,27 @@ export async function GET(_req: NextRequest) {
         }
 
         // 1) الماركات
+        // أولاً نحط حالة "جاري التحميل..."
+        setChoicesData(companyChoices, [], "جاري التحميل...");
+        company.disabled = true;
+        companyChoices.disable();
+
         try {
           brands = await loadBrands(storeId);
-          setChoicesData(companyChoices, brands, "اختر الماركة", "name_ar");
-          company.disabled = false;
-          companyChoices.enable();
+
+          if (brands.length > 0) {
+            setChoicesData(companyChoices, brands, "اختر الماركة", "name_ar");
+            company.disabled = false;
+            companyChoices.enable();
+          } else {
+            // ما فيه أي ماركات
+            setChoicesData(companyChoices, [], "لا توجد خيارات");
+            company.disabled = true;
+            companyChoices.disable();
+          }
         } catch (e) {
-          setChoicesData(companyChoices, [], "خطأ في تحميل الماركات", "name");
+          setChoicesData(companyChoices, [], "خطأ في تحميل الماركات");
+          company.disabled = true;
           companyChoices.disable();
         }
 
@@ -398,18 +417,26 @@ export async function GET(_req: NextRequest) {
             });
           }
 
+          // حالة "جاري التحميل..." للموديلات
+          setChoicesData(categoryChoices, [], "جاري التحميل...");
+          category.disabled = true;
+          categoryChoices.disable();
+
           try {
             models = await loadModels(storeId, brandId);
-            setChoicesData(
-              categoryChoices,
-              models,
-              "اختر الموديل",
-              "name_ar"
-            );
+
             if (models.length > 0) {
+              setChoicesData(
+                categoryChoices,
+                models,
+                "اختر الموديل",
+                "name_ar"
+              );
               category.disabled = false;
               categoryChoices.enable();
             } else {
+              // ما فيه موديلات
+              setChoicesData(categoryChoices, [], "لا توجد خيارات");
               category.disabled = true;
               categoryChoices.disable();
             }
@@ -417,8 +444,7 @@ export async function GET(_req: NextRequest) {
             setChoicesData(
               categoryChoices,
               [],
-              "خطأ في تحميل الموديلات",
-              "name_ar"
+              "خطأ في تحميل الموديلات"
             );
             category.disabled = true;
             categoryChoices.disable();
@@ -458,18 +484,25 @@ export async function GET(_req: NextRequest) {
             });
           }
 
+          // حالة "جاري التحميل..." للسنوات
+          setChoicesData(modelChoices, [], "جاري التحميل...");
+          model.disabled = true;
+          modelChoices.disable();
+
           try {
             years = await loadYears(storeId, categoryId);
-            setChoicesData(modelChoices, years, "اختر السنة", "year");
+
             if (years.length > 0) {
+              setChoicesData(modelChoices, years, "اختر السنة", "year");
               model.disabled = false;
               modelChoices.enable();
             } else {
+              setChoicesData(modelChoices, [], "لا توجد خيارات");
               model.disabled = true;
               modelChoices.disable();
             }
           } catch (e) {
-            setChoicesData(modelChoices, [], "خطأ في تحميل السنوات", "year");
+            setChoicesData(modelChoices, [], "خطأ في تحميل السنوات");
             model.disabled = true;
             modelChoices.disable();
           }
@@ -505,18 +538,24 @@ export async function GET(_req: NextRequest) {
             });
           }
 
+          // حالة "جاري التحميل..." للأقسام
+          setChoicesData(sectionChoices, [], "جاري التحميل...");
+          section.disabled = true;
+          sectionChoices.disable();
+
           try {
             sections = await loadSections(storeId);
-            setChoicesData(
-              sectionChoices,
-              sections,
-              "اختر القسم",
-              "name_ar"
-            );
             if (sections.length > 0) {
+              setChoicesData(
+                sectionChoices,
+                sections,
+                "اختر القسم",
+                "name_ar"
+              );
               section.disabled = false;
               sectionChoices.enable();
             } else {
+              setChoicesData(sectionChoices, [], "لا توجد خيارات");
               section.disabled = true;
               sectionChoices.disable();
             }
@@ -524,8 +563,7 @@ export async function GET(_req: NextRequest) {
             setChoicesData(
               sectionChoices,
               [],
-              "خطأ في تحميل الأقسام",
-              "name_ar"
+              "خطأ في تحميل الأقسام"
             );
             section.disabled = true;
             sectionChoices.disable();
@@ -557,6 +595,22 @@ export async function GET(_req: NextRequest) {
           var modelId = categoryChoices.getValue(true);
           var yearId = modelChoices.getValue(true);
 
+          // حالة "جاري التحميل..." للقطع
+          partsChoices.setChoices(
+            [
+              {
+                value: "",
+                label: "جاري التحميل...",
+                selected: true,
+              },
+            ],
+            "value",
+            "label",
+            true
+          );
+          parts.disabled = true;
+          partsChoices.disable();
+
           try {
             keywords = await loadKeywords(
               storeId,
@@ -566,24 +620,43 @@ export async function GET(_req: NextRequest) {
               sectionId
             );
 
-            parts.disabled = false;
             partsChoices.clearStore();
 
-            partsChoices.setChoices(
-              (keywords || []).map(function (k) {
-                var label = k.name_ar || k.slug || ("#" + k.id);
-                return {
-                  value: String(k.id),
-                  label: label,
-                  selected: false,
-                };
-              }),
-              "value",
-              "label",
-              true
-            );
+            if ((keywords || []).length > 0) {
+              parts.disabled = false;
+              partsChoices.setChoices(
+                (keywords || []).map(function (k) {
+                  var label = k.name_ar || k.slug || ("#" + k.id);
+                  return {
+                    value: String(k.id),
+                    label: label,
+                    selected: false,
+                  };
+                }),
+                "value",
+                "label",
+                true
+              );
+              partsChoices.enable();
+            } else {
+              // لا توجد كلمات / قطع
+              parts.disabled = true;
+              partsChoices.setChoices(
+                [
+                  {
+                    value: "",
+                    label: "لا توجد خيارات",
+                    selected: true,
+                  },
+                ],
+                "value",
+                "label",
+                true
+              );
+              partsChoices.disable();
+            }
 
-            partsChoices.enable();
+            // زر البحث يشتغل حتى لو ما فيه كلمات
             filterBtn.disabled = false;
           } catch (e) {
             partsChoices.clearStore();
