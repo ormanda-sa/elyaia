@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets.allPage.js — Darb Filter (same logic/style as widgets.js, for all pages except home)
+// widgets.allPage.js — Darb Filter (snapshot-based, all pages except home)
 (function () {
   try {
     var script =
@@ -30,6 +30,7 @@ export async function GET(_req: NextRequest) {
     }
 
     var API_BASE = (PANEL_ORIGIN || "") + "/api/widget";
+    var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data";
 
     // ========== Helpers ==========
 
@@ -76,40 +77,68 @@ export async function GET(_req: NextRequest) {
       return res.json();
     }
 
+    // ========= snapshot بدل APIs منفصلة =========
+
+    var SNAPSHOT = null;
+
+    async function ensureSnapshot(storeId) {
+      if (SNAPSHOT) return SNAPSHOT;
+
+      var url =
+        SNAPSHOT_BASE +
+        "/" +
+        encodeURIComponent(storeId) +
+        ".json";
+
+      try {
+        var res = await fetch(url, { credentials: "omit" });
+        if (!res.ok) {
+          throw new Error("Snapshot request failed: " + res.status);
+        }
+        var data = await res.json();
+        SNAPSHOT = data || {};
+      } catch (e) {
+        console.error("[widgets.allPage] failed to load snapshot", e);
+        SNAPSHOT = {
+          store_id: storeId,
+          brands: [],
+          models: [],
+          years: [],
+          sections: [],
+          keywords: [],
+        };
+      }
+      return SNAPSHOT;
+    }
+
     async function loadBrands(storeId) {
-      var data = await fetchJson(
-        API_BASE + "/brands?store_id=" + encodeURIComponent(storeId)
-      );
-      return data.brands || [];
+      var snap = await ensureSnapshot(storeId);
+      return snap.brands || [];
     }
 
     async function loadModels(storeId, brandId) {
-      var data = await fetchJson(
-        API_BASE +
-          "/models?store_id=" +
-          encodeURIComponent(storeId) +
-          "&brand_id=" +
-          encodeURIComponent(brandId)
-      );
-      return data.models || [];
+      var snap = await ensureSnapshot(storeId);
+      var allModels = snap.models || [];
+      var idNum = Number(brandId);
+      if (Number.isNaN(idNum)) return allModels;
+      return allModels.filter(function (m) {
+        return Number(m.brand_id) === idNum;
+      });
     }
 
     async function loadYears(storeId, modelId) {
-      var data = await fetchJson(
-        API_BASE +
-          "/years?store_id=" +
-          encodeURIComponent(storeId) +
-          "&model_id=" +
-          encodeURIComponent(modelId)
-      );
-      return data.years || [];
+      var snap = await ensureSnapshot(storeId);
+      var allYears = snap.years || [];
+      var idNum = Number(modelId);
+      if (Number.isNaN(idNum)) return allYears;
+      return allYears.filter(function (y) {
+        return Number(y.model_id) === idNum;
+      });
     }
 
     async function loadSections(storeId) {
-      var data = await fetchJson(
-        API_BASE + "/sections?store_id=" + encodeURIComponent(storeId)
-      );
-      return data.sections || [];
+      var snap = await ensureSnapshot(storeId);
+      return snap.sections || [];
     }
 
     async function loadKeywords(
@@ -119,15 +148,19 @@ export async function GET(_req: NextRequest) {
       yearId,
       sectionId
     ) {
-      var params = new URLSearchParams();
-      params.set("store_id", storeId);
-      params.set("brand_id", brandId);
-      params.set("model_id", modelId);
-      params.set("year_id", yearId);
-      params.set("section_id", sectionId);
+      var snap = await ensureSnapshot(storeId);
+      var allKeywords = snap.keywords || [];
 
-      var data = await fetchJson(API_BASE + "/keywords?" + params.toString());
-      return data.keywords || [];
+      var mId = Number(modelId);
+      var sId = Number(sectionId);
+
+      var result = allKeywords.filter(function (k) {
+        if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
+        if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
+        return true;
+      });
+
+      return result;
     }
 
     function getFilterSessionKey() {
@@ -279,7 +312,7 @@ export async function GET(_req: NextRequest) {
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-title-filter{display:none;}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-bg-img{display:none;}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-wrapper{padding:0;}" +
-            "@media(max-width:768px){.widgets-filter-hero-wrap.darb-inline-filter{padding:0 8px;}}" ;
+            "@media(max-width:768px){.widgets-filter-hero-wrap.darb-inline-filter{padding:0 8px;}}";
           document.head.appendChild(styleEl);
         }
 
@@ -393,7 +426,7 @@ export async function GET(_req: NextRequest) {
           choicesInstance.setChoices(items, "value", "label", true);
         }
 
-        // ===== 1) تحميل الماركات =====
+        // ===== 1) تحميل الماركات من snapshot =====
         setChoicesData(companyChoices, [], "جاري تحميل الماركات...", "name_ar");
 
         try {
@@ -806,7 +839,7 @@ export async function GET(_req: NextRequest) {
           window.location.href = url;
         });
 
-        // ===== Prefill من الرابط (بدون setTimeout) =====
+        // ===== Prefill من الرابط =====
         async function prefillFromUrl() {
           var info = parseCurrentUrlFilters();
           if (
@@ -820,7 +853,7 @@ export async function GET(_req: NextRequest) {
             return;
           }
 
-          // 1) حدد البراند
+          // 1) براند
           var preBrand = null;
           if (info.sCompany) {
             preBrand = brands.find(function (b) {
@@ -840,7 +873,7 @@ export async function GET(_req: NextRequest) {
           companyChoices.setChoiceByValue(String(preBrand.id));
           company.disabled = false;
 
-          // 2) حمّل الموديلات لهذا البراند وحدد الموديل
+          // 2) موديل
           try {
             models = await loadModels(storeId, preBrand.id);
             if (models.length > 0) {
@@ -880,7 +913,7 @@ export async function GET(_req: NextRequest) {
 
           categoryChoices.setChoiceByValue(String(preModel.id));
 
-          // 3) حمّل السنوات لهذا الموديل وحدد السنة
+          // 3) سنة
           try {
             years = await loadYears(storeId, preModel.id);
             if (years.length > 0) {
@@ -916,7 +949,7 @@ export async function GET(_req: NextRequest) {
 
           modelChoices.setChoiceByValue(String(preYear.id));
 
-          // 4) حمّل الأقسام وحدد القسم
+          // 4) قسم
           try {
             sections = await loadSections(storeId);
             if (sections.length > 0) {
@@ -957,7 +990,7 @@ export async function GET(_req: NextRequest) {
 
           sectionChoices.setChoiceByValue(String(preSection.id));
 
-          // 5) لو فيه keyword → حمّل الكلمات وحددها
+          // 5) كلمات من الرابط
           if (info.keywordLabels && info.keywordLabels.length) {
             try {
               keywords = await loadKeywords(
