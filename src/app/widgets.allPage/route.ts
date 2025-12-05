@@ -31,7 +31,7 @@ export async function GET(_req: NextRequest) {
 
     var API_BASE = (PANEL_ORIGIN || "") + "/api/widget";
 
-    // ========== Helpers (نفس widgets.js) ==========
+    // ========== Helpers ==========
 
     function ensureChoicesAssets() {
       return new Promise(function (resolve) {
@@ -171,7 +171,7 @@ export async function GET(_req: NextRequest) {
     async function resolveStoreDomain(storeId) {
       try {
         var data = await fetchJson(
-        API_BASE + "/store-domain?store_id=" + encodeURIComponent(storeId)
+          API_BASE + "/store-domain?store_id=" + encodeURIComponent(storeId)
         );
 
         var domain = (data && data.domain) || "";
@@ -231,7 +231,7 @@ export async function GET(_req: NextRequest) {
       return result;
     }
 
-    // ========== Build Inline Filter (نفس الفورم حق الهيرو) ==========
+    // ========== Build Inline Filter (نفس فورم الهيرو) ==========
 
     function buildAllPageFilter() {
       (async function () {
@@ -240,7 +240,6 @@ export async function GET(_req: NextRequest) {
         var wrap = document.createElement("div");
         wrap.className = "widgets-filter-hero-wrap darb-inline-filter";
 
-        // نفس فورم الهيرو بدون الخلفية والنصوص
         var html = '\\
       <div class="X1">\\
         <div class="hero-filters-wrapper">\\
@@ -259,7 +258,6 @@ export async function GET(_req: NextRequest) {
 
         wrap.innerHTML = html;
 
-        // نحطه تحت <header> لو فيه، وإلا أعلى البودي
         var headerEl = document.querySelector("header");
         if (headerEl && headerEl.parentNode) {
           if (headerEl.nextSibling) {
@@ -271,18 +269,17 @@ export async function GET(_req: NextRequest) {
           document.body.insertBefore(wrap, document.body.firstChild);
         }
 
-        // CSS خفيف لتصغير الهيرو وإلغاء الخلفيات
         var styleId = "darb-inline-filter-style";
         if (!document.getElementById(styleId)) {
           var styleEl = document.createElement("style");
           styleEl.id = styleId;
           styleEl.textContent =
             ".widgets-filter-hero-wrap.darb-inline-filter{margin:8px auto 12px auto;max-width:1200px;background:transparent;padding:0;}" +
-            ".widgets-filter-hero-wrap.darb-inline-filter .hero-section{background:none;box-shadow:none;}" +
+            ".widgets-filter-hero-wrap.darb-inline-filter .hero-section{background:linear-gradient(to right,#111827,#1f2937);box-shadow:0 10px 25px rgba(0,0,0,.25);border-radius:18px;padding:12px 16px;}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-title-filter{display:none;}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-bg-img{display:none;}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-wrapper{padding:0;}" +
-            "@media(max-width:768px){.widgets-filter-hero-wrap.darb-inline-filter{padding:0 8px;}}";
+            "@media(max-width:768px){.widgets-filter-hero-wrap.darb-inline-filter{padding:0 8px;}}" ;
           document.head.appendChild(styleEl);
         }
 
@@ -396,10 +393,8 @@ export async function GET(_req: NextRequest) {
           choicesInstance.setChoices(items, "value", "label", true);
         }
 
-        // ===== تحميل الماركات (نفس widgets.js) =====
+        // ===== 1) تحميل الماركات =====
         setChoicesData(companyChoices, [], "جاري تحميل الماركات...", "name_ar");
-        company.disabled = true;
-        companyChoices.disable();
 
         try {
           brands = await loadBrands(storeId);
@@ -409,12 +404,21 @@ export async function GET(_req: NextRequest) {
             companyChoices.enable();
           } else {
             setChoicesData(companyChoices, [], "لا توجد ماركات", "name_ar");
+            company.disabled = true;
+            companyChoices.disable();
           }
         } catch (e) {
-          setChoicesData(companyChoices, [], "خطأ في تحميل الماركات", "name_ar");
+          setChoicesData(
+            companyChoices,
+            [],
+            "خطأ في تحميل الماركات",
+            "name_ar"
+          );
+          company.disabled = true;
+          companyChoices.disable();
         }
 
-        // 2) الشركة → الموديل
+        // 2) on change brand
         company.addEventListener("change", async function () {
           var brandId = companyChoices.getValue(true);
 
@@ -474,7 +478,7 @@ export async function GET(_req: NextRequest) {
           updateFilterButtonState();
         });
 
-        // 3) الموديل → السنة
+        // 3) on change model
         category.addEventListener("change", async function () {
           var categoryId = categoryChoices.getValue(true);
 
@@ -526,7 +530,7 @@ export async function GET(_req: NextRequest) {
           updateFilterButtonState();
         });
 
-        // 4) السنة → القسم
+        // 4) on change year
         model.addEventListener("change", async function () {
           var modelId = modelChoices.getValue(true);
 
@@ -580,7 +584,7 @@ export async function GET(_req: NextRequest) {
           updateFilterButtonState();
         });
 
-        // 5) القسم → الكلمات
+        // 5) on change section
         section.addEventListener("change", async function () {
           var sectionId = sectionChoices.getValue(true);
 
@@ -802,13 +806,12 @@ export async function GET(_req: NextRequest) {
           window.location.href = url;
         });
 
-        // ===== Prefill من الـ URL (best effort) =====
-        (function prefillFromUrl() {
+        // ===== Prefill من الرابط (بدون setTimeout) =====
+        async function prefillFromUrl() {
           var info = parseCurrentUrlFilters();
           if (
             !info ||
-            (!info.pathSlug &&
-              !info.sCompany &&
+            (!info.sCompany &&
               !info.sCategory &&
               !info.sYear &&
               !info.sSection &&
@@ -817,8 +820,7 @@ export async function GET(_req: NextRequest) {
             return;
           }
 
-          // نحاول نطبّق: brand → model → year → section
-          // 1) brand
+          // 1) حدد البراند
           var preBrand = null;
           if (info.sCompany) {
             preBrand = brands.find(function (b) {
@@ -836,96 +838,175 @@ export async function GET(_req: NextRequest) {
           if (!preBrand) return;
 
           companyChoices.setChoiceByValue(String(preBrand.id));
-          company.dispatchEvent(new Event("change"));
+          company.disabled = false;
 
-          // نكمل على شكل steps مع delays بسيطة عشان الطلبات ترجع
-          setTimeout(function () {
-            if (!models.length) return;
+          // 2) حمّل الموديلات لهذا البراند وحدد الموديل
+          try {
+            models = await loadModels(storeId, preBrand.id);
+            if (models.length > 0) {
+              setChoicesData(
+                categoryChoices,
+                models,
+                "اختر الموديل",
+                "name_ar"
+              );
+              category.disabled = false;
+              categoryChoices.enable();
+            } else {
+              return;
+            }
+          } catch (e) {
+            return;
+          }
 
-            var preModel = null;
-            if (info.sCategory) {
-              preModel = models.find(function (m) {
-                return (
-                  String(m.salla_category_id) === String(info.sCategory) ||
-                  String(m.id) === String(info.sCategory)
+          var preModel = null;
+          if (info.sCategory) {
+            preModel = models.find(function (m) {
+              return (
+                String(m.salla_category_id) === String(info.sCategory) ||
+                String(m.id) === String(info.sCategory)
+              );
+            });
+          }
+          if (!preModel && info.pathSlug) {
+            preModel = models.find(function (m) {
+              return String(m.slug) === String(info.pathSlug);
+            });
+          }
+          if (!preModel) {
+            updateFilterButtonState();
+            return;
+          }
+
+          categoryChoices.setChoiceByValue(String(preModel.id));
+
+          // 3) حمّل السنوات لهذا الموديل وحدد السنة
+          try {
+            years = await loadYears(storeId, preModel.id);
+            if (years.length > 0) {
+              setChoicesData(modelChoices, years, "اختر السنة", "year");
+              model.disabled = false;
+              modelChoices.enable();
+            } else {
+              updateFilterButtonState();
+              return;
+            }
+          } catch (e) {
+            return;
+          }
+
+          var preYear = null;
+          if (info.sYear) {
+            preYear = years.find(function (y) {
+              return (
+                String(y.salla_year_id) === String(info.sYear) ||
+                String(y.id) === String(info.sYear)
+              );
+            });
+          }
+          if (!preYear && info.pathSlug) {
+            preYear = years.find(function (y) {
+              return String(y.slug) === String(info.pathSlug);
+            });
+          }
+          if (!preYear) {
+            updateFilterButtonState();
+            return;
+          }
+
+          modelChoices.setChoiceByValue(String(preYear.id));
+
+          // 4) حمّل الأقسام وحدد القسم
+          try {
+            sections = await loadSections(storeId);
+            if (sections.length > 0) {
+              setChoicesData(
+                sectionChoices,
+                sections,
+                "اختر القسم",
+                "name_ar"
+              );
+              section.disabled = false;
+              sectionChoices.enable();
+            } else {
+              updateFilterButtonState();
+              return;
+            }
+          } catch (e) {
+            return;
+          }
+
+          var preSection = null;
+          if (info.sSection) {
+            preSection = sections.find(function (s) {
+              return (
+                String(s.salla_section_id) === String(info.sSection) ||
+                String(s.id) === String(info.sSection)
+              );
+            });
+          }
+          if (!preSection && info.pathSlug) {
+            preSection = sections.find(function (s) {
+              return String(s.slug) === String(info.pathSlug);
+            });
+          }
+          if (!preSection) {
+            updateFilterButtonState();
+            return;
+          }
+
+          sectionChoices.setChoiceByValue(String(preSection.id));
+
+          // 5) لو فيه keyword → حمّل الكلمات وحددها
+          if (info.keywordLabels && info.keywordLabels.length) {
+            try {
+              keywords = await loadKeywords(
+                storeId,
+                preBrand.id,
+                preModel.id,
+                preYear.id,
+                preSection.id
+              );
+              partsChoices.clearStore();
+              if ((keywords || []).length > 0) {
+                parts.disabled = false;
+                partsChoices.setChoices(
+                  (keywords || []).map(function (k) {
+                    var label = k.name_ar || k.slug || ("#" + k.id);
+                    return {
+                      value: String(k.id),
+                      label: label,
+                      selected: false,
+                    };
+                  }),
+                  "value",
+                  "label",
+                  true
                 );
-              });
-            }
-            if (!preModel && info.pathSlug) {
-              preModel = models.find(function (m) {
-                return String(m.slug) === String(info.pathSlug);
-              });
-            }
-            if (!preModel) return;
+                partsChoices.enable();
 
-            categoryChoices.setChoiceByValue(String(preModel.id));
-            category.dispatchEvent(new Event("change"));
-
-            setTimeout(function () {
-              if (!years.length) return;
-
-              var preYear = null;
-              if (info.sYear) {
-                preYear = years.find(function (y) {
-                  return (
-                    String(y.salla_year_id) === String(info.sYear) ||
-                    String(y.id) === String(info.sYear)
-                  );
-                });
-              }
-              if (!preYear && info.pathSlug) {
-                preYear = years.find(function (y) {
-                  return String(y.slug) === String(info.pathSlug);
-                });
-              }
-              if (!preYear) return;
-
-              modelChoices.setChoiceByValue(String(preYear.id));
-              model.dispatchEvent(new Event("change"));
-
-              setTimeout(function () {
-                if (!sections.length) return;
-                var preSection = null;
-                if (info.sSection) {
-                  preSection = sections.find(function (s) {
-                    return (
-                      String(s.salla_section_id) === String(info.sSection) ||
-                      String(s.id) === String(info.sSection)
-                    );
+                var selectedIds = [];
+                info.keywordLabels.forEach(function (lbl) {
+                  var k = keywords.find(function (kw) {
+                    var nm = kw.name_ar || kw.slug || ("#" + kw.id);
+                    return nm === lbl;
                   });
+                  if (k) selectedIds.push(String(k.id));
+                });
+                if (selectedIds.length) {
+                  partsChoices.setChoiceByValue(selectedIds);
                 }
-                if (!preSection) return;
+              }
+            } catch (e) {
+              // نسكت
+            }
+          }
 
-                sectionChoices.setChoiceByValue(String(preSection.id));
-                section.dispatchEvent(new Event("change"));
+          updateFilterButtonState();
+        }
 
-                // الكلمات من keyword
-                if (
-                  info.keywordLabels &&
-                  info.keywordLabels.length &&
-                  keywords &&
-                  keywords.length
-                ) {
-                  setTimeout(function () {
-                    var selectedIds = [];
-                    info.keywordLabels.forEach(function (label) {
-                      var k = keywords.find(function (kw) {
-                        var name = kw.name_ar || kw.slug || ("#" + kw.id);
-                        return name === label;
-                      });
-                      if (k) {
-                        selectedIds.push(String(k.id));
-                      }
-                    });
-                    if (!selectedIds.length) return;
-                    partsChoices.removeActiveItems();
-                    partsChoices.setChoiceByValue(selectedIds);
-                  }, 400);
-                }
-              }, 500);
-            }, 500);
-          }, 500);
-        })();
+        // ناد prefill بعد ما تجهز الماركات
+        prefillFromUrl();
       })();
     }
 
@@ -934,7 +1015,6 @@ export async function GET(_req: NextRequest) {
         var path = window.location && window.location.pathname;
         if (!path) return;
         if (path === "/" || path === "/index.html") {
-          // الصفحة الرئيسية → لها widgets.js
           return;
         }
       } catch (e) {
