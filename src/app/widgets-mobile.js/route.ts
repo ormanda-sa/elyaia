@@ -113,7 +113,7 @@ export async function GET(_req: NextRequest) {
       }
     }
 
-    // نحافظ على logFilterEvent كما هو لباقي الأحداث (اختيار ماركة/موديل/سنة/قسم...)
+    // نفس الدالة الأصلية اللي كانت عندك
     async function logFilterEvent(payload) {
       try {
         if (!WIDGET_SECRET) return;
@@ -180,6 +180,7 @@ export async function GET(_req: NextRequest) {
       var buttonLabel =
         typeof cfg.label === "string" ? cfg.label : "اختيار السيارة";
 
+      // نفس اللي في widgets.js لكن في بوب أب
       var brands = [];
       var models = [];
       var years = [];
@@ -187,14 +188,15 @@ export async function GET(_req: NextRequest) {
       var keywords = [];
 
       var state = {
-        brand: null,
-        type: null,
-        model: null,
+        brand: null,  // = brandObj من API
+        type: null,   // = modelRow (car)
+        model: null,  // = yearRow
         section: null,
-        options: [],
+        options: [],  // أسماء القطع المختارة (labels)
       };
       var step = 0;
 
+      // زر الفتح — نفس اللي عندك
       var openBtn = document.createElement("button");
       openBtn.className = "popup-open-btn";
 
@@ -211,6 +213,7 @@ export async function GET(_req: NextRequest) {
 
       document.body.appendChild(openBtn);
 
+      // البوب أب نفس الكود تبعك
       var popup = document.createElement("div");
       popup.className = "fullpage-popup";
       popup.innerHTML =
@@ -514,7 +517,7 @@ export async function GET(_req: NextRequest) {
             listDiv.appendChild(btn);
           });
 
-          // ===== هنا التعديل المهم لحدث البحث =====
+          // **هنا فقط التعديل الحقيقي: نوع الحدث**
           confirmBtn.onclick = async function () {
             var brandObj = state.brand;
             var modelRow = state.type;
@@ -570,9 +573,9 @@ export async function GET(_req: NextRequest) {
             var yearNumeric = Number(yearRow.id);
             var sectionNumeric = Number(sectionRow.id);
 
-            // نجهز الـ payload لحدث البحث
-            var eventPayload = {
-              event_type: "search_submit", // نفس الحدث حق الكمبيوتر
+            // هنا خَلّينا الحدث "search_submit" مثل الكمبيوتر
+            logFilterEvent({
+              event_type: "search_submit",
               brand_id: !Number.isNaN(brandNumeric) ? brandNumeric : null,
               model_id: !Number.isNaN(modelNumeric) ? modelNumeric : null,
               year_id: !Number.isNaN(yearNumeric) ? yearNumeric : null,
@@ -585,35 +588,7 @@ export async function GET(_req: NextRequest) {
                 has_keywords: keywordLabels.length > 0,
                 keyword_labels: keywordLabels,
               },
-            };
-
-            // نحاول نرسل الحدث بطريقة مضمونة في الجوال قبل ما نغيّر الصفحة
-            try {
-              var bodyObj = {
-                store_id: storeId,
-                session_key: getFilterSessionKey(),
-                ...eventPayload,
-              };
-              var bodyJson = JSON.stringify(bodyObj);
-              var eventUrl =
-                API_BASE + "/event?secret=" + encodeURIComponent(WIDGET_SECRET);
-
-              if (navigator.sendBeacon) {
-                var blob = new Blob([bodyJson], {
-                  type: "application/json",
-                });
-                navigator.sendBeacon(eventUrl, blob);
-              } else {
-                fetch(eventUrl, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: bodyJson,
-                  keepalive: true,
-                });
-              }
-            } catch (e) {
-              // لو فشل التسجيل ما نوقف التنقل
-            }
+            });
 
             window.location.href = url;
           };
@@ -649,6 +624,7 @@ export async function GET(_req: NextRequest) {
         step = 0;
         setPlaceholder("جاري تحميل الماركات...");
 
+        // مثل widgets.js: نجيب الماركات أولاً وبعدين نمشي step by step
         loadBrands(storeId)
           .then(function (b) {
             brands = b || [];
