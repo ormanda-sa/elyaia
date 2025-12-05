@@ -141,7 +141,7 @@ export async function GET(_req: NextRequest) {
       return snap.sections || [];
     }
 
-    async function loadKeywords(
+      async function loadKeywords(
       storeId,
       brandId,
       modelId,
@@ -151,19 +151,34 @@ export async function GET(_req: NextRequest) {
       var snap = await ensureSnapshot(storeId);
       var allKeywords = snap.keywords || [];
 
-      var bId = Number(brandId);
+      console.log("[DarbFilter] allKeywords length:", allKeywords.length);
+
       var mId = Number(modelId);
-      var yId = Number(yearId);
       var sId = Number(sectionId);
 
-      return allKeywords.filter(function (k) {
-        if (!Number.isNaN(bId) && Number(k.brand_id) !== bId) return false;
+      var result = allKeywords.filter(function (k) {
+        // نفلتر بس على الموديل + القسم (نفس سلوك API القديم تقريباً)
         if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
-        if (!Number.isNaN(yId) && Number(k.year_id) !== yId) return false;
         if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
         return true;
       });
+
+      console.log(
+        "[DarbFilter] filtered keywords length:",
+        result.length,
+        "for model_id=",
+        modelId,
+        "section_id=",
+        sectionId
+      );
+
+      if (result.length > 0) {
+        console.log("[DarbFilter] sample keyword:", result[0]);
+      }
+
+      return result;
     }
+
 
     // ========== جزء الأحداث (خفيف) ==========
 
