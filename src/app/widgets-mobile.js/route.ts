@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets-mobile.js — Darb Advanced Car Picker (DB-based, same logic as widgets.js)
+// widgets-mobile.js — Darb Advanced Car Picker (snapshot-based, same logic as widgets.js)
 (function () {
   try {
     var script =
@@ -30,6 +30,7 @@ export async function GET(_req: NextRequest) {
     }
 
     var API_BASE = (PANEL_ORIGIN || "") + "/api/widget";
+    var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data";
 
     async function fetchJson(url, options) {
       var res = await fetch(url, {
@@ -41,40 +42,70 @@ export async function GET(_req: NextRequest) {
       return res.json();
     }
 
+    // ===== snapshot بدل API calls منفصلة =====
+    var SNAPSHOT = null;
+
+    async function ensureSnapshot(storeId) {
+      if (SNAPSHOT) return SNAPSHOT;
+
+      var url =
+        SNAPSHOT_BASE +
+        "/" +
+        encodeURIComponent(storeId) +
+        ".json";
+
+      try {
+        // simple GET بدون headers خاصة عشان CORS
+        var res = await fetch(url, { credentials: "omit" });
+        if (!res.ok) {
+          throw new Error("Snapshot request failed: " + res.status);
+        }
+        var data = await res.json();
+        SNAPSHOT = data || {};
+      } catch (e) {
+        console.error("[widgets-mobile] failed to load snapshot", e);
+        SNAPSHOT = {
+          store_id: storeId,
+          brands: [],
+          models: [],
+          years: [],
+          sections: [],
+          keywords: [],
+        };
+      }
+      return SNAPSHOT;
+    }
+
+    // ===== دوال التحميل من snapshot =====
+
     async function loadBrands(storeId) {
-      var data = await fetchJson(
-        API_BASE + "/brands?store_id=" + encodeURIComponent(storeId)
-      );
-      return data.brands || [];
+      var snap = await ensureSnapshot(storeId);
+      return snap.brands || [];
     }
 
     async function loadModels(storeId, brandId) {
-      var data = await fetchJson(
-        API_BASE +
-          "/models?store_id=" +
-          encodeURIComponent(storeId) +
-          "&brand_id=" +
-          encodeURIComponent(brandId)
-      );
-      return data.models || [];
+      var snap = await ensureSnapshot(storeId);
+      var allModels = snap.models || [];
+      var idNum = Number(brandId);
+      if (Number.isNaN(idNum)) return allModels;
+      return allModels.filter(function (m) {
+        return Number(m.brand_id) === idNum;
+      });
     }
 
     async function loadYears(storeId, modelId) {
-      var data = await fetchJson(
-        API_BASE +
-          "/years?store_id=" +
-          encodeURIComponent(storeId) +
-          "&model_id=" +
-          encodeURIComponent(modelId)
-      );
-      return data.years || [];
+      var snap = await ensureSnapshot(storeId);
+      var allYears = snap.years || [];
+      var idNum = Number(modelId);
+      if (Number.isNaN(idNum)) return allYears;
+      return allYears.filter(function (y) {
+        return Number(y.model_id) === idNum;
+      });
     }
 
     async function loadSections(storeId) {
-      var data = await fetchJson(
-        API_BASE + "/sections?store_id=" + encodeURIComponent(storeId)
-      );
-      return data.sections || [];
+      var snap = await ensureSnapshot(storeId);
+      return snap.sections || [];
     }
 
     async function loadKeywords(
@@ -84,15 +115,35 @@ export async function GET(_req: NextRequest) {
       yearId,
       sectionId
     ) {
-      var params = new URLSearchParams();
-      params.set("store_id", storeId);
-      params.set("brand_id", brandId);
-      params.set("model_id", modelId);
-      params.set("year_id", yearId);
-      params.set("section_id", sectionId);
+      var snap = await ensureSnapshot(storeId);
+      var allKeywords = snap.keywords || [];
 
-      var data = await fetchJson(API_BASE + "/keywords?" + params.toString());
-      return data.keywords || [];
+      console.log("[widgets-mobile] allKeywords length:", allKeywords.length);
+
+      var mId = Number(modelId);
+      var sId = Number(sectionId);
+
+      var result = allKeywords.filter(function (k) {
+        // نفلتر فقط على الموديل + القسم (نفس منطق widgets.js)
+        if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
+        if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
+        return true;
+      });
+
+      console.log(
+        "[widgets-mobile] filtered keywords length:",
+        result.length,
+        "for model_id=",
+        modelId,
+        "section_id=",
+        sectionId
+      );
+
+      if (result.length > 0) {
+        console.log("[widgets-mobile] sample keyword:", result[0]);
+      }
+
+      return result;
     }
 
     function getFilterSessionKey() {
@@ -188,7 +239,7 @@ export async function GET(_req: NextRequest) {
       var keywords = [];
 
       var state = {
-        brand: null,  // = brandObj من API
+        brand: null,  // = brandObj
         type: null,   // = modelRow (car)
         model: null,  // = yearRow
         section: null,
@@ -196,7 +247,7 @@ export async function GET(_req: NextRequest) {
       };
       var step = 0;
 
-      // زر الفتح — نفس اللي عندك
+      // زر الفتح
       var openBtn = document.createElement("button");
       openBtn.className = "popup-open-btn";
 
@@ -213,7 +264,7 @@ export async function GET(_req: NextRequest) {
 
       document.body.appendChild(openBtn);
 
-      // البوب أب نفس الكود تبعك
+      // البوب أب
       var popup = document.createElement("div");
       popup.className = "fullpage-popup";
       popup.innerHTML =
@@ -517,7 +568,6 @@ export async function GET(_req: NextRequest) {
             listDiv.appendChild(btn);
           });
 
-          // **هنا فقط التعديل الحقيقي: نوع الحدث**
           confirmBtn.onclick = async function () {
             var brandObj = state.brand;
             var modelRow = state.type;
@@ -573,22 +623,21 @@ export async function GET(_req: NextRequest) {
             var yearNumeric = Number(yearRow.id);
             var sectionNumeric = Number(sectionRow.id);
 
-            // هنا خَلّينا الحدث "search_submit" مثل الكمبيوتر
             await logFilterEvent({
-  event_type: "search_submit",
-  brand_id: !Number.isNaN(brandNumeric) ? brandNumeric : null,
-  model_id: !Number.isNaN(modelNumeric) ? modelNumeric : null,
-  year_id: !Number.isNaN(yearNumeric) ? yearNumeric : null,
-  section_id: !Number.isNaN(sectionNumeric) ? sectionNumeric : null,
-  keyword_ids: [],
-  meta: {
-    page_url: window.location.href,
-    target_url: url,
-    from: "advanced_popup",
-    has_keywords: keywordLabels.length > 0,
-    keyword_labels: keywordLabels,
-  },
-});
+              event_type: "search_submit",
+              brand_id: !Number.isNaN(brandNumeric) ? brandNumeric : null,
+              model_id: !Number.isNaN(modelNumeric) ? modelNumeric : null,
+              year_id: !Number.isNaN(yearNumeric) ? yearNumeric : null,
+              section_id: !Number.isNaN(sectionNumeric) ? sectionNumeric : null,
+              keyword_ids: [],
+              meta: {
+                page_url: window.location.href,
+                target_url: url,
+                from: "advanced_popup",
+                has_keywords: keywordLabels.length > 0,
+                keyword_labels: keywordLabels,
+              },
+            });
 
             window.location.href = url;
           };
@@ -624,7 +673,7 @@ export async function GET(_req: NextRequest) {
         step = 0;
         setPlaceholder("جاري تحميل الماركات...");
 
-        // مثل widgets.js: نجيب الماركات أولاً وبعدين نمشي step by step
+        // snapshot-based: نجيب الماركات من JSON
         loadBrands(storeId)
           .then(function (b) {
             brands = b || [];
