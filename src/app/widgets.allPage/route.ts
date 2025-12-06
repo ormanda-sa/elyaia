@@ -106,6 +106,7 @@ export async function GET(_req: NextRequest) {
           years: [],
           sections: [],
           keywords: [],
+          config: null,
         };
       }
       return SNAPSHOT;
@@ -197,7 +198,6 @@ export async function GET(_req: NextRequest) {
           }),
         });
       } catch (e) {
-        // نسكت
       }
     }
 
@@ -259,7 +259,6 @@ export async function GET(_req: NextRequest) {
           });
         }
       } catch (e) {
-        // نسكت
       }
       return result;
     }
@@ -312,7 +311,10 @@ export async function GET(_req: NextRequest) {
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-title-filter{display:none;}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-bg-img{display:none;}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-wrapper{padding:0;}" +
-            "@media(max-width:768px){.widgets-filter-hero-wrap.darb-inline-filter{padding:0 8px;}}";
+            ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-form{background:radial-gradient(circle at 0 0, rgba(59,130,246,0.2), transparent 55%),radial-gradient(circle at 100% 100%, rgba(244,54,54,0.25), transparent 55%),rgba(15,23,42,0.72);box-shadow:0 26px 80px rgba(15,23,42,0.65),0 0 0 1px rgba(148,163,184,0.45);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);}" +
+            ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-form select{min-width:0;width:100%;height:49px;border-radius:5px;border:1.5px solid #ececec;font-size:14px;font-weight:600;background:#fffbff;box-shadow:none;padding:0 14px;}" +
+            ".widgets-filter-hero-wrap.darb-inline-filter .hero-search-btn{background:#e5202a;color:#fff;font-size:16px;min-width:130px;padding:0 28px;height:50px;border-radius:12px;border:none;font-weight:bold;letter-spacing:0.5px;box-shadow:0 3px 12px rgba(229,32,42,0.22);}" +
+            "@media(max-width:768px){.widgets-filter-hero-wrap.darb-inline-filter{padding:0 8px;}.widgets-filter-hero-wrap.darb-inline-filter .hero-filters-form{display:block;width:100%;max-width:100%;}.widgets-filter-hero-wrap.darb-inline-filter .hero-filters-form > .select-with-step{width:100%;min-width:0;margin-bottom:6px !important;}.widgets-filter-hero-wrap.darb-inline-filter .hero-search-btn{width:100%;margin-top:8px;}}";
           document.head.appendChild(styleEl);
         }
 
@@ -577,6 +579,7 @@ export async function GET(_req: NextRequest) {
           if (!modelId) {
             sectionChoices.disable();
             partsChoices.disable();
+            updateFilterButtonState();
             return;
           }
 
@@ -627,6 +630,7 @@ export async function GET(_req: NextRequest) {
 
           if (!sectionId) {
             partsChoices.disable();
+            updateFilterButtonState();
             return;
           }
 
@@ -839,7 +843,6 @@ export async function GET(_req: NextRequest) {
           window.location.href = url;
         });
 
-        // ===== Prefill من الرابط =====
         async function prefillFromUrl() {
           var info = parseCurrentUrlFilters();
           if (
@@ -853,7 +856,6 @@ export async function GET(_req: NextRequest) {
             return;
           }
 
-          // 1) براند
           var preBrand = null;
           if (info.sCompany) {
             preBrand = brands.find(function (b) {
@@ -873,7 +875,6 @@ export async function GET(_req: NextRequest) {
           companyChoices.setChoiceByValue(String(preBrand.id));
           company.disabled = false;
 
-          // 2) موديل
           try {
             models = await loadModels(storeId, preBrand.id);
             if (models.length > 0) {
@@ -913,7 +914,6 @@ export async function GET(_req: NextRequest) {
 
           categoryChoices.setChoiceByValue(String(preModel.id));
 
-          // 3) سنة
           try {
             years = await loadYears(storeId, preModel.id);
             if (years.length > 0) {
@@ -949,7 +949,6 @@ export async function GET(_req: NextRequest) {
 
           modelChoices.setChoiceByValue(String(preYear.id));
 
-          // 4) قسم
           try {
             sections = await loadSections(storeId);
             if (sections.length > 0) {
@@ -990,7 +989,6 @@ export async function GET(_req: NextRequest) {
 
           sectionChoices.setChoiceByValue(String(preSection.id));
 
-          // 5) كلمات من الرابط
           if (info.keywordLabels && info.keywordLabels.length) {
             try {
               keywords = await loadKeywords(
@@ -1031,14 +1029,12 @@ export async function GET(_req: NextRequest) {
                 }
               }
             } catch (e) {
-              // نسكت
             }
           }
 
           updateFilterButtonState();
         }
 
-        // ناد prefill بعد ما تجهز الماركات
         prefillFromUrl();
       })();
     }
@@ -1051,7 +1047,6 @@ export async function GET(_req: NextRequest) {
           return;
         }
       } catch (e) {
-        // نسكت
       }
 
       var statusUrl =
