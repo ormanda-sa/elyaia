@@ -194,7 +194,7 @@ export async function GET(req: NextRequest) {
       keywordMap.set(row.id, row.name_ar);
     }
 
-    // 4) نبني قائمة المسارات + الأسماء ونرتبها
+    // 4) نبني قائمة المسارات + الأسماء ونرتبها (بدون قص على 20)
     const routes = Array.from(counts.values())
       .map((r) => ({
         brand_id: r.brand_id,
@@ -214,8 +214,7 @@ export async function GET(req: NextRequest) {
           r.keyword_id != null ? keywordMap.get(r.keyword_id) ?? "" : "",
         searches: r.count,
       }))
-      .sort((a, b) => b.searches - a.searches)
-      .slice(0, 20); // Top 20
+      .sort((a, b) => b.searches - a.searches); // فقط ترتيب، بدون .slice
 
     return NextResponse.json({
       store_id: storeId,
