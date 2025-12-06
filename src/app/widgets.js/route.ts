@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets.js — Darb Filter Hero (snapshot + events + config)
+// widgets.js — Darb Filter Hero (snapshot + events + full config)
 (function () {
   try {
     var script =
@@ -144,8 +144,6 @@ export async function GET(_req: NextRequest) {
       var snap = await ensureSnapshot(storeId);
       var allKeywords = snap.keywords || [];
 
-      console.log("[DarbFilter] allKeywords length:", allKeywords.length);
-
       var mId = Number(modelId);
       var sId = Number(sectionId);
 
@@ -154,19 +152,6 @@ export async function GET(_req: NextRequest) {
         if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
         return true;
       });
-
-      console.log(
-        "[DarbFilter] filtered keywords length:",
-        result.length,
-        "for model_id=",
-        modelId,
-        "section_id=",
-        sectionId
-      );
-
-      if (result.length > 0) {
-        console.log("[DarbFilter] sample keyword:", result[0]);
-      }
 
       return result;
     }
@@ -204,8 +189,7 @@ export async function GET(_req: NextRequest) {
             ...payload,
           }),
         });
-      } catch (e) {
-      }
+      } catch (e) {}
     }
 
     async function resolveStoreDomain(storeId) {
@@ -246,6 +230,7 @@ export async function GET(_req: NextRequest) {
         var snap = await ensureSnapshot(storeId);
         var cfg = (snap && snap.config) || {};
 
+        // النصوص والألوان من JSON
         var heroTitle =
           cfg.title_text || "ابحث عن قطع غيار سيارتك";
 
@@ -257,15 +242,34 @@ export async function GET(_req: NextRequest) {
           cfg.background_image_url ||
           "https://static.darb.com.sa/hero-bg/shocks.webp";
 
+        var heroTitleColor = cfg.hero_title_color || "#ffffff";
+        var heroDescColor = cfg.hero_desc_color || "#f9fafb";
+        var counterColor = cfg.counter_color || "#e5202a";
+        var shippingColor = cfg.shipping_color || "#2563eb";
+        var stepBadgeBg = cfg.step_badge_bg || "#d50026";
+
         var heroDescHtml =
           cfg.subtitle_text ||
-          'ابحث بين <span id="countUp" style="color:#e5202a;font-weight:700;">0</span> قطعة غيار لجميع سيارات تويوتا الأصلية واليابانية والتجارية<br>' +
-            '<span style="color:#2563eb;font-weight:600;">شحن سريع خلال 4-6 أيام</span> وسعر منافس جداً <span class="emoji-bounce">🚚</span><span class="emoji-bounce">🔥</span>';
+          'ابحث بين <span id="countUp" class="darb-counter">0</span> قطعة غيار لجميع سيارات تويوتا الأصلية واليابانية والتجارية<br>' +
+            '<span class="darb-shipping">شحن سريع خلال 4-6 أيام</span> وسعر منافس جداً <span class="emoji-bounce">🚚</span><span class="emoji-bounce">🔥</span>';
 
         var heroBgStyle =
           heroBgMode === "gradient" && heroBgGradient
             ? heroBgGradient
             : "url(" + heroBgImage.replace(/"/g, '\\"') + ")";
+
+        var heroButtonBg =
+          cfg.hero_button_bg ||
+          "linear-gradient(90deg, #e5202a 0%, #f97316 100%)";
+        var heroButtonText =
+          cfg.hero_button_text_color || "#ffffff";
+
+        var capsuleBg =
+          cfg.hero_capsule_bg ||
+          "radial-gradient(circle at 0 0, rgba(59,130,246,0.2), transparent 55%), radial-gradient(circle at 100% 100%, rgba(244,54,54,0.25), transparent 55%), rgba(15,23,42,0.72)";
+        var capsuleShadow =
+          cfg.hero_capsule_shadow ||
+          "0 26px 80px rgba(15,23,42,0.65), 0 0 0 1px rgba(148,163,184,0.45)";
 
         var wrap = document.createElement("div");
         wrap.className = "widgets-filter-hero-wrap";
@@ -319,13 +323,21 @@ export async function GET(_req: NextRequest) {
           document.body.appendChild(wrap);
         }
 
+        // override style من JSON
         var styleId = "darb-filter-style";
         if (!document.getElementById(styleId)) {
           var styleEl = document.createElement("style");
           styleEl.id = styleId;
           styleEl.textContent =
             ".widgets-filter-hero-wrap select.df-field-error{border-color:#ef4444 !important;outline:0;}" +
-            ".widgets-filter-hero-wrap .hero-search-btn[disabled]{opacity:.6;cursor:not-allowed;}";
+            ".widgets-filter-hero-wrap .hero-search-btn[disabled]{opacity:.6;cursor:not-allowed;}" +
+            ".widgets-filter-hero-wrap .hero-filter-head{color:" + heroTitleColor + " !important;}" +
+            ".widgets-filter-hero-wrap .hero-filter-desc{color:" + heroDescColor + " !important;}" +
+            ".widgets-filter-hero-wrap .hero-filters-form{background:" + capsuleBg + " !important;box-shadow:" + capsuleShadow + " !important;}" +
+            ".widgets-filter-hero-wrap .hero-search-btn{background:" + heroButtonBg + " !important;color:" + heroButtonText + " !important;}" +
+            ".widgets-filter-hero-wrap .step-label{background:" + stepBadgeBg + " !important;}" +
+            ".widgets-filter-hero-wrap .darb-counter{color:" + counterColor + " !important;font-weight:700;}" +
+            ".widgets-filter-hero-wrap .darb-shipping{color:" + shippingColor + " !important;font-weight:600;}";
           document.head.appendChild(styleEl);
         }
 
@@ -931,8 +943,8 @@ export async function GET(_req: NextRequest) {
         });
 
         var countEl = wrap.querySelector("#countUp");
-        if (countEl) {
-          var maxVal = counterTarget || 181825;
+        if (countEl && counterTarget) {
+          var maxVal = counterTarget;
           var c = 0;
           var interval = setInterval(function () {
             c += Math.ceil((maxVal - c) / 11);
