@@ -25,42 +25,224 @@ const PAGE_SIZE = 20;
 export default function TopRoutesTable({ routes }: Props) {
   const [page, setPage] = useState(1);
 
-  const total = routes.length;
+  // فلاتر ذكية
+  const [brandFilter, setBrandFilter] = useState<string>(""); // اسم الماركة
+  const [modelFilter, setModelFilter] = useState<string>("");
+  const [yearFilter, setYearFilter] = useState<string>("");
+  const [sectionFilter, setSectionFilter] = useState<string>("");
+  const [keywordFilter, setKeywordFilter] = useState<string>("");
+
+  // نجيب القيم الفريدة لكل فلتر من نفس البيانات
+  const brandOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          routes
+            .map((r) => r.brand_name.trim())
+            .filter((v) => v && v.length > 0),
+        ),
+      ).sort(),
+    [routes],
+  );
+
+  const modelOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          routes
+            .map((r) => r.model_name.trim())
+            .filter((v) => v && v.length > 0),
+        ),
+      ).sort(),
+    [routes],
+  );
+
+  const yearOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          routes
+            .map((r) => r.year_label.trim())
+            .filter((v) => v && v.length > 0),
+        ),
+      ).sort(),
+    [routes],
+  );
+
+  const sectionOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          routes
+            .map((r) => r.section_name.trim())
+            .filter((v) => v && v.length > 0),
+        ),
+      ).sort(),
+    [routes],
+  );
+
+  const keywordOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          routes
+            .map((r) => r.keyword_name.trim())
+            .filter((v) => v && v.length > 0),
+        ),
+      ).sort(),
+    [routes],
+  );
+
+  // نطبّق الفلاتر على البيانات
+  const filteredRoutes = useMemo(() => {
+    return routes.filter((r) => {
+      if (brandFilter && r.brand_name !== brandFilter) return false;
+      if (modelFilter && r.model_name !== modelFilter) return false;
+      if (yearFilter && r.year_label !== yearFilter) return false;
+      if (sectionFilter && r.section_name !== sectionFilter) return false;
+      if (keywordFilter && r.keyword_name !== keywordFilter) return false;
+      return true;
+    });
+  }, [routes, brandFilter, modelFilter, yearFilter, sectionFilter, keywordFilter]);
+
+  const total = filteredRoutes.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const pagedRoutes = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
+    const safePage = Math.min(page, totalPages);
+    const start = (safePage - 1) * PAGE_SIZE;
     const end = start + PAGE_SIZE;
-    return routes.slice(start, end);
-  }, [routes, page]);
+    return filteredRoutes.slice(start, end);
+  }, [filteredRoutes, page, totalPages]);
 
   function goToPage(p: number) {
     const safe = Math.min(Math.max(1, p), totalPages);
     setPage(safe);
   }
 
+  function resetFilters() {
+    setBrandFilter("");
+    setModelFilter("");
+    setYearFilter("");
+    setSectionFilter("");
+    setKeywordFilter("");
+    setPage(1);
+  }
+
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-4">
         <div>
           <div className="text-sm font-semibold text-slate-900">
             أكثر المسارات استخدامًا في البحث
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="mt-1 text-xs text-slate-500">
             المسارات اللي توضّح مسار العميل داخل الفلتر (ماركة / موديل /
             سنة / قسم / كلمة). ركّز عليها في الأسعار والعروض والمخزون
             والـ SEO.
           </p>
         </div>
-        <div className="text-xs text-slate-400">
+        <div className="text-xs text-slate-400 text-left">
           Top {total.toString()} Routes
+        </div>
+      </div>
+
+      {/* فلاتر ذكية */}
+      <div className="mb-4 grid gap-2 text-[11px] md:grid-cols-5 md:text-xs">
+        <select
+          className="rounded-full border border-slate-200 px-3 py-2 outline-none focus:border-indigo-500"
+          value={brandFilter}
+          onChange={(e) => {
+            setBrandFilter(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">كل الشركات</option>
+          {brandOptions.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
+
+        <select
+          className="rounded-full border border-slate-200 px-3 py-2 outline-none focus:border-indigo-500"
+          value={modelFilter}
+          onChange={(e) => {
+            setModelFilter(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">كل الموديلات</option>
+          {modelOptions.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+
+        <select
+          className="rounded-full border border-slate-200 px-3 py-2 outline-none focus:border-indigo-500"
+          value={yearFilter}
+          onChange={(e) => {
+            setYearFilter(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">كل السنوات</option>
+          {yearOptions.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
+
+        <select
+          className="rounded-full border border-slate-200 px-3 py-2 outline-none focus:border-indigo-500"
+          value={sectionFilter}
+          onChange={(e) => {
+            setSectionFilter(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">كل الأقسام</option>
+          {sectionOptions.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+
+        <div className="flex items-center gap-2">
+          <select
+            className="flex-1 rounded-full border border-slate-200 px-3 py-2 outline-none focus:border-indigo-500"
+            value={keywordFilter}
+            onChange={(e) => {
+              setKeywordFilter(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">كل الكلمات</option>
+            {keywordOptions.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="whitespace-nowrap rounded-full border border-slate-200 px-3 py-2 text-[11px] text-slate-600 hover:bg-slate-50"
+          >
+            تفريغ الفلاتر
+          </button>
         </div>
       </div>
 
       {total === 0 ? (
         <div className="text-sm text-slate-500">
-          لا توجد بيانات كافية بعد لعرض المسارات. جرّب تستخدم الفلتر عدة
-          مرات ثم ارجع هنا.
+          لا توجد بيانات مطابقة للفلاتر الحالية. جرّب تغير الفلاتر أو
+          تفريغها.
         </div>
       ) : (
         <>
@@ -141,7 +323,6 @@ export default function TopRoutesTable({ routes }: Props) {
                   السابق
                 </button>
 
-                {/* أرقام الصفحات البسيطة */}
                 {Array.from({ length: totalPages }).map((_, i) => {
                   const p = i + 1;
                   const active = p === page;
