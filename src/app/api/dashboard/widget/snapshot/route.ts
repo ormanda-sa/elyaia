@@ -5,6 +5,31 @@ import { getCurrentStoreId } from "@/lib/currentStore";
 
 export const runtime = "nodejs";
 
+// شكل الـ config داخل JSON
+type SnapshotConfig = {
+  enabled: boolean;
+  title_text: string | null;
+  subtitle_text: string | null;
+  hero_description_prefix: string | null;
+  hero_shipping_line: string | null;
+  background_image_url: string | null;
+  hero_bg_mode: string | null;
+  hero_bg_gradient: string | null;
+
+  hero_title_color: string | null;
+  hero_desc_color: string | null;
+  counter_target: number | null;
+  counter_color: string | null;
+  shipping_color: string | null;
+  step_badge_bg: string | null;
+
+  hero_button_bg: string | null;
+  hero_button_text_color: string | null;
+
+  hero_capsule_bg: string | null;
+  hero_capsule_shadow: string | null;
+};
+
 type SnapshotPayload = {
   store_id: string;
   brands: any[];
@@ -12,6 +37,7 @@ type SnapshotPayload = {
   years: any[];
   sections: any[];
   keywords: any[];
+  config: SnapshotConfig | null;
 };
 
 export async function POST(_req: NextRequest) {
@@ -28,13 +54,14 @@ export async function POST(_req: NextRequest) {
   }
 
   try {
-    // نجيب كل بيانات الفلتر من جداول filter_* مع ترتيب حسب sort_order ثم id
+    // نجيب بيانات الفلتر + إعدادات الهيرو في نفس الوقت
     const [
       brandsResult,
       modelsResult,
       yearsResult,
       sectionsResult,
       keywordsResult,
+      configResult,
     ] = await Promise.all([
       supabase
         .from("filter_brands")
@@ -70,6 +97,15 @@ export async function POST(_req: NextRequest) {
         .eq("store_id", storeId)
         .order("sort_order", { ascending: true })
         .order("id", { ascending: true }),
+
+      // إعدادات الهيرو من filter_configs
+      supabase
+        .from("filter_configs")
+        .select("*")
+        .eq("store_id", storeId)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
     const firstError =
@@ -77,7 +113,8 @@ export async function POST(_req: NextRequest) {
       modelsResult.error ||
       yearsResult.error ||
       sectionsResult.error ||
-      keywordsResult.error;
+      keywordsResult.error ||
+      configResult.error;
 
     if (firstError) {
       console.error("[DASHBOARD_WIDGET_SNAPSHOT_ERROR]", firstError);
@@ -87,6 +124,8 @@ export async function POST(_req: NextRequest) {
       );
     }
 
+    const cfg = configResult.data;
+
     const snapshot: SnapshotPayload = {
       store_id: storeId,
       brands: brandsResult.data ?? [],
@@ -94,6 +133,31 @@ export async function POST(_req: NextRequest) {
       years: yearsResult.data ?? [],
       sections: sectionsResult.data ?? [],
       keywords: keywordsResult.data ?? [],
+      config: cfg
+        ? {
+            enabled: cfg.enabled ?? true,
+            title_text: cfg.title_text ?? null,
+            subtitle_text: cfg.subtitle_text ?? null,
+            hero_description_prefix: cfg.hero_description_prefix ?? null,
+            hero_shipping_line: cfg.hero_shipping_line ?? null,
+            background_image_url: cfg.background_image_url ?? null,
+            hero_bg_mode: cfg.hero_bg_mode ?? null,
+            hero_bg_gradient: cfg.hero_bg_gradient ?? null,
+
+            hero_title_color: cfg.hero_title_color ?? null,
+            hero_desc_color: cfg.hero_desc_color ?? null,
+            counter_target: cfg.counter_target ?? null,
+            counter_color: cfg.counter_color ?? null,
+            shipping_color: cfg.shipping_color ?? null,
+            step_badge_bg: cfg.step_badge_bg ?? null,
+
+            hero_button_bg: cfg.hero_button_bg ?? null,
+            hero_button_text_color: cfg.hero_button_text_color ?? null,
+
+            hero_capsule_bg: cfg.hero_capsule_bg ?? null,
+            hero_capsule_shadow: cfg.hero_capsule_shadow ?? null,
+          }
+        : null,
     };
 
     const now = new Date().toISOString();

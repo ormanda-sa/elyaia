@@ -52,8 +52,12 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "تقرير",
     path: "/dashboard/analytics",
-  } 
-
+  } ,
+{
+    icon: <ListIcon />, // أو FilterIcon لو عندك واحد
+    name: "تنسيق الفلتر الذكي",
+    path: "/dashboard/hero-settings",
+  }
 
 
    

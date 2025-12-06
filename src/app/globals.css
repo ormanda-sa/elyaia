@@ -779,7 +779,6 @@ span.flatpickr-weekday,
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  
   --text-theme-xl: 22px;
   --text-theme-xl--line-height: 32px;
 
@@ -828,8 +827,6 @@ span.flatpickr-weekday,
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.705 0.015 286.067);
 
-
-
       --radius: 0.65rem;
    --background:  oklch(1 0 0);
    --foreground:  oklch(0.141 0.005 285.823);
@@ -863,7 +860,6 @@ span.flatpickr-weekday,
    --sidebar-border:  oklch(0.92 0.004 286.32);
    --sidebar-ring:  oklch(0.841 0.238 128.85);
 
-   
   --text-theme-xl: 22px;
   --text-theme-xl--line-height: 32px;
 
@@ -906,10 +902,6 @@ span.flatpickr-weekday,
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.439 0 0);
-
-
-
-
 
    --background:  oklch(0.141 0.005 285.823);
    --foreground:  oklch(0.985 0 0);
@@ -992,7 +984,7 @@ span.flatpickr-weekday,
   }
   body {
     @apply bg-background text-foreground;
-    
+
   }
 }
 
