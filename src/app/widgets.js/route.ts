@@ -230,7 +230,6 @@ export async function GET(_req: NextRequest) {
         var snap = await ensureSnapshot(storeId);
         var cfg = (snap && snap.config) || {};
 
-        // النصوص والألوان من JSON
         var heroTitle =
           cfg.title_text || "ابحث عن قطع غيار سيارتك";
 
@@ -248,10 +247,22 @@ export async function GET(_req: NextRequest) {
         var shippingColor = cfg.shipping_color || "#2563eb";
         var stepBadgeBg = cfg.step_badge_bg || "#d50026";
 
+        var descSuffix =
+          cfg.hero_description_prefix ||
+          "قطعة غيار لجميع سيارات تويوتا الأصلية واليابانية والتجارية";
+        var shippingLine =
+          cfg.hero_shipping_line ||
+          "شحن سريع خلال 4-6 أيام وسعر منافس جداً";
+
         var heroDescHtml =
           cfg.subtitle_text ||
-          'ابحث بين <span id="countUp" class="darb-counter">0</span> قطعة غيار لجميع سيارات تويوتا الأصلية واليابانية والتجارية<br>' +
-            '<span class="darb-shipping">شحن سريع خلال 4-6 أيام</span> وسعر منافس جداً <span class="emoji-bounce">🚚</span><span class="emoji-bounce">🔥</span>';
+          (
+            'ابحث بين <span id="countUp" class="darb-counter">0</span> ' +
+            String(descSuffix) +
+            '<br><span class="darb-shipping">' +
+            String(shippingLine) +
+            '</span> <span class="emoji-bounce">🚚</span><span class="emoji-bounce">🔥</span>'
+          );
 
         var heroBgStyle =
           heroBgMode === "gradient" && heroBgGradient
@@ -323,7 +334,6 @@ export async function GET(_req: NextRequest) {
           document.body.appendChild(wrap);
         }
 
-        // override style من JSON
         var styleId = "darb-filter-style";
         if (!document.getElementById(styleId)) {
           var styleEl = document.createElement("style");
