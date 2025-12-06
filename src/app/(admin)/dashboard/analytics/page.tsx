@@ -6,11 +6,12 @@ import { ChevronDownIcon } from "lucide-react";
 import AnalyticsHeader from "./_components/AnalyticsHeader";
 import OverviewRow from "./_components/OverviewRow";
 import FunnelRow from "./_components/FunnelRow";
-import TopRoutesTable, {
-  RouteRow,
-} from "./_components/TopRoutesTable";
+import TopRoutesTable, { RouteRow } from "./_components/TopRoutesTable";
 import DailySearchesChart from "./_components/DailySearchesChart";
 import DailySearchesTimelineChart from "./_components/DailySearchesTimelineChart";
+import WidgetEventsTable, {
+  WidgetEventRow,
+} from "./_components/widget-events-table";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -69,10 +70,9 @@ function fmtDate(d: Date) {
 export default function AnalyticsPage() {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [routes, setRoutes] = useState<RouteRow[]>([]);
-  const [clientStats, setClientStats] = useState<ClientStats | null>(
-    null,
-  );
+  const [clientStats, setClientStats] = useState<ClientStats | null>(null);
   const [peakHours, setPeakHours] = useState<PeakHours | null>(null);
+  const [events, setEvents] = useState<WidgetEventRow[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +82,8 @@ export default function AnalyticsPage() {
   const [activeQuick, setActiveQuick] = useState<
     "today" | "7d" | "30d" | "month" | null
   >("30d");
+
+  const [activeTab, setActiveTab] = useState<"routes" | "events">("routes");
 
   useEffect(() => {
     applyQuickRange("30d");
@@ -123,17 +125,20 @@ export default function AnalyticsPage() {
           to,
         }).toString();
 
-        const [ovRes, routesRes, statsRes, peakRes] = await Promise.all([
-          fetch(`/api/dashboard/analytics/overview?${query}`),
-          fetch(`/api/dashboard/analytics/top-routes?${query}`),
-          fetch(`/api/dashboard/analytics/client-stats?${query}`),
-          fetch(`/api/dashboard/analytics/peak-hours?${query}`),
-        ]);
+        const [ovRes, routesRes, statsRes, peakRes, eventsRes] =
+          await Promise.all([
+            fetch(`/api/dashboard/analytics/overview?${query}`),
+            fetch(`/api/dashboard/analytics/top-routes?${query}`),
+            fetch(`/api/dashboard/analytics/client-stats?${query}`),
+            fetch(`/api/dashboard/analytics/peak-hours?${query}`),
+            fetch(`/api/dashboard/analytics/events?${query}`),
+          ]);
 
         const ovJson = await ovRes.json();
         const routesJson = await routesRes.json();
         const statsJson = await statsRes.json();
         const peakJson = await peakRes.json();
+        const eventsJson = await eventsRes.json();
 
         if (!ovRes.ok) throw new Error(ovJson.error || "خطأ في الملخص");
         if (!routesRes.ok)
@@ -148,6 +153,10 @@ export default function AnalyticsPage() {
           throw new Error(
             peakJson.error || "خطأ في جلب أوقات الذروة",
           );
+        if (!eventsRes.ok)
+          throw new Error(
+            eventsJson.error || "خطأ في جلب أحداث الفلتر",
+          );
 
         setOverview(ovJson as OverviewResponse);
         setRoutes((routesJson.routes as RouteRow[]) || []);
@@ -159,6 +168,7 @@ export default function AnalyticsPage() {
         setPeakHours({
           counts: peakJson.counts || [],
         });
+        setEvents((eventsJson.events as WidgetEventRow[]) || []);
       } catch (e: any) {
         setError(e.message || "حدث خطأ غير متوقع");
       } finally {
@@ -234,7 +244,7 @@ export default function AnalyticsPage() {
       )}
 
       {error && !loading && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700 shadowسم">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700 shadow-sm">
           حدث خطأ أثناء تحميل البيانات:
           <br />
           <span className="font-mono text-xs">{error}</span>
@@ -264,8 +274,40 @@ export default function AnalyticsPage() {
             <DailySearchesChart from={from} to={to} />
           </div>
 
-          {/* جدول المسارات */}
-          <TopRoutesTable routes={routes} />
+          {/* جدول المسارات + الأحداث في تبويب */}
+          <div className="mt-4 space-y-3">
+            <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setActiveTab("routes")}
+                className={`rounded-full px-3 py-1 transition ${
+                  activeTab === "routes"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                المسارات (ملخّص)
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("events")}
+                className={`rounded-full px-3 py-1 transition ${
+                  activeTab === "events"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                جميع الأحداث (تفصيل)
+              </button>
+            </div>
+
+           {activeTab === "routes" ? (
+  <TopRoutesTable routes={routes} />
+) : (
+  <WidgetEventsTable from={from} to={to} />
+)}
+
+          </div>
         </>
       )}
     </div>
