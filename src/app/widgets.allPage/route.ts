@@ -268,7 +268,7 @@ export async function GET(_req: NextRequest) {
 
         var wrap = document.createElement("div");
         // حذف darb-inline-filter كما طلبت
-        wrap.className = "widgets-filter-hero-wrap";
+        wrap.className = "zzz";
 
         var html = '\\
       <div class="X1">\\
