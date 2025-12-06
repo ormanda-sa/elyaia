@@ -924,7 +924,7 @@ export async function GET(_req: NextRequest) {
               keyword_labels: keywordLabels,
             },
           });
-
+ 
 
             window.location.href = url;
           } catch (err) {
