@@ -305,47 +305,55 @@ export async function GET(_req: NextRequest) {
           styleEl.textContent =
             // الحاوية العامة
             ".widgets-filter-hero-wrap.darb-inline-filter{margin:12px auto 16px auto;max-width:1200px;background:transparent;padding:0 16px;}" +
-            // الكبسولة (نفس hero تقريباً)
-            ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-wrapper{margin:0;position:static;width:100%;display:flex;justify-content:center;z-index:5;}" +
-            ".widgets-filter-hero-wrap.darb-inline-filter .hero-section{background:transparent;box-shadow:none;border-radius:0;padding:0;}" +
+            ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-wrapper{width:100%;display:flex;justify-content:center;}" +
+            // نخفي العنوان والخلفية حق الهيرو، نبي بس الكبسولة
+            ".widgets-filter-hero-wrap.darb-inline-filter .hero-section{background:transparent;box-shadow:none;padding:0;}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-title-filter{display:none;}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-bg-img{display:none;}" +
+            // الكبسولة نفسها: عرض كامل، أبيض، بدون ظل
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-form{" +
-              "position:relative;z-index:10;width:min(1230px,100%);margin:0 auto;padding:18px 14px;border-radius:9px;" +
+              "position:relative;z-index:10;width:100%;max-width:100%;margin:0 auto;padding:14px 12px;border-radius:12px;" +
               "display:flex;align-items:center;gap:8px;flex-wrap:nowrap;" +
-              "background:radial-gradient(circle at 0 0, rgba(59,130,246,0.2), transparent 55%)," +
-                        "radial-gradient(circle at 100% 100%, rgba(244,54,54,0.25), transparent 55%)," +
-                        "rgba(15,23,42,0.72);" +
-              "box-shadow:0 26px 80px rgba(15,23,42,0.65)," +
-                        "0 0 0 1px rgba(148,163,184,0.45);" +
-              "backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);" +
+              "background:#ffffff;border:1px solid #e5e7eb;box-shadow:none;" +
             "}" +
             // كل حقل
-            ".widgets-filter-hero-wrap.darb-inline-filter .select-with-step{display:flex;flex-direction:column;align-items:flex-start;position:relative;margin-bottom:0;flex:1 1 0;min-width:160px;}" +
+            ".widgets-filter-hero-wrap.darb-inline-filter .select-with-step{" +
+              "display:flex;flex-direction:column;align-items:flex-start;position:relative;margin-bottom:0;" +
+              "flex:1 1 0;min-width:140px;" +
+            "}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .select-with-step .step-label{" +
-              "background:#d50026;color:#fff;text-align:center;font-size:9px;border:1.5px solid #eef0f8;" +
+              "background:#d50026;color:#ffffff;text-align:center;font-size:9px;border:1.5px solid #eef0f8;" +
               "margin-top:10px;margin-bottom:6px;letter-spacing:1px;position:absolute;display:inline-flex;" +
               "align-items:center;justify-content:center;font-weight:600;line-height:1;width:1.375rem;height:1.375rem;" +
               "border-radius:50%;inset-inline-start:0.625rem;pointer-events:none;z-index:1;" +
             "}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-form select{" +
-              "min-width:0;width:100%;height:49px;border-radius:5px;border:1.5px solid #ececec;font-size:14px;font-weight:600;" +
-              "background:#fffbff;box-shadow:none;padding:0 14px;appearance:none;-webkit-appearance:none;-moz-appearance:none;" +
+              "min-width:0;width:100%;height:44px;border-radius:5px;border:1.5px solid #e5e7eb;font-size:14px;font-weight:500;" +
+              "background:#ffffff;box-shadow:none;padding:0 12px;appearance:none;-webkit-appearance:none;-moz-appearance:none;" +
             "}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-search-btn{" +
-              "background:#e5202a;color:#fff;font-size:16px;min-width:130px;padding:0 28px;height:50px;border-radius:12px;border:none;" +
-              "font-weight:bold;letter-spacing:0.5px;box-shadow:0 3px 12px rgba(229,32,42,0.22);display:flex;align-items:center;justify-content:center;gap:8px;flex:0 0 auto;cursor:pointer;" +
+              "background:#e5202a;color:#ffffff;font-size:15px;min-width:120px;padding:0 26px;height:46px;border-radius:10px;" +
+              "border:none;font-weight:700;letter-spacing:0.5px;box-shadow:none;display:flex;align-items:center;justify-content:center;gap:8px;flex:0 0 auto;cursor:pointer;" +
             "}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-search-btn:hover{" +
-              "transform:translateY(-2px) scale(1.03);box-shadow:0 10px 26px rgba(229,32,42,0.33);" +
+              "background:#b1101e;" +
             "}" +
+            ".widgets-filter-hero-wrap.darb-inline-filter select.df-field-error{border-color:#ef4444 !important;}" +
             // موبايل
             "@media(max-width:900px){" +
               ".widgets-filter-hero-wrap.darb-inline-filter{padding:0 8px;}" +
-              ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-form{display:block;width:100%;max-width:100%;padding:16px 14px;}" +
-              ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-form > .select-with-step{width:100%;min-width:0;margin-bottom:6px !important;}" +
-              ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-form select{width:100%;min-width:0;display:block;}" +
-              ".widgets-filter-hero-wrap.darb-inline-filter .hero-search-btn{width:100%;margin-top:8px;}" +
+              ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-form{" +
+                "display:block;width:100%;max-width:100%;padding:12px 10px;" +
+              "}" +
+              ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-form > .select-with-step{" +
+                "width:100%;min-width:0;margin-bottom:6px !important;" +
+              "}" +
+              ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-form select{" +
+                "width:100%;min-width:0;display:block;" +
+              "}" +
+              ".widgets-filter-hero-wrap.darb-inline-filter .hero-search-btn{" +
+                "width:100%;margin-top:8px;" +
+              "}" +
             "}";
           document.head.appendChild(styleEl);
         }
@@ -875,7 +883,6 @@ export async function GET(_req: NextRequest) {
           window.location.href = url;
         });
 
-        // ===== Prefill من الرابط =====
         async function prefillFromUrl() {
           var info = parseCurrentUrlFilters();
           if (
