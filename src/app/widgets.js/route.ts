@@ -247,18 +247,22 @@ export async function GET(_req: NextRequest) {
         var shippingColor = cfg.shipping_color || "#2563eb";
         var stepBadgeBg = cfg.step_badge_bg || "#d50026";
 
-        var descSuffix =
+        // نصوص القالب
+        var prefixTemplate =
           cfg.hero_description_prefix ||
-          "قطعة غيار لجميع سيارات تويوتا الأصلية واليابانية والتجارية";
+          "ابحث بين {counter} قطعة غيار لجميع سيارات تويوتا الأصلية واليابانية والتجارية";
         var shippingLine =
           cfg.hero_shipping_line ||
           "شحن سريع خلال 4-6 أيام وسعر منافس جداً";
 
+        // نبني HTML من القوالب إذا ما فيه subtitle_text مخصص
         var heroDescHtml =
           cfg.subtitle_text ||
           (
-            'ابحث بين <span id="countUp" class="darb-counter">0</span> ' +
-            String(descSuffix) +
+            prefixTemplate.replace(
+              "{counter}",
+              '<span id="countUp" class="darb-counter">0</span>'
+            ) +
             '<br><span class="darb-shipping">' +
             String(shippingLine) +
             '</span> <span class="emoji-bounce">🚚</span><span class="emoji-bounce">🔥</span>'
