@@ -306,17 +306,16 @@ export async function GET(_req: NextRequest) {
             // الحاوية العامة
             ".widgets-filter-hero-wrap.darb-inline-filter{margin:12px auto 16px auto;max-width:1200px;background:transparent;padding:0 16px;}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-wrapper{width:100%;display:flex;justify-content:center;}" +
-            // نخفي العنوان والخلفية حق الهيرو، نبي بس الكبسولة
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-section{background:transparent;box-shadow:none;padding:0;}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-title-filter{display:none;}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-bg-img{display:none;}" +
-            // الكبسولة نفسها: عرض كامل، أبيض، بدون ظل
+            // الكبسولة: أبيض، عرض كامل، بدون ظل
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-form{" +
               "position:relative;z-index:10;width:100%;max-width:100%;margin:0 auto;padding:14px 12px;border-radius:12px;" +
               "display:flex;align-items:center;gap:8px;flex-wrap:nowrap;" +
               "background:#ffffff;border:1px solid #e5e7eb;box-shadow:none;" +
             "}" +
-            // كل حقل
+            // الحقول
             ".widgets-filter-hero-wrap.darb-inline-filter .select-with-step{" +
               "display:flex;flex-direction:column;align-items:flex-start;position:relative;margin-bottom:0;" +
               "flex:1 1 0;min-width:140px;" +
@@ -328,9 +327,10 @@ export async function GET(_req: NextRequest) {
               "border-radius:50%;inset-inline-start:0.625rem;pointer-events:none;z-index:1;" +
             "}" +
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-filters-form select{" +
-              "min-width:0;width:100%;height:44px;border-radius:5px;border:1.5px solid #e5e7eb;font-size:14px;font-weight:500;" +
+              "min-width:0;width:100%;height:44px;border-radius:6px;border:1.5px solid #e5e7eb;font-size:14px;font-weight:500;" +
               "background:#ffffff;box-shadow:none;padding:0 12px;appearance:none;-webkit-appearance:none;-moz-appearance:none;" +
             "}" +
+            // زر البحث
             ".widgets-filter-hero-wrap.darb-inline-filter .hero-search-btn{" +
               "background:#e5202a;color:#ffffff;font-size:15px;min-width:120px;padding:0 26px;height:46px;border-radius:10px;" +
               "border:none;font-weight:700;letter-spacing:0.5px;box-shadow:none;display:flex;align-items:center;justify-content:center;gap:8px;flex:0 0 auto;cursor:pointer;" +
