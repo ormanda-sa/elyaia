@@ -65,16 +65,16 @@ function formatEventType(type: string): string {
 export default function WidgetEventsTable({ from, to }: Props) {
   const [events, setEvents] = useState<WidgetEventRow[]>([]);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(50);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // لو تغيّرت الفترة نرجع للصفحة الأولى
   useEffect(() => {
-    // لو تغيّر التاريخ نرجع للصفحة الأولى
     setPage(1);
-  }, [from, to]);
+  }, [from, to, pageSize]);
 
   useEffect(() => {
     if (!from || !to) return;
@@ -115,6 +115,9 @@ export default function WidgetEventsTable({ from, to }: Props) {
     const safe = Math.min(Math.max(1, p), totalPages);
     setPage(safe);
   }
+
+  const startIndex = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endIndex = Math.min(page * pageSize, total);
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -285,69 +288,96 @@ export default function WidgetEventsTable({ from, to }: Props) {
             </table>
           </div>
 
+          {/* Pagination "محترفين" */}
           {totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between text-[11px] md:text-xs text-slate-500">
-              <span>
-                عرض{" "}
-                <span className="font-semibold">
-                  {(page - 1) * pageSize + 1}
-                </span>{" "}
-                إلى{" "}
-                <span className="font-semibold">
-                  {Math.min(page * pageSize, total)}
-                </span>{" "}
-                من{" "}
-                <span className="font-semibold">
-                  {total.toLocaleString("en-US")}
-                </span>{" "}
-                حدث
-              </span>
+            <div className="mt-4 flex flex-col gap-2 items-center justify-between text-[11px] md:flex-row md:text-xs text-slate-500">
+              <div className="flex items-center gap-2 order-2 md:order-1">
+                <span>
+                  عرض{" "}
+                  <span className="font-semibold">
+                    {startIndex.toLocaleString("en-US")}
+                  </span>{" "}
+                  إلى{" "}
+                  <span className="font-semibold">
+                    {endIndex.toLocaleString("en-US")}
+                  </span>{" "}
+                  من{" "}
+                  <span className="font-semibold">
+                    {total.toLocaleString("en-US")}
+                  </span>{" "}
+                  حدث
+                </span>
+              </div>
 
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => goToPage(page - 1)}
-                  disabled={page === 1}
-                  className={`rounded-full border px-2 py-1 ${
-                    page === 1
-                      ? "cursor-not-allowed border-slate-200 text-slate-300"
-                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  السابق
-                </button>
+              <div className="flex items-center gap-3 order-1 md:order-2">
+                {/* اختيار عدد الصفوف */}
+                <div className="flex items-center gap-2">
+                  <span>إظهار الصفوف:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+                  >
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
 
-                {Array.from({ length: totalPages }).map((_, i) => {
-                  const p = i + 1;
-                  const active = p === page;
-                  return (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => goToPage(p)}
-                      className={`min-w-[28px] rounded-full border px-2 py-1 text-center ${
-                        active
-                          ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
-
-                <button
-                  type="button"
-                  onClick={() => goToPage(page + 1)}
-                  disabled={page === totalPages}
-                  className={`rounded-full border px-2 py-1 ${
-                    page === totalPages
-                      ? "cursor-not-allowed border-slate-200 text-slate-300"
-                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  التالي
-                </button>
+                {/* أزرار الإنتقال */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => goToPage(1)}
+                    disabled={page === 1}
+                    className={`rounded-full border px-2 py-1 ${
+                      page === 1
+                        ? "cursor-not-allowed border-slate-200 text-slate-300"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {"|<"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToPage(page - 1)}
+                    disabled={page === 1}
+                    className={`rounded-full border px-2 py-1 ${
+                      page === 1
+                        ? "cursor-not-allowed border-slate-200 text-slate-300"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {"<"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToPage(page + 1)}
+                    disabled={page === totalPages}
+                    className={`rounded-full border px-2 py-1 ${
+                      page === totalPages
+                        ? "cursor-not-allowed border-slate-200 text-slate-300"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {">"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToPage(totalPages)}
+                    disabled={page === totalPages}
+                    className={`rounded-full border px-2 py-1 ${
+                      page === totalPages
+                        ? "cursor-not-allowed border-slate-200 text-slate-300"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {">|"}
+                  </button>
+                </div>
               </div>
             </div>
           )}
