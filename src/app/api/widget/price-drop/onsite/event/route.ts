@@ -14,7 +14,7 @@ const supabase = createClient(supabaseUrl, serviceKey, {
 type EventType = "impression" | "click" | "add_to_cart" | "order";
 
 type Body = {
-  store_id: string;
+  salla_store_id: string;      // 👈 بدل store_id
   campaign_id: number;
   product_id: string;
   target_id: number;
@@ -26,7 +26,6 @@ type Body = {
 
 export async function POST(req: NextRequest) {
   try {
-    // 🔐 تأكيد أن الطلب جاي من الويجت
     const authHeader = req.headers.get("x-widget-secret");
     if (!authHeader || authHeader !== widgetSecret) {
       return NextResponse.json({ error: "UNAUTHORIZED_WIDGET" }, { status: 401 });
@@ -35,7 +34,7 @@ export async function POST(req: NextRequest) {
     const json = (await req.json()) as Partial<Body>;
 
     const {
-      store_id,
+      salla_store_id,
       campaign_id,
       product_id,
       target_id,
@@ -45,13 +44,7 @@ export async function POST(req: NextRequest) {
       order_id,
     } = json;
 
-    if (
-      !store_id ||
-      !campaign_id ||
-      !product_id ||
-      !target_id ||
-      !event_type
-    ) {
+    if (!salla_store_id || !campaign_id || !product_id || !target_id || !event_type) {
       return NextResponse.json(
         { error: "MISSING_REQUIRED_FIELDS" },
         { status: 400 },
@@ -65,15 +58,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1) نسجل الحدث في جدول price_drop_funnel_events
-    const { error: insertError } = await supabase.from("price_drop_funnel_events").insert({
-      store_id,
-      campaign_id,
-      product_id,
-      salla_customer_id,
-      event_type,
-      cart_id: cart_id ?? null,
-    });
+    // 🧠 نجيب store_id من stores باستخدام salla_store_id
+    const { data: store, error: storeError } = await supabase
+      .from("stores")
+      .select("id")
+      .eq("salla_store_id", salla_store_id)
+      .maybeSingle<{ id: string }>();
+
+    if (storeError) {
+      console.error("ONSITE_EVENT_STORE_ERROR", storeError);
+      return NextResponse.json(
+        { error: "STORE_LOOKUP_FAILED" },
+        { status: 500 },
+      );
+    }
+
+    if (!store) {
+      return NextResponse.json(
+        { error: "STORE_NOT_FOUND" },
+        { status: 404 },
+      );
+    }
+
+    const storeId = store.id;
+
+    // 1) نسجل الحدث في price_drop_funnel_events
+    const { error: insertError } = await supabase
+      .from("price_drop_funnel_events")
+      .insert({
+        store_id: storeId,
+        campaign_id,
+        product_id,
+        salla_customer_id,
+        event_type,
+        cart_id: cart_id ?? null,
+      });
 
     if (insertError) {
       console.error("FUNNEL_EVENT_INSERT_ERROR", insertError);
@@ -85,7 +104,6 @@ export async function POST(req: NextRequest) {
 
     // 2) نحدّث price_drop_targets حسب نوع الحدث
     if (event_type === "impression") {
-      // أول ظهور للبوب أب → نثبت وقت المشاهدة لو فاضي
       const { error: updateError } = await supabase
         .from("price_drop_targets")
         .update({ onsite_seen_at: new Date().toISOString() })
@@ -106,7 +124,6 @@ export async function POST(req: NextRequest) {
         console.error("TARGET_UPDATE_ADD_TO_CART_ERROR", updateError);
       }
     } else if (event_type === "order") {
-      // هنا نربطه بالطلب ونعتبره تحويل On-site
       const { error: updateError } = await supabase
         .from("price_drop_targets")
         .update({

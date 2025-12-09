@@ -5,8 +5,6 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-// نقدر نعيد استخدام نفس السر حق الويجت لو تحب
 const widgetSecret = process.env.WIDGET_EVENT_SECRET!;
 
 const supabase = createClient(supabaseUrl, serviceKey, {
@@ -14,12 +12,11 @@ const supabase = createClient(supabaseUrl, serviceKey, {
 });
 
 type Body = {
-  store_id: string;
+  salla_store_id: string;          // 👈 بدل store_id
   product_id: string;
   salla_customer_id: string | null;
 };
 
-// نفس شكل CampaignSummary عندك
 type CampaignSummary = {
   id: number;
   product_title: string | null;
@@ -38,9 +35,7 @@ type CampaignSummary = {
 };
 
 type EligibleResponse =
-  | {
-      eligible: false;
-    }
+  | { eligible: false }
   | {
       eligible: true;
       target_id: number;
@@ -71,7 +66,7 @@ function isCampaignActiveNow(campaign: {
 
 export async function POST(req: NextRequest) {
   try {
-    // 🔐 تحقق من السر (عشان ما أحد يضرب الـ API من برا)
+    // 🔐 تحقق من السر
     const authHeader = req.headers.get("x-widget-secret");
     if (!authHeader || authHeader !== widgetSecret) {
       return NextResponse.json({ error: "UNAUTHORIZED_WIDGET" }, { status: 401 });
@@ -79,18 +74,42 @@ export async function POST(req: NextRequest) {
 
     const json = (await req.json()) as Partial<Body>;
 
-    const storeId = json.store_id;
+    const sallaStoreId = json.salla_store_id;
     const productId = json.product_id;
     const sallaCustomerId = json.salla_customer_id;
 
-    if (!storeId || !productId || !sallaCustomerId) {
+    if (!sallaStoreId || !productId || !sallaCustomerId) {
       return NextResponse.json(
         { error: "MISSING_REQUIRED_FIELDS" },
         { status: 400 },
       );
     }
 
-    // 🧠 نجيب حملة On-site فعالة + target مطابق لنفس العميل ونفس المنتج
+    // 🧠 أول شيء: نحول salla_store_id → store_id (UUID) من جدول stores
+    const { data: store, error: storeError } = await supabase
+      .from("stores")
+      .select("id")
+      .eq("salla_store_id", sallaStoreId)
+      .maybeSingle<{ id: string }>();
+
+    if (storeError) {
+      console.error("ONSITE_ELIGIBLE_STORE_ERROR", storeError);
+      return NextResponse.json(
+        { error: "STORE_LOOKUP_FAILED" },
+        { status: 500 },
+      );
+    }
+
+    if (!store) {
+      return NextResponse.json(
+        { error: "STORE_NOT_FOUND" },
+        { status: 404 },
+      );
+    }
+
+    const storeId = store.id;
+
+    // 🧠 نجيب حملة On-site فعالة + target لهذا العميل / المنتج
     const { data, error } = await supabase
       .from("price_drop_campaigns")
       .select(
@@ -150,7 +169,7 @@ export async function POST(req: NextRequest) {
       }>();
 
     if (error) {
-      console.error("ONSITE_ELIGIBLE_ERROR", error);
+      console.error("ONSITE_ELIGIBLE_CAMPAIGN_ERROR", error);
       return NextResponse.json(
         { error: "CAMPAIGN_LOOKUP_FAILED" },
         { status: 500 },
@@ -162,7 +181,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(payload);
     }
 
-    // نتأكد من التاريخ فعلياً
     if (!isCampaignActiveNow(data)) {
       const payload: EligibleResponse = { eligible: false };
       return NextResponse.json(payload);
