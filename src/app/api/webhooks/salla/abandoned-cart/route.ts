@@ -5,7 +5,8 @@ import { getSupabaseServerClient } from "@/lib/supabaseServer";
 
 const SALLA_WEBHOOK_SECRET = process.env.SALLA_WEBHOOK_SECRET;
 
-// نوع الـ payload حسب اللي أرسلته
+// ===== أنواع الـ payload من سلة =====
+
 type AbandonedCartItem = {
   id: number;
   product_id: number;
@@ -48,12 +49,23 @@ type AbandonedCartWebhookBody = {
   data: AbandonedCartData;
 };
 
+// ===== تحقق بسيط من الـ secret =====
+
 async function verifySallaWebhook(req: NextRequest) {
-  // بسيط الآن، بعدين تقدر تضيف HMAC
-  if (!SALLA_WEBHOOK_SECRET) return true;
+  if (!SALLA_WEBHOOK_SECRET) return true; // لو ما حطيت secret، نسمح مؤقتاً
   const secret = req.headers.get("x-salla-secret");
   return secret === SALLA_WEBHOOK_SECRET;
 }
+
+// (اختياري) عشان لو فتحت الرابط من المتصفح ما يطلع 405
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    message: "abandoned-cart webhook is alive",
+  });
+}
+
+// ===== الـ Webhook الفعلي (POST) =====
 
 export async function POST(req: NextRequest) {
   try {
@@ -63,6 +75,9 @@ export async function POST(req: NextRequest) {
     }
 
     const body = (await req.json()) as AbandonedCartWebhookBody;
+
+    // نطبع في اللوق عشان تقدر تتأكد في Vercel
+    console.log("ABANDONED_CART_WEBHOOK:", JSON.stringify(body));
 
     const sallaStoreId = String(body.merchant);
     const customerId = body.data.customer?.id
@@ -94,7 +109,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (storeError) {
-      console.error("ABANDONED_CART storeError", storeError);
+      console.error("AB_CART storeError", storeError);
       return NextResponse.json(
         { error: "STORE_LOOKUP_ERROR" },
         { status: 500 },
@@ -110,7 +125,7 @@ export async function POST(req: NextRequest) {
 
     const internalStoreId = storeRow.id as string;
 
-    // 2) نطلع product_ids المميزة من العناصر
+    // 2) نطلع product_ids من العناصر
     const productIds = [
       ...new Set(items.map((i) => String(i.product_id))),
     ];
@@ -122,13 +137,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // وقت الحدث: نفضل updated_at.date لو موجود، غير كذا created_at
+    // وقت الحدث: نفضل updated_at.date لو موجود، غير كذا created_at.date
     const eventTime =
       body.data.updated_at?.date ??
       body.data.created_at?.date ??
       new Date().toISOString();
 
-    // 3) نجيب الحملات على هذي المنتجات (نشطة في الوقت الحالي)
+    const eventDate = new Date(eventTime);
+
+    // 3) نجيب الحملات على هذي المنتجات
     const { data: campaigns, error: campaignsError } = await supabase
       .from("price_drop_campaigns")
       .select("id, product_id, store_id, status, starts_at, ends_at")
@@ -137,7 +154,7 @@ export async function POST(req: NextRequest) {
       .in("status", ["active", "paused"]);
 
     if (campaignsError) {
-      console.error("ABANDONED_CART campaignsError", campaignsError);
+      console.error("AB_CART campaignsError", campaignsError);
       return NextResponse.json(
         { error: "CAMPAIGNS_FETCH_ERROR" },
         { status: 500 },
@@ -154,19 +171,17 @@ export async function POST(req: NextRequest) {
     let updatedTargetsCount = 0;
     let funnelEventsCount = 0;
 
-    const eventDate = new Date(eventTime);
-
     for (const camp of campaigns) {
       const campaignId = camp.id as number;
       const productId = camp.product_id as string;
 
-      // نتأكد إن الحدث داخل فترة الحملة (اختياري بس منطقي)
+      // نتأكد إن الحدث داخل فترة الحملة
       const startsAt = new Date(camp.starts_at);
       const endsAt = camp.ends_at ? new Date(camp.ends_at) : null;
       if (eventDate < startsAt) continue;
       if (endsAt && eventDate > endsAt) continue;
 
-      // 4) نجيب الـ target
+      // 4) نجيب target (نفس الحملة + نفس المنتج + نفس العميل)
       const { data: target, error: targetError } = await supabase
         .from("price_drop_targets")
         .select("id, added_to_cart_at")
@@ -177,12 +192,12 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (targetError) {
-        console.error("ABANDONED_CART targetError", targetError);
+        console.error("AB_CART targetError", targetError);
         continue;
       }
 
       if (!target) {
-        // العميل مو target في هذه الحملة → نتجاهله
+        // مو ضمن targets الحملة → نطنّش
         continue;
       }
 
@@ -196,13 +211,13 @@ export async function POST(req: NextRequest) {
           .eq("id", target.id);
 
         if (updateError) {
-          console.error("ABANDONED_CART updateError", updateError);
+          console.error("AB_CART updateError", updateError);
         } else {
           updatedTargetsCount += 1;
         }
       }
 
-      // 6) نسجل الحدث في الـ funnel (اختياري بس حلو للتحليل)
+      // 6) نسجّل الحدث في الـ funnel events
       const { error: funnelError } = await supabase
         .from("price_drop_funnel_events")
         .insert({
@@ -212,10 +227,11 @@ export async function POST(req: NextRequest) {
           salla_customer_id: customerId,
           event_type: "add_to_cart",
           occurred_at: eventTime,
+          cart_id: body.data.id, // لو ضفت العمود في الجدول
         });
 
       if (funnelError) {
-        console.error("ABANDONED_CART funnelError", funnelError);
+        console.error("AB_CART funnelError", funnelError);
       } else {
         funnelEventsCount += 1;
       }
@@ -227,7 +243,7 @@ export async function POST(req: NextRequest) {
       funnel_events: funnelEventsCount,
     });
   } catch (err) {
-    console.error("ABANDONED_CART_EXCEPTION", err);
+    console.error("AB_CART_EXCEPTION", err);
     return NextResponse.json(
       { error: "INTERNAL_SERVER_ERROR" },
       { status: 500 },
