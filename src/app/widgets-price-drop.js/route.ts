@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets-price-drop.js — Check target + product card popup + funnel events
+// widgets-price-drop.js — multi offers slider + countdown + funnel events
 (function () {
   try {
     var script =
@@ -75,7 +75,40 @@ export async function GET(_req: NextRequest) {
       });
     }
 
-    function createPopup(offer) {
+    function startCountdown(root, endIso) {
+      if (!endIso) return;
+      var end = new Date(endIso).getTime();
+      if (!isFinite(end)) return;
+
+      function update() {
+        var now = Date.now();
+        var diff = end - now;
+        if (diff < 0) diff = 0;
+
+        var totalSeconds = Math.floor(diff / 1000);
+        var days = Math.floor(totalSeconds / 86400);
+        var hours = Math.floor((totalSeconds % 86400) / 3600);
+        var mins = Math.floor((totalSeconds % 3600) / 60);
+        var secs = totalSeconds % 60;
+
+        var dEl = root.querySelector("[data-tt='d']");
+        var hEl = root.querySelector("[data-tt='h']");
+        var mEl = root.querySelector("[data-tt='m']");
+        var sEl = root.querySelector("[data-tt='s']");
+
+        if (dEl) dEl.textContent = String(days).padStart(2, "0");
+        if (hEl) hEl.textContent = String(hours).padStart(2, "0");
+        if (mEl) mEl.textContent = String(mins).padStart(2, "0");
+        if (sEl) sEl.textContent = String(secs).padStart(2, "0");
+      }
+
+      update();
+      setInterval(update, 1000);
+    }
+
+    function createPopup(offers) {
+      if (!offers || !offers.length) return;
+
       var overlay = document.createElement("div");
       overlay.style.position = "fixed";
       overlay.style.top = "0";
@@ -93,13 +126,12 @@ export async function GET(_req: NextRequest) {
       box.style.background = "#ffffff";
       box.style.borderRadius = "18px";
       box.style.padding = "18px 18px 16px";
-      box.style.maxWidth = "520px";
+      box.style.maxWidth = "720px";
       box.style.width = "100%";
       box.style.fontFamily =
         "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
       box.style.boxShadow = "0 24px 80px rgba(15,23,42,0.45)";
 
-      // عنوان عام فوق السلايدر
       var headerTitle = document.createElement("div");
       headerTitle.textContent = "نزل سعر منتج شفته قبل 👀";
       headerTitle.style.fontSize = "16px";
@@ -112,173 +144,236 @@ export async function GET(_req: NextRequest) {
       headerSub.style.color = "#4b5563";
       headerSub.style.marginBottom = "10px";
       headerSub.textContent =
-        "عندك عرض خصم مخصص على منتج شفته قبل، شوف تفاصيل العرض تحت:";
+        "عندك عروض خصم مخصصة على منتجات شفتها قبل، شوف تفاصيل العروض تحت:";
       box.appendChild(headerSub);
 
-      // سلايدر منتج واحد حالياً (s-slider-container) — جاهز للتوسّع لاحقاً
       var slider = document.createElement("div");
       slider.className = "s-slider-container darb-price-drop-slider";
+      slider.style.display = "flex";
+      slider.style.gap = "12px";
+      slider.style.overflowX = "auto";
+      slider.style.padding = "4px 2px 8px";
       slider.style.marginBottom = "10px";
 
-      var wrapper = document.createElement("div");
-      wrapper.className = "swiper-wrapper";
+      for (var i = 0; i < offers.length; i++) {
+        (function (offer) {
+          var card = document.createElement("div");
+          card.style.minWidth = "220px";
+          card.style.maxWidth = "240px";
+          card.style.background = "#f9fafb";
+          card.style.borderRadius = "14px";
+          card.style.border = "1px solid #e5e7eb";
+          card.style.padding = "10px";
+          card.style.display = "flex";
+          card.style.flexDirection = "column";
+          card.style.gap = "6px";
 
-      var slide = document.createElement("div");
-      slide.className = "swiper-slide";
+          var topRow = document.createElement("div");
+          topRow.style.display = "flex";
+          topRow.style.gap = "8px";
+          topRow.style.alignItems = "center";
 
-      var card = document.createElement("div");
-      card.style.display = "flex";
-      card.style.gap = "12px";
-      card.style.alignItems = "stretch";
-      card.style.border = "1px solid #e5e7eb";
-      card.style.borderRadius = "14px";
-      card.style.padding = "10px";
-      card.style.background = "#f9fafb";
+          if (offer.product_image_url) {
+            var imgWrap = document.createElement("div");
+            imgWrap.style.width = "64px";
+            imgWrap.style.height = "64px";
+            imgWrap.style.borderRadius = "12px";
+            imgWrap.style.overflow = "hidden";
+            imgWrap.style.background = "#f3f4f6";
+            imgWrap.style.flexShrink = "0";
 
-      // صورة المنتج
-      if (offer && offer.product_image_url) {
-        var imgWrap = document.createElement("div");
-        imgWrap.style.width = "90px";
-        imgWrap.style.minWidth = "90px";
-        imgWrap.style.height = "90px";
-        imgWrap.style.borderRadius = "12px";
-        imgWrap.style.overflow = "hidden";
-        imgWrap.style.background = "#f3f4f6";
-        imgWrap.style.display = "flex";
-        imgWrap.style.alignItems = "center";
-        imgWrap.style.justifyContent = "center";
+            var img = document.createElement("img");
+            img.src = offer.product_image_url;
+            img.alt = offer.product_title || "";
+            img.style.width = "100%";
+            img.style.height = "100%";
+            img.style.objectFit = "cover";
 
-        var img = document.createElement("img");
-        img.src = offer.product_image_url;
-        img.alt = offer.product_title || "";
-        img.style.width = "100%";
-        img.style.height = "100%";
-        img.style.objectFit = "cover";
+            imgWrap.appendChild(img);
+            topRow.appendChild(imgWrap);
+          }
 
-        imgWrap.appendChild(img);
-        card.appendChild(imgWrap);
+          var titleBox = document.createElement("div");
+          titleBox.style.flex = "1";
+
+          if (offer.product_title) {
+            var pTitle = document.createElement("div");
+            pTitle.textContent = offer.product_title;
+            pTitle.style.fontSize = "13px";
+            pTitle.style.fontWeight = "600";
+            pTitle.style.color = "#111827";
+            pTitle.style.marginBottom = "2px";
+            titleBox.appendChild(pTitle);
+          }
+
+          var typeLabel = document.createElement("div");
+          typeLabel.style.fontSize = "11px";
+          typeLabel.style.color = "#6b7280";
+          if (offer.discount_type === "coupon") {
+            typeLabel.textContent = "عرض كوبون خصم";
+          } else {
+            typeLabel.textContent = "عرض خصم على سعر المنتج";
+          }
+          titleBox.appendChild(typeLabel);
+
+          topRow.appendChild(titleBox);
+          card.appendChild(topRow);
+
+          var priceRow = document.createElement("div");
+          priceRow.style.display = "flex";
+          priceRow.style.alignItems = "baseline";
+          priceRow.style.gap = "6px";
+
+          var currentFormatted = formatPrice(
+            offer.current_price != null
+              ? offer.current_price
+              : offer.new_price != null
+              ? offer.new_price
+              : null,
+          );
+
+          if (currentFormatted) {
+            var currentPriceText = document.createElement("div");
+            currentPriceText.textContent = currentFormatted + " ر.س";
+            currentPriceText.style.fontSize = "15px";
+            currentPriceText.style.fontWeight = "700";
+            currentPriceText.style.color = "#e11d48";
+            priceRow.appendChild(currentPriceText);
+          }
+
+          if (offer.discount_type === "price") {
+            var oldFormatted = formatPrice(offer.original_price);
+            if (oldFormatted) {
+              var oldPriceText = document.createElement("div");
+              oldPriceText.textContent = oldFormatted + " ر.س";
+              oldPriceText.style.fontSize = "11px";
+              oldPriceText.style.color = "#6b7280";
+              oldPriceText.style.textDecoration = "line-through";
+              priceRow.appendChild(oldPriceText);
+            }
+          }
+
+          if (offer.discount_percent) {
+            var badge = document.createElement("div");
+            badge.textContent = "خصم " + String(offer.discount_percent) + "%";
+            badge.style.marginLeft = "auto";
+            badge.style.fontSize = "11px";
+            badge.style.padding = "2px 8px";
+            badge.style.borderRadius = "999px";
+            badge.style.background = "#fee2e2";
+            badge.style.color = "#b91c1c";
+            priceRow.appendChild(badge);
+          }
+
+          if (priceRow.children.length > 0) {
+            card.appendChild(priceRow);
+          }
+
+          if (offer.discount_type === "coupon" && offer.coupon_code) {
+            var cpLabel = document.createElement("div");
+            cpLabel.textContent = "كوبون الخصم:";
+            cpLabel.style.fontSize = "11px";
+            cpLabel.style.color = "#4b5563";
+            card.appendChild(cpLabel);
+
+            var cpRow = document.createElement("div");
+            cpRow.style.display = "flex";
+            cpRow.style.alignItems = "center";
+            cpRow.style.gap = "6px";
+
+            var codeBtn = document.createElement("button");
+            codeBtn.type = "button";
+            codeBtn.textContent = offer.coupon_code;
+            codeBtn.style.fontSize = "12px";
+            codeBtn.style.fontWeight = "700";
+            codeBtn.style.letterSpacing = "0.12em";
+            codeBtn.style.padding = "4px 10px";
+            codeBtn.style.borderRadius = "999px";
+            codeBtn.style.border = "1px dashed #e11d48";
+            codeBtn.style.background = "#fff1f2";
+            codeBtn.style.color = "#b91c1c";
+            codeBtn.style.cursor = "pointer";
+
+            codeBtn.addEventListener("click", function () {
+              try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                  navigator.clipboard.writeText(offer.coupon_code);
+                }
+              } catch (e) {}
+              var old = codeBtn.textContent;
+              codeBtn.textContent = "تم النسخ";
+              setTimeout(function () {
+                codeBtn.textContent = old;
+              }, 1500);
+            });
+
+            cpRow.appendChild(codeBtn);
+
+            if (offer.discount_percent) {
+              var cpBadge = document.createElement("div");
+              cpBadge.textContent = "خصم " + String(offer.discount_percent) + "%";
+              cpBadge.style.fontSize = "11px";
+              cpBadge.style.color = "#b91c1c";
+              cpRow.appendChild(cpBadge);
+            }
+
+            card.appendChild(cpRow);
+          }
+
+          if (offer.coupon_expires_at || offer.ends_at) {
+            var timerRoot = document.createElement("div");
+            timerRoot.style.display = "flex";
+            timerRoot.style.gap = "4px";
+            timerRoot.style.marginTop = "6px";
+
+            function makeBox(label, attr) {
+              var wrap = document.createElement("div");
+              wrap.style.display = "flex";
+              wrap.style.flexDirection = "column";
+              wrap.style.alignItems = "center";
+              wrap.style.fontSize = "9px";
+
+              var num = document.createElement("div");
+              num.setAttribute("data-tt", attr);
+              num.textContent = "00";
+              num.style.background = "#ef4444";
+              num.style.color = "#ffffff";
+              num.style.padding = "2px 6px";
+              num.style.borderRadius = "6px";
+              num.style.fontSize = "11px";
+              num.style.fontWeight = "600";
+              num.style.minWidth = "32px";
+              num.style.textAlign = "center";
+
+              var lab = document.createElement("div");
+              lab.textContent = label;
+              lab.style.color = "#6b7280";
+              lab.style.marginTop = "1px";
+
+              wrap.appendChild(num);
+              wrap.appendChild(lab);
+              return wrap;
+            }
+
+            timerRoot.appendChild(makeBox("أيام", "d"));
+            timerRoot.appendChild(makeBox("ساعات", "h"));
+            timerRoot.appendChild(makeBox("دقائق", "m"));
+            timerRoot.appendChild(makeBox("ثواني", "s"));
+
+            card.appendChild(timerRoot);
+
+            startCountdown(
+              timerRoot,
+              offer.coupon_expires_at || offer.ends_at,
+            );
+          }
+
+          slider.appendChild(card);
+        })(offers[i]);
       }
 
-      var cardContent = document.createElement("div");
-      cardContent.style.flex = "1";
-      cardContent.style.display = "flex";
-      cardContent.style.flexDirection = "column";
-      cardContent.style.gap = "6px";
-
-      if (offer && offer.product_title) {
-        var pTitle = document.createElement("div");
-        pTitle.textContent = offer.product_title;
-        pTitle.style.fontSize = "14px";
-        pTitle.style.fontWeight = "600";
-        pTitle.style.color = "#111827";
-        cardContent.appendChild(pTitle);
-      }
-
-      // سطر السعر
-      var priceRow = document.createElement("div");
-      priceRow.style.display = "flex";
-      priceRow.style.alignItems = "baseline";
-      priceRow.style.gap = "8px";
-
-      var currentFormatted = formatPrice(
-        offer && offer.current_price != null
-          ? offer.current_price
-          : offer && offer.new_price != null
-          ? offer.new_price
-          : null,
-      );
-
-      if (currentFormatted) {
-        var currentPriceText = document.createElement("div");
-        currentPriceText.textContent = currentFormatted + " ر.س";
-        currentPriceText.style.fontSize = "16px";
-        currentPriceText.style.fontWeight = "700";
-        currentPriceText.style.color = "#e11d48";
-        priceRow.appendChild(currentPriceText);
-      }
-
-      if (offer && offer.discount_type === "price") {
-        var oldFormatted = formatPrice(offer.original_price);
-        if (oldFormatted) {
-          var oldPriceText = document.createElement("div");
-          oldPriceText.textContent = oldFormatted + " ر.س";
-          oldPriceText.style.fontSize = "12px";
-          oldPriceText.style.color = "#6b7280";
-          oldPriceText.style.textDecoration = "line-through";
-          priceRow.appendChild(oldPriceText);
-        }
-      }
-
-      if (offer && offer.discount_percent) {
-        var badge = document.createElement("div");
-        badge.textContent = "خصم " + String(offer.discount_percent) + "%";
-        badge.style.marginLeft = "auto";
-        badge.style.fontSize = "11px";
-        badge.style.padding = "2px 8px";
-        badge.style.borderRadius = "999px";
-        badge.style.background = "#fef2f2";
-        badge.style.color = "#b91c1c";
-        priceRow.appendChild(badge);
-      }
-
-      if (priceRow.children.length > 0) {
-        cardContent.appendChild(priceRow);
-      }
-
-      // كوبون إن وجد
-      if (offer && offer.discount_type === "coupon") {
-        var cpLabel = document.createElement("div");
-        cpLabel.textContent = "عندك كوبون خصم على هذا المنتج:";
-        cpLabel.style.fontSize = "12px";
-        cpLabel.style.color = "#4b5563";
-        cardContent.appendChild(cpLabel);
-
-        var couponRow = document.createElement("div");
-        couponRow.style.display = "flex";
-        couponRow.style.alignItems = "center";
-        couponRow.style.gap = "8px";
-
-        if (offer.coupon_code) {
-          var codeBox = document.createElement("div");
-          codeBox.textContent = offer.coupon_code;
-          codeBox.style.fontSize = "13px";
-          codeBox.style.fontWeight = "700";
-          codeBox.style.letterSpacing = "0.12em";
-          codeBox.style.padding = "4px 10px";
-          codeBox.style.borderRadius = "999px";
-          codeBox.style.border = "1px dashed #e11d48";
-          codeBox.style.background = "#fff1f2";
-          codeBox.style.color = "#b91c1c";
-          couponRow.appendChild(codeBox);
-        }
-
-        if (offer.discount_percent) {
-          var cpBadge = document.createElement("div");
-          cpBadge.textContent = "خصم " + String(offer.discount_percent) + "%";
-          cpBadge.style.fontSize = "12px";
-          cpBadge.style.color = "#b91c1c";
-          couponRow.appendChild(cpBadge);
-        }
-
-        cardContent.appendChild(couponRow);
-      }
-
-      if (offer && (offer.coupon_expires_at || offer.ends_at)) {
-        var ends = document.createElement("div");
-        ends.style.fontSize = "11px";
-        ends.style.color = "#9ca3af";
-        var d = offer.coupon_expires_at || offer.ends_at;
-        ends.textContent = "ينتهي العرض بتاريخ: " + d;
-        cardContent.appendChild(ends);
-      }
-
-      card.appendChild(cardContent);
-      slide.appendChild(card);
-      wrapper.appendChild(slide);
-      slider.appendChild(wrapper);
       box.appendChild(slider);
 
-      // أزرار أسفل
       var btnRow = document.createElement("div");
       btnRow.style.display = "flex";
       btnRow.style.gap = "8px";
@@ -314,11 +409,12 @@ export async function GET(_req: NextRequest) {
       overlay.appendChild(box);
       document.body.appendChild(overlay);
 
-      var currentProductId = offer && offer.product_id ? offer.product_id : null;
-      try { sendPopupEvent("impression", currentProductId); } catch (e) {}
+      var firstProductId =
+        offers[0] && offers[0].product_id ? offers[0].product_id : null;
+      try { sendPopupEvent("impression", firstProductId); } catch (e) {}
 
       function closePopup() {
-        try { sendPopupEvent("close", currentProductId); } catch (e) {}
+        try { sendPopupEvent("close", firstProductId); } catch (e) {}
         overlay.remove();
       }
 
@@ -331,9 +427,11 @@ export async function GET(_req: NextRequest) {
       });
 
       goBtn.addEventListener("click", function () {
-        try { sendPopupEvent("click", currentProductId); } catch (e) {}
-        if (offer && offer.product_url) {
-          try { window.location.href = offer.product_url; } catch (e) {}
+        try { sendPopupEvent("click", firstProductId); } catch (e) {}
+        var url =
+          (offers[0] && offers[0].product_url) ? offers[0].product_url : null;
+        if (url) {
+          try { window.location.href = url; } catch (e) {}
         } else {
           closePopup();
         }
@@ -354,12 +452,12 @@ export async function GET(_req: NextRequest) {
       return null;
     }
 
-    function fetchCheckTarget(customerId) {
+    function fetchMultiOffers(customerId) {
       if (!PANEL_ORIGIN) return;
 
       var url =
         PANEL_ORIGIN +
-        "/api/dashboard/price-drop/check-target" +
+        "/api/dashboard/price-drop/multi-offers" +
         "?store_id=" +
         encodeURIComponent(STORE_ID) +
         "&salla_customer_id=" +
@@ -370,19 +468,15 @@ export async function GET(_req: NextRequest) {
           return res.text().then(function (text) {
             var json = null;
             try { json = JSON.parse(text); } catch (e) {}
-            console.log("[check-target]", res.status, json);
+            console.log("[multi-offers]", res.status, json);
 
-            if (res.ok && json && json.has_target) {
-              if (json.campaign) {
-                createPopup(json.campaign);
-              } else {
-                createPopup(null);
-              }
+            if (res.ok && json && json.has_offers && json.offers) {
+              createPopup(json.offers);
             }
           });
         })
         .catch(function (e) {
-          console.warn("[check-target] fetch error", e);
+          console.warn("[multi-offers] fetch error", e);
         });
     }
 
@@ -394,7 +488,7 @@ export async function GET(_req: NextRequest) {
         if (cid) {
           clearInterval(timer);
           SALLA_CUSTOMER_ID = cid;
-          fetchCheckTarget(cid);
+          fetchMultiOffers(cid);
         } else if (tries >= maxTries) {
           clearInterval(timer);
         }
