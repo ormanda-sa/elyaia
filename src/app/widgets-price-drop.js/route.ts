@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets-price-drop.js — check target only (no popup yet)
+// widgets-price-drop.js — Check target + simple popup + funnel events
 (function () {
   try {
     var script =
@@ -15,12 +15,14 @@ export async function GET(_req: NextRequest) {
 
     if (!script) return;
 
-    var sallaStoreId = script.getAttribute("data-store-id");
-    if (!sallaStoreId) return;
+    // 👇 يجي من سلة لكل متجر
+    var STORE_ID = script.getAttribute("data-store-id");
+    if (!STORE_ID) return;
 
+    // 👇 لو احتجناه بعدين، ما نستخدمه الآن في check-target
     var WIDGET_SECRET = script.getAttribute("data-event-secret") || "";
 
-    // نحدد origin حق البانل من src (elyaia.vercel.app)
+    // 👇 أصل البانل من src (elyaia.vercel.app)
     var PANEL_ORIGIN = "";
     try {
       var src = script.getAttribute("src") || "";
@@ -29,15 +31,146 @@ export async function GET(_req: NextRequest) {
     } catch (e) {
       PANEL_ORIGIN = "";
     }
- 
-    // نجيب ID العميل من dataLayer (email_hashed / phone_hashed)
+
+    var SALLA_CUSTOMER_ID = null;
+
+    function sendPopupEvent(eventType) {
+      if (!PANEL_ORIGIN || !STORE_ID || !SALLA_CUSTOMER_ID) return;
+
+      var url = PANEL_ORIGIN + "/api/dashboard/price-drop/popup-event";
+
+      var payload = {
+        store_id: STORE_ID,
+        salla_customer_id: SALLA_CUSTOMER_ID,
+        event_type: eventType,
+      };
+
+      try {
+        fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+          .then(function (res) {
+            return res.text().then(function (text) {
+              var json = null;
+              try { json = JSON.parse(text); } catch (e) {}
+              console.log("[popup-event]", eventType, res.status, json);
+            });
+          })
+          .catch(function (e) {
+            console.warn("[popup-event] fetch error", eventType, e);
+          });
+      } catch (e) {
+        console.warn("[popup-event] error building request", eventType, e);
+      }
+    }
+
+    // ---------- UI: popup بسيط ---------- //
+    function createPopup() {
+      var overlay = document.createElement("div");
+      overlay.style.position = "fixed";
+      overlay.style.top = "0";
+      overlay.style.left = "0";
+      overlay.style.right = "0";
+      overlay.style.bottom = "0";
+      overlay.style.background = "rgba(0,0,0,0.45)";
+      overlay.style.zIndex = "99999";
+      overlay.style.display = "flex";
+      overlay.style.alignItems = "center";
+      overlay.style.justifyContent = "center";
+      overlay.dir = "rtl";
+
+      var box = document.createElement("div");
+      box.style.background = "#ffffff";
+      box.style.borderRadius = "12px";
+      box.style.padding = "16px";
+      box.style.maxWidth = "360px";
+      box.style.width = "100%";
+      box.style.fontFamily =
+        "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+      box.style.boxShadow = "0 20px 60px rgba(15,23,42,0.35)";
+
+      var title = document.createElement("div");
+      title.textContent = "نزل سعر منتج شفته قبل 👀";
+      title.style.fontSize = "16px";
+      title.style.fontWeight = "600";
+      title.style.marginBottom = "6px";
+
+      var desc = document.createElement("div");
+      desc.textContent =
+        "عندك عرض خصم مخصص على منتج شفته من قبل، اضغط روح للمنتج وشوف التفاصيل.";
+      desc.style.fontSize = "13px";
+      desc.style.marginBottom = "10px";
+
+      var btnRow = document.createElement("div");
+      btnRow.style.display = "flex";
+      btnRow.style.gap = "8px";
+
+      var goBtn = document.createElement("button");
+      goBtn.textContent = "روح للمنتج";
+      goBtn.style.flex = "1";
+      goBtn.style.padding = "8px 10px";
+      goBtn.style.borderRadius = "6px";
+      goBtn.style.border = "none";
+      goBtn.style.background = "red";
+      goBtn.style.color = "#ffffff";
+      goBtn.style.cursor = "pointer";
+      goBtn.style.fontSize = "14px";
+      goBtn.style.fontWeight = "500";
+
+      var closeBtn = document.createElement("button");
+      closeBtn.textContent = "لاحقًا";
+      closeBtn.style.flex = "0 0 auto";
+      closeBtn.style.padding = "8px 10px";
+      closeBtn.style.borderRadius = "6px";
+      closeBtn.style.border = "1px solid #e5e7eb";
+      closeBtn.style.background = "#ffffff";
+      closeBtn.style.color = "#111827";
+      closeBtn.style.cursor = "pointer";
+      closeBtn.style.fontSize = "13px";
+
+      btnRow.appendChild(goBtn);
+      btnRow.appendChild(closeBtn);
+
+      box.appendChild(title);
+      box.appendChild(desc);
+      box.appendChild(btnRow);
+
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      // impression
+      try { sendPopupEvent("impression"); } catch (e) {}
+
+      function closePopup() {
+        try { sendPopupEvent("close"); } catch (e) {}
+        overlay.remove();
+      }
+
+      overlay.addEventListener("click", function (e) {
+        if (e.target === overlay) closePopup();
+      });
+
+      closeBtn.addEventListener("click", function () {
+        closePopup();
+      });
+
+      goBtn.addEventListener("click", function () {
+        try { sendPopupEvent("click"); } catch (e) {}
+        // TODO: لاحقًا نجيب رابط المنتج من API الحملة
+        closePopup();
+      });
+    }
+
+    // ---------- helpers: قراءة العميل ---------- //
     function getCustomerIdFromDataLayer() {
       var dl = window.dataLayer || [];
       for (var i = dl.length - 1; i >= 0; i--) {
         var ev = dl[i];
         if (!ev || !ev.customer) continue;
         var c = ev.customer;
-        if (c.isGuest) return null; // ضيف → مو هدفنا الآن
+        if (c.isGuest) return null;
         var cid = c.email_hashed || c.phone_hashed || null;
         if (!cid) return null;
         return String(cid);
@@ -45,41 +178,41 @@ export async function GET(_req: NextRequest) {
       return null;
     }
 
-    // ينادي API check-target
-   function fetchByCustomer(customerId) {
-  if (!PANEL_ORIGIN) return;
+    // ---------- call API check-target ---------- //
+    function fetchCheckTarget(customerId) {
+      if (!PANEL_ORIGIN) return;
 
-  var url =
-    PANEL_ORIGIN +
-    "/api/dashboard/price-drop/check-target" +   // 👈 هنا
-    "?salla_store_id=" +
-    encodeURIComponent(String(sallaStoreId)) +
-    "&salla_customer_id=" +
-    encodeURIComponent(String(customerId));
+      var url =
+        PANEL_ORIGIN +
+        "/api/dashboard/price-drop/check-target" +
+        "?store_id=" +
+        encodeURIComponent(STORE_ID) +
+        "&salla_customer_id=" +
+        encodeURIComponent(customerId);
 
-  fetch(url, {
-    method: "GET",
-  })
-    .then(function (res) {
-      return res.text().then(function (text) {
-        var json = null;
-        try { json = JSON.parse(text); } catch (e) {}
+      fetch(url, {
+        method: "GET",
+      })
+        .then(function (res) {
+          return res.text().then(function (text) {
+            var json = null;
+            try {
+              json = JSON.parse(text);
+            } catch (e) {}
 
-        console.log("[check-target]", res.status, json);
+            console.log("[check-target]", res.status, json);
 
-        if (res.ok && json && json.has_target) {
-          console.log("نعم");
-        }
-      });
-    })
-    .catch(function (e) {
-      console.warn("[check-target] fetch error", e);
-    });
-}
+            if (res.ok && json && json.has_target) {
+              console.log("نعم");
+              createPopup();
+            }
+          });
+        })
+        .catch(function (e) {
+          console.warn("[check-target] fetch error", e);
+        });
+    }
 
-
-
-    // ننتظر dataLayer لين يجهز
     function waitForCustomerAndRun(maxTries) {
       var tries = 0;
       var timer = setInterval(function () {
@@ -87,7 +220,8 @@ export async function GET(_req: NextRequest) {
         var cid = getCustomerIdFromDataLayer();
         if (cid) {
           clearInterval(timer);
-          fetchByCustomer(cid);
+          SALLA_CUSTOMER_ID = cid;
+          fetchCheckTarget(cid);
         } else if (tries >= maxTries) {
           clearInterval(timer);
         }
@@ -95,7 +229,7 @@ export async function GET(_req: NextRequest) {
     }
 
     function init() {
-      waitForCustomerAndRun(10);
+      waitForCustomerAndRun(10); // يحاول 5 ثواني تقريبًا
     }
 
     if (document.readyState === "loading") {
