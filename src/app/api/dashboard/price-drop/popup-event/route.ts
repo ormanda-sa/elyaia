@@ -1,5 +1,4 @@
 // FILE: src/app/(admin)/api/dashboard/price-drop/popup-event/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import { withCors, handleOptions } from "../cors";
@@ -51,7 +50,7 @@ export async function POST(req: NextRequest) {
   // نجيب آخر Target لهذا العميل في هذا المتجر
   const { data: target, error: targetError } = await supabase
     .from("price_drop_targets")
-    .select("id, campaign_id, product_id, store_id, onsite_seen_at")
+    .select("id, campaign_id, product_id, store_id, status, onsite_seen_at, created_at")
     .eq("store_id", storeId)
     .eq("salla_customer_id", sallaCustomerId)
     .order("created_at", { ascending: false })
@@ -61,7 +60,9 @@ export async function POST(req: NextRequest) {
       campaign_id: number;
       product_id: string;
       store_id: string;
+      status: string;
       onsite_seen_at: string | null;
+      created_at: string;
     }>();
 
   if (targetError) {
@@ -73,7 +74,6 @@ export async function POST(req: NextRequest) {
   }
 
   if (!target) {
-    // مافيه Target لهذا العميل - نرجع 200 عادي لكن نقول ما سوّينا شي
     return withCors(
       req,
       NextResponse.json({ ok: true, skipped: "NO_TARGET_FOUND" }),
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
 
   const productId = productIdOverride || target.product_id;
 
-  // 1) نكتب الحدث في price_drop_funnel_events
+  // 1) نسجل الحدث في funnel
   const { error: insertError } = await supabase
     .from("price_drop_funnel_events")
     .insert({
@@ -102,17 +102,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2) لو أول مرة يشوف البوب أب (impression) نحدّث onsite_seen_at
-  if (eventType === "impression" && !target.onsite_seen_at) {
+  // 2) أول ظهور للبوب أب → نحدّث الـ target
+  if (eventType === "impression" && target.status === "pending") {
+    const nowIso = new Date().toISOString();
+
     const { error: updateError } = await supabase
       .from("price_drop_targets")
-      .update({ onsite_seen_at: new Date().toISOString() })
+      .update({
+        onsite_seen_at: nowIso,
+        status: "notified", // 👈 أهم سطر
+      })
       .eq("id", target.id)
       .eq("store_id", storeId);
 
     if (updateError) {
       console.error("[popup-event] UPDATE_TARGET_FAILED", updateError);
-      // ما نرجع Error للمستخدم، نكتفي بالتسجيل في اللوق
+      // ما نطلع Error للمستخدم، بس نطبع في اللوق
     }
   }
 

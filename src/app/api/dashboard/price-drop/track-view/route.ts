@@ -57,6 +57,37 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // 👇 من هنا منطق منع التكرار خلال 30 دقيقة
+  if (salla_customer_id) {
+    const { data: lastView, error: lastErr } = await supabase
+      .from("price_drop_product_views")
+      .select("id, viewed_at")
+      .eq("store_id", store_id)
+      .eq("product_id", product_id)
+      .eq("salla_customer_id", salla_customer_id)
+      .order("viewed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<{ id: number; viewed_at: string }>();
+
+    if (!lastErr && lastView && lastView.viewed_at) {
+      const lastTime = new Date(lastView.viewed_at).getTime();
+      const now = Date.now();
+      const diffMs = now - lastTime;
+      const thirtyMinutesMs = 30 * 60 * 1000;
+
+      if (diffMs >= 0 && diffMs < thirtyMinutesMs) {
+        // خلال آخر 30 دقيقة لنفس (store + product + customer) → نتجاهل الإدخال
+        return withCors(
+          req,
+          NextResponse.json(
+            { ok: true, skipped: "RECENT_VIEW" },
+            { status: 200 },
+          ),
+        );
+      }
+    }
+  }
+
   const client_ip =
     req.headers.get("x-forwarded-for") ||
     req.headers.get("x-real-ip") ||

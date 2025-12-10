@@ -194,7 +194,7 @@ export async function GET(_req: NextRequest) {
           if (offer.product_title) {
             var pTitle = document.createElement("div");
             pTitle.textContent = offer.product_title;
-            pTitle.style.fontSize = "13px";
+            pTitle.style.fontSize = "11px";
             pTitle.style.fontWeight = "600";
             pTitle.style.color = "#111827";
             pTitle.style.marginTop = "6px";
