@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets-price-drop.js — Check target + details popup + funnel events
+// widgets-price-drop.js — Check target + product card popup + funnel events
 (function () {
   try {
     var script =
@@ -91,28 +91,62 @@ export async function GET(_req: NextRequest) {
 
       var box = document.createElement("div");
       box.style.background = "#ffffff";
-      box.style.borderRadius = "16px";
+      box.style.borderRadius = "18px";
       box.style.padding = "18px 18px 16px";
-      box.style.maxWidth = "420px";
+      box.style.maxWidth = "520px";
       box.style.width = "100%";
       box.style.fontFamily =
         "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
       box.style.boxShadow = "0 24px 80px rgba(15,23,42,0.45)";
 
-      var headerRow = document.createElement("div");
-      headerRow.style.display = "flex";
-      headerRow.style.alignItems = "center";
-      headerRow.style.gap = "10px";
-      headerRow.style.marginBottom = "10px";
+      // عنوان عام فوق السلايدر
+      var headerTitle = document.createElement("div");
+      headerTitle.textContent = "نزل سعر منتج شفته قبل 👀";
+      headerTitle.style.fontSize = "16px";
+      headerTitle.style.fontWeight = "700";
+      headerTitle.style.marginBottom = "4px";
+      box.appendChild(headerTitle);
 
+      var headerSub = document.createElement("div");
+      headerSub.style.fontSize = "13px";
+      headerSub.style.color = "#4b5563";
+      headerSub.style.marginBottom = "10px";
+      headerSub.textContent =
+        "عندك عرض خصم مخصص على منتج شفته قبل، شوف تفاصيل العرض تحت:";
+      box.appendChild(headerSub);
+
+      // سلايدر منتج واحد حالياً (s-slider-container) — جاهز للتوسّع لاحقاً
+      var slider = document.createElement("div");
+      slider.className = "s-slider-container darb-price-drop-slider";
+      slider.style.marginBottom = "10px";
+
+      var wrapper = document.createElement("div");
+      wrapper.className = "swiper-wrapper";
+
+      var slide = document.createElement("div");
+      slide.className = "swiper-slide";
+
+      var card = document.createElement("div");
+      card.style.display = "flex";
+      card.style.gap = "12px";
+      card.style.alignItems = "stretch";
+      card.style.border = "1px solid #e5e7eb";
+      card.style.borderRadius = "14px";
+      card.style.padding = "10px";
+      card.style.background = "#f9fafb";
+
+      // صورة المنتج
       if (offer && offer.product_image_url) {
         var imgWrap = document.createElement("div");
-        imgWrap.style.width = "56px";
-        imgWrap.style.height = "56px";
+        imgWrap.style.width = "90px";
+        imgWrap.style.minWidth = "90px";
+        imgWrap.style.height = "90px";
         imgWrap.style.borderRadius = "12px";
         imgWrap.style.overflow = "hidden";
-        imgWrap.style.flexShrink = "0";
         imgWrap.style.background = "#f3f4f6";
+        imgWrap.style.display = "flex";
+        imgWrap.style.alignItems = "center";
+        imgWrap.style.justifyContent = "center";
 
         var img = document.createElement("img");
         img.src = offer.product_image_url;
@@ -122,54 +156,49 @@ export async function GET(_req: NextRequest) {
         img.style.objectFit = "cover";
 
         imgWrap.appendChild(img);
-        headerRow.appendChild(imgWrap);
+        card.appendChild(imgWrap);
       }
 
-      var headerText = document.createElement("div");
+      var cardContent = document.createElement("div");
+      cardContent.style.flex = "1";
+      cardContent.style.display = "flex";
+      cardContent.style.flexDirection = "column";
+      cardContent.style.gap = "6px";
 
-      var title = document.createElement("div");
-      title.textContent = "نزل سعر منتج شفته قبل 👀";
-      title.style.fontSize = "15px";
-      title.style.fontWeight = "700";
-      title.style.marginBottom = "4px";
-
-      var sub = document.createElement("div");
-      sub.style.fontSize = "13px";
-      sub.style.color = "#4b5563";
-      var baseText = "عندك عرض خصم مخصص على ";
       if (offer && offer.product_title) {
-        baseText += "المنتج: " + offer.product_title;
-      } else {
-        baseText += "منتج شفته من قبل.";
+        var pTitle = document.createElement("div");
+        pTitle.textContent = offer.product_title;
+        pTitle.style.fontSize = "14px";
+        pTitle.style.fontWeight = "600";
+        pTitle.style.color = "#111827";
+        cardContent.appendChild(pTitle);
       }
-      sub.textContent = baseText;
 
-      headerText.appendChild(title);
-      headerText.appendChild(sub);
+      // سطر السعر
+      var priceRow = document.createElement("div");
+      priceRow.style.display = "flex";
+      priceRow.style.alignItems = "baseline";
+      priceRow.style.gap = "8px";
 
-      headerRow.appendChild(headerText);
-      box.appendChild(headerRow);
+      var currentFormatted = formatPrice(
+        offer && offer.current_price != null
+          ? offer.current_price
+          : offer && offer.new_price != null
+          ? offer.new_price
+          : null,
+      );
+
+      if (currentFormatted) {
+        var currentPriceText = document.createElement("div");
+        currentPriceText.textContent = currentFormatted + " ر.س";
+        currentPriceText.style.fontSize = "16px";
+        currentPriceText.style.fontWeight = "700";
+        currentPriceText.style.color = "#e11d48";
+        priceRow.appendChild(currentPriceText);
+      }
 
       if (offer && offer.discount_type === "price") {
-        var priceRow = document.createElement("div");
-        priceRow.style.display = "flex";
-        priceRow.style.alignItems = "baseline";
-        priceRow.style.gap = "8px";
-        priceRow.style.marginTop = "6px";
-        priceRow.style.marginBottom = "6px";
-
-        var newFormatted = formatPrice(offer.new_price);
         var oldFormatted = formatPrice(offer.original_price);
-
-        if (newFormatted) {
-          var newPriceText = document.createElement("div");
-          newPriceText.textContent = newFormatted + " ر.س";
-          newPriceText.style.fontSize = "18px";
-          newPriceText.style.fontWeight = "700";
-          newPriceText.style.color = "#e11d48";
-          priceRow.appendChild(newPriceText);
-        }
-
         if (oldFormatted) {
           var oldPriceText = document.createElement("div");
           oldPriceText.textContent = oldFormatted + " ر.س";
@@ -178,43 +207,41 @@ export async function GET(_req: NextRequest) {
           oldPriceText.style.textDecoration = "line-through";
           priceRow.appendChild(oldPriceText);
         }
+      }
 
-        if (offer.discount_percent) {
-          var badge = document.createElement("div");
-          badge.textContent = "خصم " + String(offer.discount_percent) + "%";
-          badge.style.display = "inline-flex";
-          badge.style.alignItems = "center";
-          badge.style.justifyContent = "center";
-          badge.style.padding = "2px 8px";
-          badge.style.borderRadius = "999px";
-          badge.style.background = "#fef2f2";
-          badge.style.color = "#b91c1c";
-          badge.style.fontSize = "11px";
-          badge.style.marginLeft = "auto";
-          priceRow.appendChild(badge);
-        }
+      if (offer && offer.discount_percent) {
+        var badge = document.createElement("div");
+        badge.textContent = "خصم " + String(offer.discount_percent) + "%";
+        badge.style.marginLeft = "auto";
+        badge.style.fontSize = "11px";
+        badge.style.padding = "2px 8px";
+        badge.style.borderRadius = "999px";
+        badge.style.background = "#fef2f2";
+        badge.style.color = "#b91c1c";
+        priceRow.appendChild(badge);
+      }
 
-        if (priceRow.children.length > 0) {
-          box.appendChild(priceRow);
-        }
-      } else if (offer && offer.discount_type === "coupon") {
-        var info = document.createElement("div");
-        info.style.fontSize = "13px";
-        info.style.marginTop = "6px";
-        info.style.marginBottom = "4px";
-        info.textContent = "عندك كوبون خصم على هذا المنتج.";
-        box.appendChild(info);
+      if (priceRow.children.length > 0) {
+        cardContent.appendChild(priceRow);
+      }
+
+      // كوبون إن وجد
+      if (offer && offer.discount_type === "coupon") {
+        var cpLabel = document.createElement("div");
+        cpLabel.textContent = "عندك كوبون خصم على هذا المنتج:";
+        cpLabel.style.fontSize = "12px";
+        cpLabel.style.color = "#4b5563";
+        cardContent.appendChild(cpLabel);
 
         var couponRow = document.createElement("div");
         couponRow.style.display = "flex";
         couponRow.style.alignItems = "center";
         couponRow.style.gap = "8px";
-        couponRow.style.marginBottom = "6px";
 
         if (offer.coupon_code) {
           var codeBox = document.createElement("div");
           codeBox.textContent = offer.coupon_code;
-          codeBox.style.fontSize = "14px";
+          codeBox.style.fontSize = "13px";
           codeBox.style.fontWeight = "700";
           codeBox.style.letterSpacing = "0.12em";
           codeBox.style.padding = "4px 10px";
@@ -233,20 +260,25 @@ export async function GET(_req: NextRequest) {
           couponRow.appendChild(cpBadge);
         }
 
-        box.appendChild(couponRow);
+        cardContent.appendChild(couponRow);
       }
 
       if (offer && (offer.coupon_expires_at || offer.ends_at)) {
         var ends = document.createElement("div");
         ends.style.fontSize = "11px";
         ends.style.color = "#9ca3af";
-        ends.style.marginBottom = "8px";
-
         var d = offer.coupon_expires_at || offer.ends_at;
         ends.textContent = "ينتهي العرض بتاريخ: " + d;
-        box.appendChild(ends);
+        cardContent.appendChild(ends);
       }
 
+      card.appendChild(cardContent);
+      slide.appendChild(card);
+      wrapper.appendChild(slide);
+      slider.appendChild(wrapper);
+      box.appendChild(slider);
+
+      // أزرار أسفل
       var btnRow = document.createElement("div");
       btnRow.style.display = "flex";
       btnRow.style.gap = "8px";
