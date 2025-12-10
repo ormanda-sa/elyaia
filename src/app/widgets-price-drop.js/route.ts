@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets-price-drop.js — active-offer-by-customer + funnel events
+// widgets-price-drop.js — Check target + simple popup + funnel events
 (function () {
   try {
     var script =
@@ -65,17 +65,7 @@ export async function GET(_req: NextRequest) {
       }
     }
 
-    function formatPrice(value) {
-      if (value == null) return null;
-      var num = Number(value);
-      if (!isFinite(num)) return null;
-      return num.toLocaleString("ar-SA", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-    }
-
-    function createPopup(offer) {
+    function createPopup() {
       var overlay = document.createElement("div");
       overlay.style.position = "fixed";
       overlay.style.top = "0";
@@ -92,8 +82,8 @@ export async function GET(_req: NextRequest) {
       var box = document.createElement("div");
       box.style.background = "#ffffff";
       box.style.borderRadius = "12px";
-      box.style.padding = "18px 18px 14px";
-      box.style.maxWidth = "380px";
+      box.style.padding = "16px";
+      box.style.maxWidth = "360px";
       box.style.width = "100%";
       box.style.fontFamily =
         "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
@@ -102,95 +92,18 @@ export async function GET(_req: NextRequest) {
       var title = document.createElement("div");
       title.textContent = "نزل سعر منتج شفته قبل 👀";
       title.style.fontSize = "16px";
-      title.style.fontWeight = "700";
+      title.style.fontWeight = "600";
       title.style.marginBottom = "6px";
 
       var desc = document.createElement("div");
-      var baseText = "عندك عرض خصم مخصص على منتج شفته من قبل. ";
-      if (offer && offer.product_title) {
-        baseText += "المنتج: " + offer.product_title;
-      } else {
-        baseText += "اضغط روح للمنتج وشوف التفاصيل.";
-      }
-      desc.textContent = baseText;
+      desc.textContent =
+        "عندك عرض خصم مخصص على منتج شفته من قبل، اضغط روح للمنتج وشوف التفاصيل.";
       desc.style.fontSize = "13px";
       desc.style.marginBottom = "10px";
-
-      box.appendChild(title);
-      box.appendChild(desc);
-
-      if (offer) {
-        var priceRow = document.createElement("div");
-        priceRow.style.display = "flex";
-        priceRow.style.alignItems = "baseline";
-        priceRow.style.gap = "8px";
-        priceRow.style.marginBottom = "8px";
-
-        var newFormatted = formatPrice(offer.new_price);
-        var oldFormatted = formatPrice(offer.original_price);
-
-        if (newFormatted) {
-          var newPriceText = document.createElement("div");
-          newPriceText.textContent = newFormatted + " ر.س";
-          newPriceText.style.fontSize = "16px";
-          newPriceText.style.fontWeight = "700";
-          newPriceText.style.color = "#e11d48";
-          priceRow.appendChild(newPriceText);
-        }
-
-        if (oldFormatted) {
-          var oldPriceText = document.createElement("div");
-          oldPriceText.textContent = oldFormatted + " ر.س";
-          oldPriceText.style.fontSize = "12px";
-          oldPriceText.style.color = "#6b7280";
-          oldPriceText.style.textDecoration = "line-through";
-          priceRow.appendChild(oldPriceText);
-        }
-
-        if (priceRow.children.length > 0) {
-          box.appendChild(priceRow);
-        }
-
-        if (offer.discount_percent) {
-          var badge = document.createElement("div");
-          badge.textContent = "خصم " + String(offer.discount_percent) + "%";
-          badge.style.display = "inline-flex";
-          badge.style.alignItems = "center";
-          badge.style.justifyContent = "center";
-          badge.style.padding = "2px 8px";
-          badge.style.borderRadius = "999px";
-          badge.style.background = "#fef2f2";
-          badge.style.color = "#b91c1c";
-          badge.style.fontSize = "11px";
-          badge.style.marginBottom = "8px";
-          box.appendChild(badge);
-        }
-
-        if (offer.coupon_code && offer.discount_type === "coupon") {
-          var couponBox = document.createElement("div");
-          couponBox.style.marginTop = "6px";
-          couponBox.style.marginBottom = "8px";
-          couponBox.style.fontSize = "12px";
-
-          var label = document.createElement("span");
-          label.textContent = "كود الخصم: ";
-          label.style.color = "#374151";
-
-          var codeSpan = document.createElement("span");
-          codeSpan.textContent = offer.coupon_code;
-          codeSpan.style.fontWeight = "700";
-          codeSpan.style.letterSpacing = "0.08em";
-
-          couponBox.appendChild(label);
-          couponBox.appendChild(codeSpan);
-          box.appendChild(couponBox);
-        }
-      }
 
       var btnRow = document.createElement("div");
       btnRow.style.display = "flex";
       btnRow.style.gap = "8px";
-      btnRow.style.marginTop = "10px";
 
       var goBtn = document.createElement("button");
       goBtn.textContent = "روح للمنتج";
@@ -198,11 +111,11 @@ export async function GET(_req: NextRequest) {
       goBtn.style.padding = "8px 10px";
       goBtn.style.borderRadius = "6px";
       goBtn.style.border = "none";
-      goBtn.style.background = "#e11d48";
+      goBtn.style.background = "red";
       goBtn.style.color = "#ffffff";
       goBtn.style.cursor = "pointer";
       goBtn.style.fontSize = "14px";
-      goBtn.style.fontWeight = "600";
+      goBtn.style.fontWeight = "500";
 
       var closeBtn = document.createElement("button");
       closeBtn.textContent = "لاحقًا";
@@ -218,16 +131,17 @@ export async function GET(_req: NextRequest) {
       btnRow.appendChild(goBtn);
       btnRow.appendChild(closeBtn);
 
+      box.appendChild(title);
+      box.appendChild(desc);
       box.appendChild(btnRow);
+
       overlay.appendChild(box);
       document.body.appendChild(overlay);
 
-      var currentProductId = offer && offer.product_id ? offer.product_id : null;
-
-      try { sendPopupEvent("impression", currentProductId); } catch (e) {}
+      try { sendPopupEvent("impression", null); } catch (e) {}
 
       function closePopup() {
-        try { sendPopupEvent("close", currentProductId); } catch (e) {}
+        try { sendPopupEvent("close", null); } catch (e) {}
         overlay.remove();
       }
 
@@ -240,12 +154,9 @@ export async function GET(_req: NextRequest) {
       });
 
       goBtn.addEventListener("click", function () {
-        try { sendPopupEvent("click", currentProductId); } catch (e) {}
-        if (offer && offer.product_url) {
-          try { window.location.href = offer.product_url; } catch (e) {}
-        } else {
-          closePopup();
-        }
+        try { sendPopupEvent("click", null); } catch (e) {}
+        // TODO: لاحقًا نجيب رابط المنتج من API الحملة
+        closePopup();
       });
     }
 
@@ -263,12 +174,12 @@ export async function GET(_req: NextRequest) {
       return null;
     }
 
-    function fetchActiveOffer(customerId) {
+    function fetchCheckTarget(customerId) {
       if (!PANEL_ORIGIN) return;
 
       var url =
         PANEL_ORIGIN +
-        "/api/dashboard/price-drop/active-offer-by-customer" +
+        "/api/dashboard/price-drop/check-target" +
         "?store_id=" +
         encodeURIComponent(STORE_ID) +
         "&salla_customer_id=" +
@@ -279,15 +190,16 @@ export async function GET(_req: NextRequest) {
           return res.text().then(function (text) {
             var json = null;
             try { json = JSON.parse(text); } catch (e) {}
-            console.log("[active-offer-by-customer]", res.status, json);
 
-            if (res.ok && json && json.has_offer) {
-              createPopup(json);
+            console.log("[check-target]", res.status, json);
+
+            if (res.ok && json && json.has_target) {
+              createPopup();
             }
           });
         })
         .catch(function (e) {
-          console.warn("[active-offer-by-customer] fetch error", e);
+          console.warn("[check-target] fetch error", e);
         });
     }
 
@@ -299,7 +211,7 @@ export async function GET(_req: NextRequest) {
         if (cid) {
           clearInterval(timer);
           SALLA_CUSTOMER_ID = cid;
-          fetchActiveOffer(cid);
+          fetchCheckTarget(cid);
         } else if (tries >= maxTries) {
           clearInterval(timer);
         }
