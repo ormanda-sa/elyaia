@@ -242,10 +242,7 @@ export async function GET(_req: NextRequest) {
         ends.style.color = "#9ca3af";
         ends.style.marginBottom = "8px";
 
-        var d =
-          offer.coupon_expires_at ||
-          offer.ends_at;
-
+        var d = offer.coupon_expires_at || offer.ends_at;
         ends.textContent = "ينتهي العرض بتاريخ: " + d;
         box.appendChild(ends);
       }
@@ -272,7 +269,7 @@ export async function GET(_req: NextRequest) {
       closeBtn.style.flex = "0 0 auto";
       closeBtn.style.padding = "9px 12px";
       closeBtn.style.borderRadius = "8px";
-      closeBtn.style.border = "1px solid "#e5e7eb";
+      closeBtn.style.border = "1px solid #e5e7eb";
       closeBtn.style.background = "#ffffff";
       closeBtn.style.color = "#111827";
       closeBtn.style.cursor = "pointer";
