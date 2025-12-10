@@ -1,27 +1,10 @@
-// FILE: src/app/api/widget/price-drop/onsite/check-target/route.ts
-
+// FILE: src/app/(admin)/api/dashboard/price-drop/check-target/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const widgetSecret = process.env.WIDGET_EVENT_SECRET!;
-
-const supabase = createClient(supabaseUrl, serviceKey, {
-  auth: { persistSession: false },
-});
+import { getSupabaseServerClient } from "@/lib/supabaseServer";
 
 export async function GET(req: NextRequest) {
   try {
-    // تأكيد السر
-    const authHeader = req.headers.get("x-widget-secret");
-    if (!authHeader || authHeader !== widgetSecret) {
-      return NextResponse.json(
-        { error: "UNAUTHORIZED_WIDGET" },
-        { status: 401 },
-      );
-    }
-
+    const supabase = getSupabaseServerClient();
     const { searchParams } = new URL(req.url);
 
     const sallaStoreId = searchParams.get("salla_store_id");
@@ -29,12 +12,12 @@ export async function GET(req: NextRequest) {
 
     if (!sallaStoreId || !sallaCustomerId) {
       return NextResponse.json(
-        { error: "MISSING_REQUIRED_FIELDS" },
+        { error: "MISSING_FIELDS" },
         { status: 400 },
       );
     }
 
-    // نحول salla_store_id -> store_id
+    // نحول salla_store_id -> store_id من جدول stores
     const { data: store, error: storeError } = await supabase
       .from("stores")
       .select("id")
@@ -72,7 +55,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ has_target: false });
     }
 
-    // لقينا target → نرجّع "نعم" بشكل واضح
+    // لقينا target → نرجّع "نعم"
     return NextResponse.json({ has_target: true, message: "نعم" });
   } catch (err) {
     console.error("CHECK_TARGET_FATAL", err);
