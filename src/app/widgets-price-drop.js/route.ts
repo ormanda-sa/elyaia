@@ -1,10 +1,9 @@
 // FILE: src/app/widgets-price-drop.js/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets-price-drop.js — Price Drop Popup (On-site)
+// widgets-price-drop.js — Price Drop Popup (simple eligible)
 (function () {
   try {
     var script =
@@ -16,104 +15,12 @@ export async function GET(_req: NextRequest) {
 
     if (!script) return;
 
-    // 👈 نفس اللي تسويه في widgets.js
     var sallaStoreId = script.getAttribute("data-store-id");
     if (!sallaStoreId) return;
 
     var WIDGET_SECRET = script.getAttribute("data-event-secret") || "";
 
-    // TODO: عدّل هذي القيم حسب بيئة سلة عندك
-    // حاول تستخدم نفس الطريقة اللي مستخدمها في widgets.js أو كود سلة
-    var PRODUCT_ID = window.Salla && window.Salla.product
-      ? String(window.Salla.product.id)
-      : (window.PRODUCT_ID || null);
-
-    var CUSTOMER_ID = window.Salla && window.Salla.customer
-      ? String(window.Salla.customer.id)
-      : (window.CUSTOMER_ID || null);
-
-    if (!PRODUCT_ID || !CUSTOMER_ID) {
-      console.log("[price-drop] missing PRODUCT_ID or CUSTOMER_ID");
-      return;
-    }
-
-    function fetchEligible() {
-      try {
-        fetch("/api/widget/price-drop/onsite/eligible", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-widget-secret": WIDGET_SECRET
-          },
-          body: JSON.stringify({
-            salla_store_id: String(sallaStoreId),
-            product_id: String(PRODUCT_ID),
-            salla_customer_id: String(CUSTOMER_ID)
-          })
-        })
-          .then(function (res) {
-            return res.text().then(function (text) {
-              var json = null;
-              try {
-                json = JSON.parse(text);
-              } catch (e) {
-                console.warn("[price-drop] eligible: invalid JSON", text);
-              }
-              return { res: res, json: json };
-            });
-          })
-          .then(function (out) {
-            var res = out.res;
-            var json = out.json;
-
-            if (!res.ok) {
-              console.warn("[price-drop] eligible not ok", res.status, json);
-              return;
-            }
-
-            if (!json || !json.eligible) {
-              console.log("[price-drop] not eligible for popup");
-              return;
-            }
-
-            console.log("[price-drop] ✅ eligible:", json);
-            createPopup(json.campaign, json.target_id);
-          })
-          .catch(function (err) {
-            console.error("[price-drop] eligible error", err);
-          });
-      } catch (e) {
-        console.error("[price-drop] fetchEligible fatal", e);
-      }
-    }
-
-    function sendEvent(eventType, extra) {
-      try {
-        fetch("/api/widget/price-drop/onsite/event", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-widget-secret": WIDGET_SECRET
-          },
-          body: JSON.stringify({
-            salla_store_id: String(sallaStoreId),
-            campaign_id: extra.campaign_id,
-            product_id: String(PRODUCT_ID),
-            target_id: extra.target_id,
-            salla_customer_id: String(CUSTOMER_ID),
-            event_type: eventType,
-            cart_id: extra.cart_id || null,
-            order_id: extra.order_id || null
-          })
-        }).catch(function (err) {
-          console.warn("[price-drop] sendEvent error", err);
-        });
-      } catch (e) {
-        console.error("[price-drop] sendEvent fatal", e);
-      }
-    }
-
-    function createPopup(campaign, targetId) {
+    function createPopup(campaign) {
       var overlay = document.createElement("div");
       overlay.style.position = "fixed";
       overlay.style.inset = "0";
@@ -191,7 +98,7 @@ export async function GET(_req: NextRequest) {
       closeBtn.style.flex = "0 0 auto";
       closeBtn.style.padding = "8px 10px";
       closeBtn.style.borderRadius = "8px";
-      closeBtn.style.border = "1px solid #cbd5f5";
+      closeBtn.style.border = "1px solid "#cbd5f5";
       closeBtn.style.background = "#fff";
       closeBtn.style.color = "#334155";
       closeBtn.style.cursor = "pointer";
@@ -208,31 +115,15 @@ export async function GET(_req: NextRequest) {
       overlay.appendChild(box);
       document.body.appendChild(overlay);
 
-      // impression أول ما يظهر
-      sendEvent("impression", {
-        campaign_id: campaign.id,
-        target_id: targetId
-      });
-
-      function closePopup() {
-        overlay.remove();
-      }
+      function closePopup() { overlay.remove(); }
 
       overlay.addEventListener("click", function (e) {
-        if (e.target === overlay) {
-          closePopup();
-        }
+        if (e.target === overlay) closePopup();
       });
 
-      closeBtn.addEventListener("click", function () {
-        closePopup();
-      });
+      closeBtn.addEventListener("click", function () { closePopup(); });
 
       goBtn.addEventListener("click", function () {
-        sendEvent("click", {
-          campaign_id: campaign.id,
-          target_id: targetId
-        });
         if (campaign.product_url) {
           window.location.href = campaign.product_url;
         } else {
@@ -241,12 +132,76 @@ export async function GET(_req: NextRequest) {
       });
     }
 
+    function getDetailFromDataLayerOnce() {
+      var dl = window.dataLayer || [];
+      for (var i = dl.length - 1; i >= 0; i--) {
+        var ev = dl[i];
+        if (!ev) continue;
+        if (
+          ev.event === "detail" &&
+          ev.ecommerce &&
+          ev.ecommerce.detail &&
+          ev.ecommerce.detail.products &&
+          ev.ecommerce.detail.products.length > 0 &&
+          ev.customer
+        ) {
+          var product = ev.ecommerce.detail.products[0];
+          var customer = ev.customer;
+
+          if (customer.isGuest) return null; // ضيف → لا شيء
+
+          var productId = product.id;
+          if (!productId) return null;
+
+          return String(productId);
+        }
+      }
+      return null;
+    }
+
+    function waitForDetailAndRun(maxTries) {
+      var tries = 0;
+      var timer = setInterval(function () {
+        tries++;
+        var productId = getDetailFromDataLayerOnce();
+        if (productId) {
+          clearInterval(timer);
+          fetchSimpleEligible(productId);
+        } else if (tries >= maxTries) {
+          clearInterval(timer);
+        }
+      }, 500);
+    }
+
+    function fetchSimpleEligible(productId) {
+      fetch("/api/widget/price-drop/onsite/simple-eligible", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-widget-secret": WIDGET_SECRET
+        },
+        body: JSON.stringify({
+          salla_store_id: String(sallaStoreId),
+          product_id: String(productId)
+        })
+      })
+        .then(function (res) {
+          return res.text().then(function (text) {
+            var json = null;
+            try { json = JSON.parse(text); } catch (e) {}
+            if (!res.ok || !json || !json.eligible) return;
+            createPopup(json.campaign);
+          });
+        })
+        .catch(function () {});
+    }
+
     function init() {
-      fetchEligible();
+      waitForDetailAndRun(10); // يحاول 5 ثواني
     }
 
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", init);
+      document.addEventListener("DOMContentDOMContentLoaded", init);
     } else {
       init();
     }
