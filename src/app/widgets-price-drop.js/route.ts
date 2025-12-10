@@ -167,16 +167,13 @@ export async function GET(_req: NextRequest) {
           card.style.display = "flex";
           card.style.flexDirection = "column";
           card.style.gap = "6px";
+          card.style.alignItems = "stretch";
 
-          var topRow = document.createElement("div");
-          topRow.style.display = "flex";
-          topRow.style.gap = "8px";
-          topRow.style.alignItems = "center";
-
+          // صورة كبيرة فوق
           if (offer.product_image_url) {
             var imgWrap = document.createElement("div");
-            imgWrap.style.width = "64px";
-            imgWrap.style.height = "64px";
+            imgWrap.style.width = "100%";
+            imgWrap.style.height = "140px";
             imgWrap.style.borderRadius = "12px";
             imgWrap.style.overflow = "hidden";
             imgWrap.style.background = "#f3f4f6";
@@ -190,20 +187,18 @@ export async function GET(_req: NextRequest) {
             img.style.objectFit = "cover";
 
             imgWrap.appendChild(img);
-            topRow.appendChild(imgWrap);
+            card.appendChild(imgWrap);
           }
 
-          var titleBox = document.createElement("div");
-          titleBox.style.flex = "1";
-
+          // العنوان تحت الصورة
           if (offer.product_title) {
             var pTitle = document.createElement("div");
             pTitle.textContent = offer.product_title;
             pTitle.style.fontSize = "13px";
             pTitle.style.fontWeight = "600";
             pTitle.style.color = "#111827";
-            pTitle.style.marginBottom = "2px";
-            titleBox.appendChild(pTitle);
+            pTitle.style.marginTop = "6px";
+            card.appendChild(pTitle);
           }
 
           var typeLabel = document.createElement("div");
@@ -214,11 +209,9 @@ export async function GET(_req: NextRequest) {
           } else {
             typeLabel.textContent = "عرض خصم على سعر المنتج";
           }
-          titleBox.appendChild(typeLabel);
+          card.appendChild(typeLabel);
 
-          topRow.appendChild(titleBox);
-          card.appendChild(topRow);
-
+          // السعر
           var priceRow = document.createElement("div");
           priceRow.style.display = "flex";
           priceRow.style.alignItems = "baseline";
@@ -269,6 +262,7 @@ export async function GET(_req: NextRequest) {
             card.appendChild(priceRow);
           }
 
+          // كوبون
           if (offer.discount_type === "coupon" && offer.coupon_code) {
             var cpLabel = document.createElement("div");
             cpLabel.textContent = "كوبون الخصم:";
@@ -320,6 +314,7 @@ export async function GET(_req: NextRequest) {
             card.appendChild(cpRow);
           }
 
+          // التايمر
           if (offer.coupon_expires_at || offer.ends_at) {
             var timerRoot = document.createElement("div");
             timerRoot.style.display = "flex";
@@ -368,9 +363,10 @@ export async function GET(_req: NextRequest) {
             );
           }
 
+          // زر عرض المنتج داخل البطاقة
           var cardBtnRow = document.createElement("div");
           cardBtnRow.style.display = "flex";
-          cardBtnRow.style.marginTop = "6px";
+          cardBtnRow.style.marginTop = "8px";
 
           var viewBtn = document.createElement("button");
           viewBtn.type = "button";
