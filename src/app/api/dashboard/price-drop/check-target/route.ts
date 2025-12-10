@@ -98,15 +98,35 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  const { data: viewRow } = await supabase
+    .from("price_drop_product_views")
+    .select("product_image_url, current_price")
+    .eq("store_id", storeId)
+    .eq("product_id", target.product_id)
+    .order("viewed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ product_image_url: string | null; current_price: string | null }>();
+
+  const productImageUrl =
+    (c.product_image_url && c.product_image_url.length > 0
+      ? c.product_image_url
+      : null) ||
+    (viewRow && viewRow.product_image_url ? viewRow.product_image_url : null);
+
+  const currentPrice =
+    (viewRow && viewRow.current_price ? viewRow.current_price : null) ||
+    (c.new_price ?? c.original_price ?? null);
+
   const campaignPayload = {
     target_id: target.id,
     campaign_id: target.campaign_id,
     product_id: target.product_id,
     product_title: c.product_title,
-    product_image_url: c.product_image_url,
+    product_image_url: productImageUrl,
     product_url: c.product_url,
     original_price: c.original_price,
     new_price: c.new_price,
+    current_price: currentPrice,
     discount_percent: c.discount_percent,
     discount_type: c.discount_type,
     coupon_code: c.coupon_code,
