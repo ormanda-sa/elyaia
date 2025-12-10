@@ -23,6 +23,7 @@ const SCRIPT = `
       product_title: cfg.productTitle || null,
       product_url: cfg.productUrl || window.location.href,
       current_price: cfg.currentPrice || null,
+      product_image_url: cfg.productImageUrl || null,
 
       salla_customer_id: cfg.sallaCustomerId || null,
       customer_name: cfg.customerName || null,
@@ -50,7 +51,7 @@ const SCRIPT = `
       console.error("DARB track-view exception", e);
     }
 
-    // 2) check active offer (الآن فقط نرسل الطلب عشان المستقبل)
+    // 2) check active offer
     try {
       fetch(cfg.apiBase + "/active-offer", {
         method: "POST",
