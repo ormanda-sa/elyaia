@@ -368,6 +368,33 @@ export async function GET(_req: NextRequest) {
             );
           }
 
+          var cardBtnRow = document.createElement("div");
+          cardBtnRow.style.display = "flex";
+          cardBtnRow.style.marginTop = "6px";
+
+          var viewBtn = document.createElement("button");
+          viewBtn.type = "button";
+          viewBtn.textContent = "عرض المنتج";
+          viewBtn.style.flex = "1";
+          viewBtn.style.padding = "6px 8px";
+          viewBtn.style.borderRadius = "8px";
+          viewBtn.style.border = "none";
+          viewBtn.style.background = "#e11d48";
+          viewBtn.style.color = "#ffffff";
+          viewBtn.style.cursor = "pointer";
+          viewBtn.style.fontSize = "13px";
+          viewBtn.style.fontWeight = "600";
+
+          viewBtn.addEventListener("click", function () {
+            try { sendPopupEvent("click", offer.product_id); } catch (e) {}
+            if (offer.product_url) {
+              try { window.location.href = offer.product_url; } catch (e) {}
+            }
+          });
+
+          cardBtnRow.appendChild(viewBtn);
+          card.appendChild(cardBtnRow);
+
           slider.appendChild(card);
         })(offers[i]);
       }
@@ -379,17 +406,9 @@ export async function GET(_req: NextRequest) {
       btnRow.style.gap = "8px";
       btnRow.style.marginTop = "10px";
 
-      var goBtn = document.createElement("button");
-      goBtn.textContent = "روح للمنتج";
-      goBtn.style.flex = "1";
-      goBtn.style.padding = "9px 10px";
-      goBtn.style.borderRadius = "8px";
-      goBtn.style.border = "none";
-      goBtn.style.background = "#e11d48";
-      goBtn.style.color = "#ffffff";
-      goBtn.style.cursor = "pointer";
-      goBtn.style.fontSize = "14px";
-      goBtn.style.fontWeight = "600";
+      var spacer = document.createElement("div");
+      spacer.style.flex = "1";
+      btnRow.appendChild(spacer);
 
       var closeBtn = document.createElement("button");
       closeBtn.textContent = "لاحقًا";
@@ -402,7 +421,6 @@ export async function GET(_req: NextRequest) {
       closeBtn.style.cursor = "pointer";
       closeBtn.style.fontSize = "13px";
 
-      btnRow.appendChild(goBtn);
       btnRow.appendChild(closeBtn);
       box.appendChild(btnRow);
 
@@ -424,17 +442,6 @@ export async function GET(_req: NextRequest) {
 
       closeBtn.addEventListener("click", function () {
         closePopup();
-      });
-
-      goBtn.addEventListener("click", function () {
-        try { sendPopupEvent("click", firstProductId); } catch (e) {}
-        var url =
-          (offers[0] && offers[0].product_url) ? offers[0].product_url : null;
-        if (url) {
-          try { window.location.href = url; } catch (e) {}
-        } else {
-          closePopup();
-        }
       });
     }
 
