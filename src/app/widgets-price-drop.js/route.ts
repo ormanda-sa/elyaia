@@ -173,7 +173,7 @@ export async function GET(_req: NextRequest) {
           if (offer.product_image_url) {
             var imgWrap = document.createElement("div");
             imgWrap.style.width = "100%";
-            imgWrap.style.height = "140px";
+            imgWrap.style.height = "188px";
             imgWrap.style.borderRadius = "12px";
             imgWrap.style.overflow = "hidden";
             imgWrap.style.background = "#f3f4f6";
