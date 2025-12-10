@@ -210,7 +210,7 @@ export async function GET(_req: NextRequest) {
   }
 })();
 `;
-
+ 
   return new NextResponse(js, {
     status: 200,
     headers: {
