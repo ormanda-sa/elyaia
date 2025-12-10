@@ -46,42 +46,38 @@ export async function GET(_req: NextRequest) {
     }
 
     // ينادي API check-target
-    function fetchByCustomer(customerId) {
-      if (!PANEL_ORIGIN) return;
+   function fetchByCustomer(customerId) {
+  if (!PANEL_ORIGIN) return;
 
-      var url =
-        PANEL_ORIGIN +
-        "/api/widget/price-drop/onsite/check-target" +
-        "?salla_store_id=" +
-        encodeURIComponent(String(sallaStoreId)) +
-        "&salla_customer_id=" +
-        encodeURIComponent(String(customerId));
+  var url =
+    PANEL_ORIGIN +
+    "/api/dashboard/price-drop/check-target" +   // 👈 هنا
+    "?salla_store_id=" +
+    encodeURIComponent(String(sallaStoreId)) +
+    "&salla_customer_id=" +
+    encodeURIComponent(String(customerId));
 
-      fetch(url, {
-        method: "GET",
-        headers: {
-          "x-widget-secret": WIDGET_SECRET,
-        },
-      })
-        .then(function (res) {
-          return res.text().then(function (text) {
-            var json = null;
-            try {
-              json = JSON.parse(text);
-            } catch (e) {}
+  fetch(url, {
+    method: "GET",
+  })
+    .then(function (res) {
+      return res.text().then(function (text) {
+        var json = null;
+        try { json = JSON.parse(text); } catch (e) {}
 
-            console.log("[check-target]", res.status, json);
+        console.log("[check-target]", res.status, json);
 
-            // 👇 لو عنده صف في price_drop_targets → نطبع "نعم"
-            if (res.ok && json && json.has_target) {
-              console.log("نعم");
-            }
-          });
-        })
-        .catch(function (e) {
-          console.warn("[check-target] fetch error", e);
-        });
-    }
+        if (res.ok && json && json.has_target) {
+          console.log("نعم");
+        }
+      });
+    })
+    .catch(function (e) {
+      console.warn("[check-target] fetch error", e);
+    });
+}
+
+
 
     // ننتظر dataLayer لين يجهز
     function waitForCustomerAndRun(maxTries) {
