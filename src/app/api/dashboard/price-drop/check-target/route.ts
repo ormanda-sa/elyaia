@@ -3,68 +3,54 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import { withCors, handleOptions } from "../cors";
 
-// للـ preflight من المتصفح (OPTIONS)
 export async function OPTIONS(req: NextRequest) {
   return handleOptions(req);
 }
 
 export async function GET(req: NextRequest) {
   const supabase = getSupabaseServerClient();
+  const { searchParams } = new URL(req.url);
 
-  try {
-    const { searchParams } = new URL(req.url);
+  const storeId = searchParams.get("store_id");
 
-    const storeId = searchParams.get("store_id");
-    const sallaCustomerId = searchParams.get("salla_customer_id");
-
-    if (!storeId || !sallaCustomerId) {
-      return withCors(
-        req,
-        NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 }),
-      );
-    }
-
-    const { data: target, error: targetError } = await supabase
-      .from("price_drop_targets")
-      .select("id")
-      .eq("store_id", storeId)
-      .eq("salla_customer_id", sallaCustomerId)
-      .limit(1)
-      .maybeSingle<{ id: number }>();
-
-    if (targetError) {
-      console.error("CHECK_TARGET_ERROR", targetError);
-      return withCors(
-        req,
-        NextResponse.json(
-          { error: "TARGET_LOOKUP_FAILED" },
-          { status: 500 },
-        ),
-      );
-    }
-
-    if (!target) {
-      return withCors(
-        req,
-        NextResponse.json({ has_target: false }, { status: 200 }),
-      );
-    }
-
+  if (!storeId) {
     return withCors(
       req,
-      NextResponse.json(
-        { has_target: true, message: "نعم" },
-        { status: 200 },
-      ),
+      NextResponse.json({ error: "MISSING_STORE_ID" }, { status: 400 }),
     );
-  } catch (err) {
-    console.error("CHECK_TARGET_FATAL", err);
+  }
+
+  const { data: target, error } = await supabase
+    .from("price_drop_targets")
+    .select("id")
+    .eq("store_id", storeId)
+    .eq("status", "pending")
+    .limit(1)
+    .maybeSingle<{ id: number }>();
+
+  if (error) {
+    console.error("CHECK_TARGET_ERROR", error);
     return withCors(
       req,
       NextResponse.json(
-        { error: "INTERNAL_SERVER_ERROR" },
+        { error: "TARGET_LOOKUP_FAILED" },
         { status: 500 },
       ),
     );
   }
+
+  if (!target) {
+    return withCors(
+      req,
+      NextResponse.json({ has_target: false }, { status: 200 }),
+    );
+  }
+
+  return withCors(
+    req,
+    NextResponse.json(
+      { has_target: true, message: "نعم" },
+      { status: 200 },
+    ),
+  );
 }
