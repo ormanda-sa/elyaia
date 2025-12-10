@@ -22,11 +22,54 @@ export async function GET(req: NextRequest) {
 
   const { data: target, error } = await supabase
     .from("price_drop_targets")
-    .select("id")
+    .select(
+      `
+      id,
+      store_id,
+      campaign_id,
+      product_id,
+      status,
+      created_at,
+      campaign:price_drop_campaigns (
+        id,
+        product_title,
+        product_image_url,
+        product_url,
+        original_price,
+        new_price,
+        discount_percent,
+        discount_type,
+        coupon_code,
+        coupon_expires_at,
+        ends_at
+      )
+    `,
+    )
     .eq("store_id", storeId)
     .eq("status", "pending")
+    .order("created_at", { ascending: false })
     .limit(1)
-    .maybeSingle<{ id: number }>();
+    .maybeSingle<{
+      id: number;
+      store_id: string;
+      campaign_id: number;
+      product_id: string;
+      status: string;
+      created_at: string;
+      campaign: {
+        id: number;
+        product_title: string | null;
+        product_image_url: string | null;
+        product_url: string | null;
+        original_price: string | null;
+        new_price: string | null;
+        discount_percent: string | null;
+        discount_type: "price" | "coupon";
+        coupon_code: string | null;
+        coupon_expires_at: string | null;
+        ends_at: string | null;
+      } | null;
+    }>();
 
   if (error) {
     console.error("CHECK_TARGET_ERROR", error);
@@ -46,10 +89,39 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  const c = target.campaign;
+
+  if (!c) {
+    return withCors(
+      req,
+      NextResponse.json({ has_target: true, message: "نعم" }, { status: 200 }),
+    );
+  }
+
+  const campaignPayload = {
+    target_id: target.id,
+    campaign_id: target.campaign_id,
+    product_id: target.product_id,
+    product_title: c.product_title,
+    product_image_url: c.product_image_url,
+    product_url: c.product_url,
+    original_price: c.original_price,
+    new_price: c.new_price,
+    discount_percent: c.discount_percent,
+    discount_type: c.discount_type,
+    coupon_code: c.coupon_code,
+    coupon_expires_at: c.coupon_expires_at,
+    ends_at: c.ends_at,
+  };
+
   return withCors(
     req,
     NextResponse.json(
-      { has_target: true, message: "نعم" },
+      {
+        has_target: true,
+        message: "نعم",
+        campaign: campaignPayload,
+      },
       { status: 200 },
     ),
   );
