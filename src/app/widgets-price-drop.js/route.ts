@@ -29,7 +29,7 @@ export async function GET(_req: NextRequest) {
     } catch (e) {
       PANEL_ORIGIN = "";
     }
-
+ 
     // نجيب ID العميل من dataLayer (email_hashed / phone_hashed)
     function getCustomerIdFromDataLayer() {
       var dl = window.dataLayer || [];
