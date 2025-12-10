@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets-price-drop.js — multi offers slider + countdown + funnel events
+// widgets-price-drop.js — multi offers slider + countdown + funnel events + cooldown
 (function () {
   try {
     var script =
@@ -28,6 +28,32 @@ export async function GET(_req: NextRequest) {
     }
 
     var SALLA_CUSTOMER_ID = null;
+    var POPUP_COOLDOWN_MS = 30 * 60 * 1000; // 30 دقيقة
+
+    function getCooldownKey() {
+      return "darb_price_drop_last_popup_" + STORE_ID;
+    }
+
+    function shouldSkipPopupByCooldown() {
+      try {
+        var key = getCooldownKey();
+        var raw = localStorage.getItem(key);
+        if (!raw) return false;
+        var last = parseInt(raw, 10);
+        if (isNaN(last)) return false;
+        var now = Date.now();
+        return now - last < POPUP_COOLDOWN_MS;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function markPopupShownNow() {
+      try {
+        var key = getCooldownKey();
+        localStorage.setItem(key, String(Date.now()));
+      } catch (e) {}
+    }
 
     function sendPopupEvent(eventType, productId) {
       if (!PANEL_ORIGIN || !STORE_ID || !SALLA_CUSTOMER_ID) return;
@@ -109,6 +135,9 @@ export async function GET(_req: NextRequest) {
     function createPopup(offers) {
       if (!offers || !offers.length) return;
 
+      // نحط ختم البوب أب أول ما نعرضه
+      markPopupShownNow();
+
       var overlay = document.createElement("div");
       overlay.style.position = "fixed";
       overlay.style.top = "0";
@@ -169,11 +198,10 @@ export async function GET(_req: NextRequest) {
           card.style.gap = "6px";
           card.style.alignItems = "stretch";
 
-          // صورة كبيرة فوق
           if (offer.product_image_url) {
             var imgWrap = document.createElement("div");
             imgWrap.style.width = "100%";
-            imgWrap.style.height = "188px";
+            imgWrap.style.height = "188px"; // الارتفاع المعتمد
             imgWrap.style.borderRadius = "12px";
             imgWrap.style.overflow = "hidden";
             imgWrap.style.background = "#f3f4f6";
@@ -190,11 +218,10 @@ export async function GET(_req: NextRequest) {
             card.appendChild(imgWrap);
           }
 
-          // العنوان تحت الصورة
           if (offer.product_title) {
             var pTitle = document.createElement("div");
             pTitle.textContent = offer.product_title;
-            pTitle.style.fontSize = "11px";
+            pTitle.style.fontSize = "13px";
             pTitle.style.fontWeight = "600";
             pTitle.style.color = "#111827";
             pTitle.style.marginTop = "6px";
@@ -211,7 +238,6 @@ export async function GET(_req: NextRequest) {
           }
           card.appendChild(typeLabel);
 
-          // السعر
           var priceRow = document.createElement("div");
           priceRow.style.display = "flex";
           priceRow.style.alignItems = "baseline";
@@ -262,7 +288,6 @@ export async function GET(_req: NextRequest) {
             card.appendChild(priceRow);
           }
 
-          // كوبون
           if (offer.discount_type === "coupon" && offer.coupon_code) {
             var cpLabel = document.createElement("div");
             cpLabel.textContent = "كوبون الخصم:";
@@ -314,7 +339,6 @@ export async function GET(_req: NextRequest) {
             card.appendChild(cpRow);
           }
 
-          // التايمر
           if (offer.coupon_expires_at || offer.ends_at) {
             var timerRoot = document.createElement("div");
             timerRoot.style.display = "flex";
@@ -363,7 +387,6 @@ export async function GET(_req: NextRequest) {
             );
           }
 
-          // زر عرض المنتج داخل البطاقة
           var cardBtnRow = document.createElement("div");
           cardBtnRow.style.display = "flex";
           cardBtnRow.style.marginTop = "8px";
@@ -458,6 +481,12 @@ export async function GET(_req: NextRequest) {
     function fetchMultiOffers(customerId) {
       if (!PANEL_ORIGIN) return;
 
+      // كول داون: لا تطلع بوب أب لو ظهر خلال آخر 30 دقيقة
+      if (shouldSkipPopupByCooldown()) {
+        console.log("[multi-offers] skipped by cooldown");
+        return;
+      }
+
       var url =
         PANEL_ORIGIN +
         "/api/dashboard/price-drop/multi-offers" +
@@ -482,6 +511,35 @@ export async function GET(_req: NextRequest) {
           console.warn("[multi-offers] fetch error", e);
         });
     }
+
+    function shouldSkipPopupByCooldown() {
+      try {
+        var key = "darb_price_drop_last_popup_" + STORE_ID;
+        var raw = localStorage.getItem(key);
+        if (!raw) return false;
+        var last = parseInt(raw, 10);
+        if (isNaN(last)) return false;
+        var now = Date.now();
+        return now - last < (30 * 60 * 1000);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function markPopupShownNow() {
+      try {
+        var key = "darb_price_drop_last_popup_" + STORE_ID;
+        localStorage.setItem(key, String(Date.now()));
+      } catch (e) {}
+    }
+
+    // نعدل createPopup لاستدعاء markPopupShownNow داخلها
+    var _originalCreatePopup = createPopup;
+    createPopup = function (offers) {
+      if (!offers || !offers.length) return;
+      markPopupShownNow();
+      _originalCreatePopup(offers);
+    };
 
     function waitForCustomerAndRun(maxTries) {
       var tries = 0;
