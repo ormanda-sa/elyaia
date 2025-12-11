@@ -76,6 +76,11 @@ type CampaignReportCustomerRow = {
   first_click_at: string | null;
   first_close_at: string | null;
   first_order_at: string | null;
+
+  // 👇 حالة الإيميل لهذا الـ target
+  email_delivered_at: string | null;
+  email_failed_at: string | null;
+  email_opened_at: string | null;
 };
 
 type OnsiteFunnelStats = {
@@ -268,12 +273,13 @@ export async function GET(
       }
     }
 
-    // 👇 Email funnel من JOIN بين messages و targets
+    // 👇 Email funnel + خريطة لكل target_id
     const { data: emailMessages, error: emailError } = await supabase
       .from("price_drop_messages")
       .select(
         `
         id,
+        target_id,
         channel,
         sent_at,
         delivered_at,
@@ -301,6 +307,16 @@ export async function GET(
       opened: 0,
     };
 
+    const emailByTarget: Record<
+      number,
+      {
+        sent_at: string | null;
+        delivered_at: string | null;
+        failed_at: string | null;
+        opened_at: string | null;
+      }
+    > = {};
+
     if (emailMessages && emailMessages.length) {
       email_funnel.total = emailMessages.length;
       for (const m of emailMessages as any[]) {
@@ -308,6 +324,16 @@ export async function GET(
         if (m.delivered_at) email_funnel.delivered += 1;
         if (m.failed_at) email_funnel.failed += 1;
         if (m.opened_at) email_funnel.opened += 1;
+
+        const tid = m.target_id as number | null;
+        if (tid) {
+          emailByTarget[tid] = {
+            sent_at: m.sent_at,
+            delivered_at: m.delivered_at,
+            failed_at: m.failed_at,
+            opened_at: m.opened_at,
+          };
+        }
       }
     }
 
@@ -359,6 +385,7 @@ export async function GET(
       const nameKey =
         String(t.product_id) + "|" + (t.salla_customer_id || "");
       const viewInfo = nameMap[nameKey];
+      const emailInfo = emailByTarget[t.id];
 
       return {
         id: t.id,
@@ -378,6 +405,9 @@ export async function GET(
         first_click_at,
         first_close_at,
         first_order_at,
+        email_delivered_at: emailInfo?.delivered_at ?? null,
+        email_failed_at: emailInfo?.failed_at ?? null,
+        email_opened_at: emailInfo?.opened_at ?? null,
       };
     });
 

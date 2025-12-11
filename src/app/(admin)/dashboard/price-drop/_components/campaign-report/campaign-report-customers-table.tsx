@@ -28,8 +28,8 @@ export function CampaignReportCustomersTable({ customers, campaign }: Props) {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium">تفاصيل العملاء (On-site أولاً)</h3>
         <span className="text-xs text-muted-foreground">
-          يظهر جميع الـ targets مع حالة المشاهدة والتحويل وسلوك الإعلان في الفترة
-          المختارة
+          يظهر جميع الـ targets مع حالة المشاهدة والتحويل وسلوك الإعلان في
+          الفترة المختارة
         </span>
       </div>
 
@@ -60,6 +60,7 @@ export function CampaignReportCustomersTable({ customers, campaign }: Props) {
 
             {customers.map((c) => (
               <TableRow key={c.id}>
+                {/* العميل */}
                 <TableCell className="text-xs">
                   <div className="flex flex-col gap-0.5">
                     {c.customer_name && (
@@ -81,26 +82,91 @@ export function CampaignReportCustomersTable({ customers, campaign }: Props) {
                   </div>
                 </TableCell>
 
+                {/* قناة الإشعار: حالة الإيميل + الواتساب + On-site */}
                 <TableCell className="text-xs">
-                  <div className="flex flex-col gap-0.5">
-                    {c.email_sent_at && (
-                      <span className="text-[11px]">
-                        Email: {formatDate(c.email_sent_at)}
+                  <div className="flex flex-col gap-1">
+                    {/* حالة الإيميل */}
+                    {c.customer_email ? (
+                      c.email_failed_at ? (
+                        <div className="flex items-center justify-between gap-1">
+                          <Badge
+                            variant="outline"
+                            className="border-red-500 text-[11px] text-red-600"
+                          >
+                            فشل إرسال الإيميل
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatDate(c.email_failed_at)}
+                          </span>
+                        </div>
+                      ) : c.email_delivered_at ? (
+                        <div className="flex items-center justify-between gap-1">
+                          <Badge
+                            variant="outline"
+                            className="border-emerald-500 text-[11px] text-emerald-700"
+                          >
+                            وصل لصندوق البريد
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatDate(c.email_delivered_at)}
+                          </span>
+                        </div>
+                      ) : c.email_sent_at ? (
+                        <div className="flex items-center justify-between gap-1">
+                          <Badge
+                            variant="outline"
+                            className="border-sky-500 text-[11px] text-sky-700"
+                          >
+                            تم الإرسال (بانتظار التسليم)
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatDate(c.email_sent_at)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">
+                          لم تُرسل رسالة إيميل بعد
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">
+                        لا يوجد إيميل لهذا العميل
                       </span>
                     )}
-                    {c.whatsapp_sent_at && (
-                      <span className="text-[11px]">
-                        WhatsApp: {formatDate(c.whatsapp_sent_at)}
-                      </span>
+
+                    {/* حالة الواتساب */}
+                    {c.whatsapp_number && (
+                      <div className="flex items-center justify-between gap-1">
+                        {c.whatsapp_sent_at ? (
+                          <>
+                            <Badge
+                              variant="outline"
+                              className="border-emerald-500 text-[11px] text-emerald-700"
+                            >
+                              تم إرسال واتساب
+                            </Badge>
+                            <span className="text-[10px] text-muted-foreground">
+                              {formatDate(c.whatsapp_sent_at)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground">
+                            لم تُرسل رسالة واتساب بعد
+                          </span>
+                        )}
+                      </div>
                     )}
+
+                    {/* تذكير بـ On-site */}
                     {campaign?.send_onsite && (
                       <span className="text-[11px] text-muted-foreground">
-                        On-site: يعتمد على ظهور البانر/العرض
+                        On-site: يعتمد على ظهور البانر/العرض في المتجر
                       </span>
                     )}
                   </div>
                 </TableCell>
 
+                {/* مشاهدة On-site / سلوك الإعلان */}
                 <TableCell className="text-xs">
                   <div className="flex flex-col gap-0.5">
                     {c.first_impression_at ? (
@@ -142,6 +208,7 @@ export function CampaignReportCustomersTable({ customers, campaign }: Props) {
                   </div>
                 </TableCell>
 
+                {/* تحويل */}
                 <TableCell className="text-xs">
                   {c.converted_at ? (
                     <Badge
@@ -162,10 +229,12 @@ export function CampaignReportCustomersTable({ customers, campaign }: Props) {
                   )}
                 </TableCell>
 
+                {/* رقم الطلب */}
                 <TableCell className="text-xs">
                   {c.conversion_order_id ?? "-"}
                 </TableCell>
 
+                {/* نوع العميل */}
                 <TableCell className="text-xs">
                   {c.is_new ? (
                     <Badge
@@ -181,6 +250,7 @@ export function CampaignReportCustomersTable({ customers, campaign }: Props) {
                   )}
                 </TableCell>
 
+                {/* تاريخ الإضافة للحملة */}
                 <TableCell className="text-xs">
                   {formatDate(c.created_at)}
                 </TableCell>

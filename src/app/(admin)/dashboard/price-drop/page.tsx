@@ -1,3 +1,5 @@
+// FILE: src/app/(admin)/dashboard/price-drop/page
+
 "use client";
 
 import { useState } from "react";

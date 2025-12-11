@@ -2,7 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { DateRange } from "react-day-picker";
-import { ChevronDownIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  TrendingUp,
+  Eye,
+  Users,
+  Clock,
+  DollarSign,
+  Package,
+  User,
+  Mail,
+  Phone,
+  ShoppingBag,
+  ArrowUpDown,
+} from "lucide-react";
 
 import { HighInterestProduct } from "../page";
 import { Button } from "@/components/ui/button";
@@ -90,7 +103,6 @@ export function HighInterestProductsTable({
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(50);
 
-  // Dialog عرض منتجات العميل
   const [customerProductsOpen, setCustomerProductsOpen] = useState(false);
   const [customerProductsLoading, setCustomerProductsLoading] = useState(false);
   const [selectedCustomer, setSelectedCustomer] =
@@ -99,7 +111,6 @@ export function HighInterestProductsTable({
     [],
   );
 
-  // تحميل المنتجات (نفس منطقك الأصلي)
   useEffect(() => {
     let cancelled = false;
 
@@ -152,7 +163,6 @@ export function HighInterestProductsTable({
     };
   }, [preset, from, to, sort, minViews, minViewers]);
 
-  // تحميل العملاء لما يكون تبويب العملاء مفتوح
   useEffect(() => {
     if (tab !== "customers") return;
 
@@ -192,7 +202,6 @@ export function HighInterestProductsTable({
     };
   }, [tab, preset, from, to, minViews, minViewers]);
 
-  // لو تغيّرت الفلاتر رجّع صفحة المنتجات للأولى
   useEffect(() => {
     setPage(1);
   }, [preset, from, to, sort, minViews, minViewers]);
@@ -219,7 +228,6 @@ export function HighInterestProductsTable({
     setDateOpen(false);
   };
 
-  // Pagination للمنتجات
   const totalItems = items.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -227,7 +235,6 @@ export function HighInterestProductsTable({
   const endIndex = startIndex + pageSize;
   const pagedItems = items.slice(startIndex, endIndex);
 
-  // تحميل منتجات عميل معيّن وفتح الـ Dialog
   const handleShowCustomerProducts = async (customer: HighInterestCustomer) => {
     if (!customer.customer_id) return;
 
@@ -263,49 +270,52 @@ export function HighInterestProductsTable({
 
   return (
     <>
-      <Card className="rounded-2xl">
-        <CardHeader className="space-y-3">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-base font-semibold">
-                المنتجات ذات الاهتمام العالي
-              </CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">
-                تقدر تشوف المنتجات أو العملاء حسب نفس الفترة والشروط.
+      <Card className="rounded-2xl shadow-sm border-muted/40">
+        <CardHeader className="space-y-4 pb-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-blue-500" />
+                <CardTitle className="text-lg font-semibold">
+                  المنتجات ذات الاهتمام العالي
+                </CardTitle>
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                تقدر تشوف المنتجات أو العملاء حسب نفس الفترة والشروط
               </p>
             </div>
 
-            {/* Tabs بسيطة */}
-            <div className="flex items-center gap-2 text-xs">
+            <div className="flex items-center gap-2 rounded-xl border bg-muted/30 p-1">
               <button
                 type="button"
                 className={cn(
-                  "rounded-full px-3 py-1",
+                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
                   tab === "products"
-                    ? "bg-primary text-primary-foreground"
-                    : "border bg-background text-foreground",
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
                 onClick={() => setTab("products")}
               >
+                <Package className="h-3.5 w-3.5" />
                 حسب المنتجات
               </button>
               <button
                 type="button"
                 className={cn(
-                  "rounded-full px-3 py-1",
+                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
                   tab === "customers"
-                    ? "bg-primary text-primary-foreground"
-                    : "border bg-background text-foreground",
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
                 onClick={() => setTab("customers")}
               >
+                <Users className="h-3.5 w-3.5" />
                 حسب العملاء
               </button>
             </div>
           </div>
 
-          {/* فلاتر التاريخ + الفرز (مشتركة) */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/20 p-3">
             <div className="flex flex-wrap gap-2">
               <PresetChip
                 label="اليوم"
@@ -335,9 +345,9 @@ export function HighInterestProductsTable({
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-xs">
-              {/* المدة من/إلى */}
-              <div className="flex items-center gap-1">
-                <span>المدة</span>
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-muted-foreground">المدة</span>
                 <Popover open={dateOpen} onOpenChange={setDateOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -386,56 +396,55 @@ export function HighInterestProductsTable({
                 </Popover>
               </div>
 
-              {/* الترتيب + الحد الأدنى */}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1">
-                  <span>ترتيب حسب</span>
-                  <Select
-                    value={sort}
-                    onValueChange={(v) => setSort(v as SortKey)}
-                  >
-                    <SelectTrigger className="h-8 w-[150px] text-xs">
-                      <SelectValue placeholder="الترتيب" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="views">عدد المشاهدات</SelectItem>
-                      <SelectItem value="viewers">عدد العملاء</SelectItem>
-                      <SelectItem value="last">آخر مشاهدة</SelectItem>
-                      <SelectItem value="price">السعر الحالي</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="flex items-center gap-1.5">
+                <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-muted-foreground">ترتيب حسب</span>
+                <Select
+                  value={sort}
+                  onValueChange={(v) => setSort(v as SortKey)}
+                >
+                  <SelectTrigger className="h-8 w-[150px] text-xs">
+                    <SelectValue placeholder="الترتيب" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="views">عدد المشاهدات</SelectItem>
+                    <SelectItem value="viewers">عدد العملاء</SelectItem>
+                    <SelectItem value="last">آخر مشاهدة</SelectItem>
+                    <SelectItem value="price">السعر الحالي</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="flex items-center gap-2 text-[11px]">
-                  <span>حد أدنى</span>
-                  <div className="flex items-center gap-1">
-                    <span>مشاهدات</span>
-                    <input
-                      type="number"
-                      min={1}
-                      className="h-8 w-16 rounded-full border px-2 text-xs text-right"
-                      value={minViews}
-                      onChange={(e) =>
-                        setMinViews(
-                          e.target.value ? Number(e.target.value) : 1,
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span>عملاء</span>
-                    <input
-                      type="number"
-                      min={1}
-                      className="h-8 w-16 rounded-full border px-2 text-xs text-right"
-                      value={minViewers}
-                      onChange={(e) =>
-                        setMinViewers(
-                          e.target.value ? Number(e.target.value) : 1,
-                        )
-                      }
-                    />
-                  </div>
+              <div className="flex items-center gap-2 rounded-full border bg-background px-3 py-1.5">
+                <span className="text-[11px] text-muted-foreground">
+                  حد أدنى
+                </span>
+                <div className="flex items-center gap-1">
+                  <Eye className="h-3 w-3 text-muted-foreground" />
+                  <input
+                    type="number"
+                    min={1}
+                    className="h-6 w-14 rounded border bg-background px-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-ring"
+                    value={minViews}
+                    onChange={(e) =>
+                      setMinViews(e.target.value ? Number(e.target.value) : 1)
+                    }
+                  />
+                </div>
+                <div className="h-3 w-px bg-border" />
+                <div className="flex items-center gap-1">
+                  <Users className="h-3 w-3 text-muted-foreground" />
+                  <input
+                    type="number"
+                    min={1}
+                    className="h-6 w-14 rounded border bg-background px-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-ring"
+                    value={minViewers}
+                    onChange={(e) =>
+                      setMinViewers(
+                        e.target.value ? Number(e.target.value) : 1,
+                      )
+                    }
+                  />
                 </div>
               </div>
             </div>
@@ -443,20 +452,48 @@ export function HighInterestProductsTable({
         </CardHeader>
 
         <CardContent className="pt-0">
-          {/* تبويب المنتجات */}
           {tab === "products" && (
             <>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-xl border bg-card">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-right">المنتج</TableHead>
-                      <TableHead className="text-right">السعر الحالي</TableHead>
-                      <TableHead className="text-right">المشاهدات</TableHead>
-                      <TableHead className="text-right">عدد العملاء</TableHead>
-                      <TableHead className="text-right">آخر مشاهدة</TableHead>
-                      <TableHead className="text-center">العملاء</TableHead>
-                      <TableHead className="text-center">إجراء</TableHead>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableHead className="text-right font-semibold">
+                        <div className="flex items-center gap-2 justify-end">
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                          المنتج
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-right font-semibold">
+                        <div className="flex items-center gap-2 justify-end">
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          السعر الحالي
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-right font-semibold">
+                        <div className="flex items-center gap-2 justify-end">
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                          المشاهدات
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-right font-semibold">
+                        <div className="flex items-center gap-2 justify-end">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          عدد العملاء
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-right font-semibold">
+                        <div className="flex items-center gap-2 justify-end">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          آخر مشاهدة
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center font-semibold">
+                        العملاء
+                      </TableHead>
+                      <TableHead className="text-center font-semibold">
+                        إجراء
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -464,9 +501,14 @@ export function HighInterestProductsTable({
                       <TableRow>
                         <TableCell
                           colSpan={7}
-                          className="py-6 text-center text-sm"
+                          className="py-12 text-center text-sm"
                         >
-                          جاري التحميل...
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                            <span className="text-muted-foreground">
+                              جاري التحميل...
+                            </span>
+                          </div>
                         </TableCell>
                       </TableRow>
                     )}
@@ -475,16 +517,24 @@ export function HighInterestProductsTable({
                       <TableRow>
                         <TableCell
                           colSpan={7}
-                          className="py-6 text-center text-sm"
+                          className="py-12 text-center text-sm"
                         >
-                          لا توجد منتجات ضمن هذه المدة / الشروط حتى الآن.
+                          <div className="flex flex-col items-center gap-2">
+                            <Package className="h-12 w-12 text-muted-foreground/50" />
+                            <span className="text-muted-foreground">
+                              لا توجد منتجات ضمن هذه المدة / الشروط حتى الآن
+                            </span>
+                          </div>
                         </TableCell>
                       </TableRow>
                     )}
 
                     {!loading &&
                       pagedItems.map((item) => (
-                        <TableRow key={item.product_id}>
+                        <TableRow
+                          key={item.product_id}
+                          className="hover:bg-muted/50 transition-colors"
+                        >
                           <TableCell className="max-w-[260px]">
                             <div className="flex flex-col gap-1">
                               <span className="line-clamp-2 text-sm font-medium">
@@ -492,7 +542,7 @@ export function HighInterestProductsTable({
                               </span>
                               {item.product_url && (
                                 <a
-                                  className="text-xs text-muted-foreground underline underline-offset-4"
+                                  className="text-xs text-blue-500 hover:text-blue-600 underline underline-offset-4 transition-colors"
                                   href={item.product_url}
                                   target="_blank"
                                   rel="noreferrer"
@@ -503,21 +553,29 @@ export function HighInterestProductsTable({
                             </div>
                           </TableCell>
                           <TableCell className="text-sm">
-                            {item.current_price != null
-                              ? `${item.current_price} ر.س`
-                              : "-"}
+                            {item.current_price != null ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-1 font-medium text-green-600">
+                                {item.current_price} ر.س
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-sm">
-                            {item.total_views}
+                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-1 font-medium text-blue-600">
+                              {item.total_views}
+                            </span>
                           </TableCell>
                           <TableCell className="text-sm">
-                            {item.unique_viewers}
+                            <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2.5 py-1 font-medium text-purple-600">
+                              {item.unique_viewers}
+                            </span>
                           </TableCell>
                           <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                             {item.last_view_at
-                              ? new Date(
-                                  item.last_view_at,
-                                ).toLocaleString("en-GB")
+                              ? new Date(item.last_view_at).toLocaleString(
+                                  "en-GB",
+                                )
                               : "-"}
                           </TableCell>
 
@@ -525,9 +583,10 @@ export function HighInterestProductsTable({
                             <Button
                               size="sm"
                               variant="outline"
-                              className="rounded-xl"
+                              className="rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors"
                               onClick={() => onShowVisitors(item)}
                             >
+                              <Users className="h-3.5 w-3.5 ml-1" />
                               عرض العملاء
                             </Button>
                           </TableCell>
@@ -535,9 +594,10 @@ export function HighInterestProductsTable({
                           <TableCell className="text-center">
                             <Button
                               size="sm"
-                              className="rounded-xl"
+                              className="rounded-xl shadow-sm hover:shadow transition-shadow"
                               onClick={() => onCreateCampaign(item)}
                             >
+                              <ShoppingBag className="h-3.5 w-3.5 ml-1" />
                               إنشاء حملة خصم
                             </Button>
                           </TableCell>
@@ -547,36 +607,37 @@ export function HighInterestProductsTable({
                 </Table>
               </div>
 
-              {/* Pagination */}
               {!loading && totalItems > 0 && (
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/20 p-3 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <button
-                      className="h-7 w-7 rounded-full border px-1 disabled:opacity-40"
+                      className="h-7 w-7 rounded-lg border bg-background hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       onClick={() => setPage(1)}
                       disabled={safePage === 1}
                     >
                       {"|<"}
                     </button>
                     <button
-                      className="h-7 w-7 rounded-full border px-1 disabled:opacity-40"
+                      className="h-7 w-7 rounded-lg border bg-background hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={safePage === 1}
                     >
                       {"<"}
                     </button>
-                    <span className="px-2">
+                    <span className="px-3 font-medium text-foreground">
                       {safePage} / {totalPages}
                     </span>
                     <button
-                      className="h-7 w-7 rounded-full border px-1 disabled:opacity-40"
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      className="h-7 w-7 rounded-lg border bg-background hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      onClick={() =>
+                        setPage((p) => Math.min(totalPages, p + 1))
+                      }
                       disabled={safePage === totalPages}
                     >
                       {">"}
                     </button>
                     <button
-                      className="h-7 w-7 rounded-full border px-1 disabled:opacity-40"
+                      className="h-7 w-7 rounded-lg border bg-background hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       onClick={() => setPage(totalPages)}
                       disabled={safePage === totalPages}
                     >
@@ -587,7 +648,7 @@ export function HighInterestProductsTable({
                   <div className="flex items-center gap-2">
                     <span>إظهار</span>
                     <select
-                      className="h-8 rounded-full border px-2 text-xs"
+                      className="h-8 rounded-lg border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                       value={pageSize}
                       onChange={(e) => {
                         const size = Number(e.target.value) || 10;
@@ -610,52 +671,79 @@ export function HighInterestProductsTable({
             </>
           )}
 
-          {/* تبويب العملاء */}
           {tab === "customers" && (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-xl border bg-card">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-right">العميل</TableHead>
-                    <TableHead className="text-right">
-                      البريد / الهاتف
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead className="text-right font-semibold">
+                      <div className="flex items-center gap-2 justify-end">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        العميل
+                      </div>
                     </TableHead>
-                    <TableHead className="text-right">
-                      عدد المنتجات التي زارها
+                    <TableHead className="text-right font-semibold">
+                      <div className="flex items-center gap-2 justify-end">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        البريد / الهاتف
+                      </div>
                     </TableHead>
-                    <TableHead className="text-right">
-                      إجمالي المشاهدات
+                    <TableHead className="text-right font-semibold">
+                      <div className="flex items-center gap-2 justify-end">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        عدد المنتجات
+                      </div>
                     </TableHead>
-                    <TableHead className="text-right">آخر زيارة</TableHead>
-                    <TableHead className="text-center">إجراء</TableHead>
+                    <TableHead className="text-right font-semibold">
+                      <div className="flex items-center gap-2 justify-end">
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                        إجمالي المشاهدات
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-right font-semibold">
+                      <div className="flex items-center gap-2 justify-end">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        آخر زيارة
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-center font-semibold">
+                      إجراء
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {customersLoading && (
                     <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="py-6 text-center text-sm"
-                      >
-                        جاري التحميل...
+                      <TableCell colSpan={6} className="py-12 text-center text-sm">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                          <span className="text-muted-foreground">
+                            جاري التحميل...
+                          </span>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )}
 
                   {!customersLoading && customers.length === 0 && (
                     <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="py-6 text-center text-sm"
-                      >
-                        لا يوجد عملاء ضمن هذه المدة / الشروط حتى الآن.
+                      <TableCell colSpan={6} className="py-12 text-center text-sm">
+                        <div className="flex flex-col items-center gap-2">
+                          <Users className="h-12 w-12 text-muted-foreground/50" />
+                          <span className="text-muted-foreground">
+                            لا يوجد عملاء ضمن هذه المدة / الشروط حتى الآن
+                          </span>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )}
 
                   {!customersLoading &&
                     customers.map((c, idx) => (
-                      <TableRow key={c.customer_id ?? idx}>
+                      <TableRow
+                        key={c.customer_id ?? idx}
+                        className="hover:bg-muted/50 transition-colors"
+                      >
                         <TableCell className="max-w-[220px]">
                           <div className="flex flex-col gap-1">
                             <span className="text-sm font-medium">
@@ -665,41 +753,54 @@ export function HighInterestProductsTable({
                                 "عميل بدون اسم"}
                             </span>
                             {c.customer_id && (
-                              <span className="text-[11px] text-muted-foreground">
+                              <span className="text-[11px] text-muted-foreground bg-muted/50 rounded px-1.5 py-0.5 w-fit">
                                 ID: {c.customer_id}
                               </span>
                             )}
                           </div>
                         </TableCell>
                         <TableCell className="text-xs">
-                          {c.customer_email && <div>{c.customer_email}</div>}
-                          {c.customer_phone && (
-                            <div className="text-muted-foreground">
-                              {c.customer_phone}
-                            </div>
-                          )}
-                          {!c.customer_email && !c.customer_phone && "-"}
+                          <div className="flex flex-col gap-0.5">
+                            {c.customer_email && (
+                              <div className="flex items-center gap-1.5">
+                                <Mail className="h-3 w-3 text-muted-foreground" />
+                                {c.customer_email}
+                              </div>
+                            )}
+                            {c.customer_phone && (
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <Phone className="h-3 w-3" />
+                                {c.customer_phone}
+                              </div>
+                            )}
+                            {!c.customer_email && !c.customer_phone && (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-sm">
-                          {c.products_count}
+                          <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 px-2.5 py-1 font-medium text-orange-600">
+                            {c.products_count}
+                          </span>
                         </TableCell>
                         <TableCell className="text-sm">
-                          {c.total_views}
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-1 font-medium text-blue-600">
+                            {c.total_views}
+                          </span>
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                           {c.last_view_at
-                            ? new Date(
-                                c.last_view_at,
-                              ).toLocaleString("en-GB")
+                            ? new Date(c.last_view_at).toLocaleString("en-GB")
                             : "-"}
                         </TableCell>
                         <TableCell className="text-center">
                           <Button
                             size="sm"
                             variant="outline"
-                            className="rounded-xl"
+                            className="rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors"
                             onClick={() => handleShowCustomerProducts(c)}
                           >
+                            <Package className="h-3.5 w-3.5 ml-1" />
                             عرض المنتجات
                           </Button>
                         </TableCell>
@@ -712,7 +813,6 @@ export function HighInterestProductsTable({
         </CardContent>
       </Card>
 
-      {/* Dialog: منتجات العميل */}
       <Dialog
         open={customerProductsOpen}
         onOpenChange={(open) => {
@@ -723,9 +823,10 @@ export function HighInterestProductsTable({
           }
         }}
       >
-        <DialogContent className="max-w-3xl" dir="rtl">
+        <DialogContent className="max-w-3xl rounded-2xl" dir="rtl">
           <DialogHeader>
-            <DialogTitle className="text-base">
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <ShoppingBag className="h-5 w-5 text-blue-500" />
               المنتجات التي زارها العميل{" "}
               {selectedCustomer?.customer_name ||
                 selectedCustomer?.customer_email ||
@@ -735,31 +836,62 @@ export function HighInterestProductsTable({
           </DialogHeader>
 
           {customerProductsLoading && (
-            <div className="py-6 text-center text-sm">جاري التحميل...</div>
+            <div className="py-12 text-center text-sm">
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <span className="text-muted-foreground">جاري التحميل...</span>
+              </div>
+            </div>
           )}
 
           {!customerProductsLoading && customerProducts.length === 0 && (
-            <div className="py-6 text-center text-sm">
-              لا توجد منتجات ضمن هذه المدة / الشروط لهذا العميل.
+            <div className="py-12 text-center text-sm">
+              <div className="flex flex-col items-center gap-2">
+                <Package className="h-12 w-12 text-muted-foreground/50" />
+                <span className="text-muted-foreground">
+                  لا توجد منتجات ضمن هذه المدة / الشروط لهذا العميل
+                </span>
+              </div>
             </div>
           )}
 
           {!customerProductsLoading && customerProducts.length > 0 && (
-            <div className="mt-2 max-h-[420px] overflow-auto">
+            <div className="mt-2 max-h-[420px] overflow-auto rounded-xl border">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-right">المنتج</TableHead>
-                    <TableHead className="text-right">السعر الحالي</TableHead>
-                    <TableHead className="text-right">
-                      عدد المشاهدات من هذا العميل
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead className="text-right font-semibold">
+                      <div className="flex items-center gap-2 justify-end">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        المنتج
+                      </div>
                     </TableHead>
-                    <TableHead className="text-right">آخر زيارة</TableHead>
+                    <TableHead className="text-right font-semibold">
+                      <div className="flex items-center gap-2 justify-end">
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        السعر الحالي
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-right font-semibold">
+                      <div className="flex items-center gap-2 justify-end">
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                        عدد المشاهدات
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-right font-semibold">
+                      <div className="flex items-center gap-2 justify-end">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        آخر زيارة
+                      </div>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {customerProducts.map((p) => (
-                    <TableRow key={p.product_id}>
+                    <TableRow
+                      key={p.product_id}
+                      className="hover:bg-muted/50 transition-colors"
+                    >
                       <TableCell className="max-w-[260px]">
                         <div className="flex flex-col gap-1">
                           <span className="line-clamp-2 text-sm font-medium">
@@ -767,7 +899,7 @@ export function HighInterestProductsTable({
                           </span>
                           {p.product_url && (
                             <a
-                              className="text-xs text-muted-foreground underline underline-offset-4"
+                              className="text-xs text-blue-500 hover:text-blue-600 underline underline-offset-4 transition-colors"
                               href={p.product_url}
                               target="_blank"
                               rel="noreferrer"
@@ -778,18 +910,22 @@ export function HighInterestProductsTable({
                         </div>
                       </TableCell>
                       <TableCell className="text-sm">
-                        {p.current_price != null
-                          ? `${p.current_price} ر.س`
-                          : "-"}
+                        {p.current_price != null ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-1 font-medium text-green-600">
+                            {p.current_price} ر.س
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm">
-                        {p.total_views}
+                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-1 font-medium text-blue-600">
+                          {p.total_views}
+                        </span>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                         {p.last_view_at
-                          ? new Date(
-                              p.last_view_at,
-                            ).toLocaleString("en-GB")
+                          ? new Date(p.last_view_at).toLocaleString("en-GB")
                           : "-"}
                       </TableCell>
                     </TableRow>
@@ -817,8 +953,8 @@ function PresetChip({ label, active, onClick }: PresetChipProps) {
       size="sm"
       variant={active ? "default" : "outline"}
       className={cn(
-        "h-8 rounded-full px-3 text-xs",
-        active ? "" : "bg-background",
+        "h-8 rounded-full px-3 text-xs transition-all hover:scale-105",
+        active ? "shadow-sm" : "bg-background hover:bg-accent",
       )}
       onClick={onClick}
     >

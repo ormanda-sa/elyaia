@@ -15,7 +15,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-
+import {
+  Package,
+  DollarSign,
+  Eye,
+  Clock,
+  ShoppingBag,
+  User,
+  ExternalLink,
+} from "lucide-react";
+ 
+import { LoadingState } from "@/components/loading-skeleton";
+import { EmptyState } from "@/components/empty-state";
 type Customer = {
   customer_id: string | null;
   customer_name: string | null;
@@ -31,10 +42,9 @@ type CustomerProduct = {
   total_views: number;
   last_view_at: string | null;
 
-  // 👇 معلومات الحملة (اختيارية) لكل منتج
   has_active_campaign?: boolean;
   active_campaign_id?: number | null;
-  is_in_active_campaign?: boolean; // هل هذا العميل نفسه موجود في targets الحملة النشطة؟
+  is_in_active_campaign?: boolean;
 };
 
 type Props = {
@@ -44,10 +54,8 @@ type Props = {
   products: CustomerProduct[];
   loading: boolean;
 
-  // إنشاء حملة جديدة على هذا المنتج
   onCreateCampaignFromProduct: (p: CustomerProduct) => void;
 
-  // 👇 ربط / إزالة هذا العميل من الحملة النشطة على المنتج (اختياري – انت تربطه من برّا)
   onAttachCustomerToCampaign?: (p: CustomerProduct) => void;
   onRemoveCustomerFromCampaign?: (p: CustomerProduct) => void;
 };
@@ -66,157 +74,199 @@ export function CustomerProductsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         dir="rtl"
-        className="!max-w-[1100px] w-[95vw] max-h-[80vh] overflow-hidden rounded-2xl bg-background p-0"
+        className="!max-w-[1100px] w-[95vw] max-h-[80vh] overflow-hidden rounded-2xl border-muted/40 bg-background p-0"
       >
-        <DialogHeader className="border-b px-6 py-4">
-          <DialogTitle className="text-base font-semibold">
-            المنتجات التي زارها العميل{" "}
-            <span className="font-normal text-muted-foreground">
-              {customer?.customer_name ||
-                customer?.customer_email ||
-                customer?.customer_phone ||
-                ""}
-            </span>
-          </DialogTitle>
+        <DialogHeader className="border-b border-muted/40 bg-muted/20 px-6 py-4">
+          <div className="flex items-center gap-2">
+            <div className="rounded-full bg-blue-500/10 p-1.5">
+              <User className="h-4 w-4 text-blue-600" />
+            </div>
+            <DialogTitle className="text-base font-semibold">
+              المنتجات التي زارها العميل{" "}
+              <span className="font-normal text-muted-foreground">
+                {customer?.customer_name ||
+                  customer?.customer_email ||
+                  customer?.customer_phone ||
+                  ""}
+              </span>
+            </DialogTitle>
+          </div>
         </DialogHeader>
 
-        {loading && (
-          <div className="py-6 text-center text-sm">جاري التحميل...</div>
-        )}
+        <div className="max-h-[calc(80vh-76px)] overflow-auto">
+          {loading && (
+            <div className="p-8">
+              <LoadingState message="جاري تحميل المنتجات..." />
+            </div>
+          )}
 
-        {!loading && products.length === 0 && (
-          <div className="py-6 text-center text-sm">
-            لا توجد منتجات ضمن هذه المدة / الشروط لهذا العميل.
-          </div>
-        )}
+          {!loading && products.length === 0 && (
+            <div className="p-8">
+              <EmptyState
+                icon={Package}
+                title="لا توجد منتجات"
+                description="لا توجد منتجات ضمن هذه المدة / الشروط لهذا العميل"
+              />
+            </div>
+          )}
 
-        {!loading && products.length > 0 && (
-          <div className="max-h-[calc(80vh-64px)] overflow-auto px-6 py-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[40%] text-right">المنتج</TableHead>
-                  <TableHead className="w-[15%] text-right">
-                    السعر الحالي
-                  </TableHead>
-                  <TableHead className="w-[15%] text-right">
-                    عدد المشاهدات
-                  </TableHead>
-                  <TableHead className="w-[15%] text-right">
-                    آخر زيارة
-                  </TableHead>
-                  <TableHead className="w-[15%] text-center">
-                    حالة الحملة
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {products.map((p) => {
-                  const hasActive = !!p.has_active_campaign;
-                  const isInCampaign = !!p.is_in_active_campaign;
-
-                  return (
-                    <TableRow key={p.product_id}>
-                      <TableCell className="max-w-[420px]">
-                        <div className="flex flex-col gap-1">
-                          <span className="line-clamp-2 text-sm font-medium">
-                            {p.product_title || p.product_id}
-                          </span>
-                          {p.product_url && (
-                            <a
-                              className="text-xs text-muted-foreground underline underline-offset-4"
-                              href={p.product_url}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              عرض في المتجر
-                            </a>
-                          )}
+          {!loading && products.length > 0 && (
+            <div className="p-6">
+              <div className="overflow-hidden rounded-xl border border-muted/40">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/20 hover:bg-muted/20">
+                      <TableHead className="w-[35%] text-right">
+                        <div className="flex items-center gap-2 justify-end">
+                          <span className="font-semibold">المنتج</span>
+                          <Package className="h-4 w-4 text-muted-foreground" />
                         </div>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-sm">
-                        {p.current_price != null
-                          ? `${p.current_price} ر.س`
-                          : "-"}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {p.total_views}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                        {p.last_view_at
-                          ? new Date(p.last_view_at).toLocaleString("en-GB")
-                          : "-"}
-                      </TableCell>
-                      <TableCell className="text-center align-top">
-                        {/* حالة الحملة لهذا المنتج بالنسبة لهذا العميل */}
-                        <div className="flex flex-col items-center gap-2 text-[11px]">
-                          {hasActive ? (
-                            <>
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="inline-flex rounded-full bg-orange-50 px-2 py-0.5 font-medium text-orange-700">
-                                  حملة خصم نشطة على المنتج
-                                </span>
-                                {isInCampaign ? (
-                                  <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
-                                    العميل ضمن الحملة الحالية
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex rounded-full bg-slate-50 px-2 py-0.5 font-medium text-slate-600">
-                                    العميل غير مضاف للحملة الحالية
-                                  </span>
-                                )}
-                              </div>
+                      </TableHead>
+                      <TableHead className="w-[13%] text-right">
+                        <div className="flex items-center gap-2 justify-end">
+                          <span className="font-semibold">السعر الحالي</span>
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </TableHead>
+                      <TableHead className="w-[13%] text-right">
+                        <div className="flex items-center gap-2 justify-end">
+                          <span className="font-semibold">عدد المشاهدات</span>
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </TableHead>
+                      <TableHead className="w-[15%] text-right">
+                        <div className="flex items-center gap-2 justify-end">
+                          <span className="font-semibold">آخر زيارة</span>
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </TableHead>
+                      <TableHead className="w-[24%] text-center">
+                        <span className="font-semibold">حالة الحملة</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {products.map((p) => {
+                      const hasActive = !!p.has_active_campaign;
+                      const isInCampaign = !!p.is_in_active_campaign;
 
-                              {/* أزرار ضم / إزالة حسب حالة العميل */}
-                              {isInCampaign ? (
-                                onRemoveCustomerFromCampaign ? (
+                      return (
+                        <TableRow
+                          key={p.product_id}
+                          className="hover:bg-muted/30 transition-colors"
+                        >
+                          <TableCell className="max-w-[380px]">
+                            <div className="flex flex-col gap-1.5">
+                              <span className="line-clamp-2 text-sm font-medium">
+                                {p.product_title || p.product_id}
+                              </span>
+                              {p.product_url && (
+                                <a
+                                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors w-fit"
+                                  href={p.product_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  <span>عرض في المتجر</span>
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {p.current_price != null ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-700">
+                                {p.current_price} ر.س
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-700">
+                              {p.total_views}
+                            </span>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                            {p.last_view_at
+                              ? new Date(p.last_view_at).toLocaleString(
+                                  "en-GB"
+                                )
+                              : "-"}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex flex-col items-center gap-2">
+                              {hasActive ? (
+                                <>
+                                  <div className="flex flex-col items-center gap-1.5">
+                                    <span className="inline-flex items-center rounded-full bg-orange-500/10 px-3 py-1 text-xs font-medium text-orange-700">
+                                      حملة خصم نشطة على المنتج
+                                    </span>
+                                    {isInCampaign ? (
+                                      <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700">
+                                        العميل ضمن الحملة الحالية
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center rounded-full bg-slate-500/10 px-3 py-1 text-xs font-medium text-slate-600">
+                                        العميل غير مضاف للحملة الحالية
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {isInCampaign ? (
+                                    onRemoveCustomerFromCampaign ? (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 rounded-xl border-red-200 px-3 text-xs text-red-600 hover:bg-red-50 hover:border-red-300 transition-colors"
+                                        onClick={() =>
+                                          onRemoveCustomerFromCampaign(p)
+                                        }
+                                      >
+                                        إزالة العميل من الحملة
+                                      </Button>
+                                    ) : null
+                                  ) : onAttachCustomerToCampaign ? (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 rounded-xl px-3 text-xs hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-colors"
+                                      onClick={() =>
+                                        onAttachCustomerToCampaign(p)
+                                      }
+                                    >
+                                      ضم العميل إلى الحملة
+                                    </Button>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <>
+                                  <span className="inline-flex items-center rounded-full bg-slate-500/10 px-3 py-1 text-xs font-medium text-slate-600">
+                                    لا توجد حملة نشطة على هذا المنتج
+                                  </span>
                                   <Button
                                     size="sm"
-                                    variant="outline"
-                                    className="h-7 rounded-full px-3 text-[11px] text-red-600"
+                                    className="h-7 rounded-xl bg-blue-600 hover:bg-blue-700 px-3 text-xs transition-colors"
                                     onClick={() =>
-                                      onRemoveCustomerFromCampaign(p)
+                                      onCreateCampaignFromProduct(p)
                                     }
                                   >
-                                    إزالة العميل من الحملة
+                                    <ShoppingBag className="h-3 w-3 ml-1" />
+                                    إنشاء حملة
                                   </Button>
-                                ) : null
-                              ) : onAttachCustomerToCampaign ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 rounded-full px-3 text-[11px]"
-                                  onClick={() =>
-                                    onAttachCustomerToCampaign(p)
-                                  }
-                                >
-                                  ضم العميل إلى الحملة
-                                </Button>
-                              ) : null}
-                            </>
-                          ) : (
-                            <>
-                              <span className="inline-flex rounded-full bg-slate-50 px-2 py-0.5 font-medium text-slate-600">
-                                لا توجد حملة نشطة على هذا المنتج
-                              </span>
-                              <Button
-                                size="sm"
-                                className="h-7 rounded-full px-3 text-[11px]"
-                                onClick={() => onCreateCampaignFromProduct(p)}
-                              >
-                                إنشاء حملة
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

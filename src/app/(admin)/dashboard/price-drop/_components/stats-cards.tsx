@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrendingUp, Users, ShoppingCart } from "lucide-react";
 
 type Stats = {
   active_campaigns: number;
@@ -49,48 +50,59 @@ export function StatsCards() {
   };
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      <Card className="rounded-2xl">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">الحملات النشطة</CardTitle>
+    <div className="grid gap-6 md:grid-cols-3">
+      <Card className="border-l-4 border-l-blue-500 hover:shadow-lg transition-shadow duration-300">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            الحملات النشطة
+          </CardTitle>
+          <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+            <TrendingUp className="h-5 w-5 text-blue-500" />
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">
+          <div className="text-3xl font-bold text-blue-600">
             {loading ? "..." : s.active_campaigns}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-2">
             عدد العروض اللي شغّالة الآن
           </p>
         </CardContent>
       </Card>
 
-      <Card className="rounded-2xl">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">
+      <Card className="border-l-4 border-l-green-500 hover:shadow-lg transition-shadow duration-300">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             العملاء المستهدفين (آخر ٧ أيام)
           </CardTitle>
+          <div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center">
+            <Users className="h-5 w-5 text-green-500" />
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">
+          <div className="text-3xl font-bold text-green-600">
             {loading ? "..." : s.total_targets_last_7d}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-2">
             عدد العملاء اللي وصلتهم عروض سعر مؤخّرًا
           </p>
         </CardContent>
       </Card>
 
-      <Card className="rounded-2xl">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">
+      <Card className="border-l-4 border-l-orange-500 hover:shadow-lg transition-shadow duration-300">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
             التحويلات من عروض السعر (آخر ٧ أيام)
           </CardTitle>
+          <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center">
+            <ShoppingCart className="h-5 w-5 text-orange-500" />
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">
+          <div className="text-3xl font-bold text-orange-600">
             {loading ? "..." : s.conversions_last_7d}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-2">
             عدد الطلبات اللي جت من حملات نزول السعر
           </p>
         </CardContent>

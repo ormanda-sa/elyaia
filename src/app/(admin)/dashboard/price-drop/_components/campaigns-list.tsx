@@ -1,4 +1,3 @@
-// FILE: src/app/(admin)/dashboard/price-drop/_components/campaigns-list.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -28,6 +27,32 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { CampaignReportDialog } from "./campaign-report-dialog";
 import type { CampaignSummary } from "./campaign-report/campaign-report-types";
+import {
+  Package,
+  ExternalLink,
+  Percent,
+  Edit3,
+  Trash2,
+  FileText,
+  Users,
+  MessageSquare,
+  Loader2,
+  AlertCircle,
+  TrendingDown,
+  Ticket,
+  Truck,
+  Activity,
+  MoreVertical,
+} from "lucide-react";
+import { LoadingState } from "@/components/loading-skeleton";
+import { EmptyState } from "@/components/empty-state";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type Props = {
   refreshKey?: number;
@@ -49,6 +74,9 @@ export function CampaignsList({ refreshKey }: Props) {
   const [reportOpen, setReportOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] =
     useState<CampaignSummary | null>(null);
+
+  const [buildingTargets, setBuildingTargets] = useState<number | null>(null);
+  const [buildingMessages, setBuildingMessages] = useState<number | null>(null);
 
   const openReport = (campaign: PriceDropCampaign) => {
     const summary: CampaignSummary = {
@@ -166,59 +194,164 @@ export function CampaignsList({ refreshKey }: Props) {
     }
   };
 
+  const handleBuildTargets = async (campaign: PriceDropCampaign) => {
+    setBuildingTargets(campaign.id);
+    try {
+      const res = await fetch(
+        `/api/dashboard/price-drop/campaigns/${campaign.id}/build-targets`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        console.error("failed to build targets", json);
+        alert(
+          "تعذر بناء العملاء المستهدفين، تأكد من وجود مشاهدات للمنتج.",
+        );
+        return;
+      }
+
+      const created = json.created ?? 0;
+
+      alert(
+        created > 0
+          ? `تم بنجاح بناء العملاء المستهدفين لهذه الحملة.\nعدد العملاء المضافين: ${created}`
+          : "لا يوجد عملاء جدد يمكن ضمّهم لهذه الحملة حالياً.",
+      );
+
+      await reload();
+    } catch (e) {
+      console.error(e);
+      alert("حدث خطأ غير متوقع أثناء بناء العملاء المستهدفين.");
+    } finally {
+      setBuildingTargets(null);
+    }
+  };
+
+  const handleBuildMessages = async (campaign: PriceDropCampaign) => {
+    setBuildingMessages(campaign.id);
+    try {
+      const res = await fetch(
+        `/api/dashboard/price-drop/campaigns/${campaign.id}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        console.error("failed to build messages", json);
+        alert("تعذر بناء رسائل الحملة، تأكد من وجود عملاء مستهدفين.");
+        return;
+      }
+
+      const createdEmail = json.created_email ?? 0;
+      const createdWhatsapp = json.created_whatsapp ?? 0;
+
+      alert(
+        `تم بناء رسائل الحملة.\nإيميل: ${createdEmail}\nواتساب: ${createdWhatsapp}`,
+      );
+    } catch (e) {
+      console.error(e);
+      alert("حدث خطأ غير متوقع أثناء بناء رسائل الحملة.");
+    } finally {
+      setBuildingMessages(null);
+    }
+  };
+
   return (
     <>
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">
-            الحملات الحالية
-          </CardTitle>
+      <Card className="rounded-2xl border border-slate-200 shadow-sm">
+        <CardHeader className="pb-4 border-b border-slate-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-blue-600 p-2">
+                <Activity className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-lg font-bold text-slate-900">
+                  الحملات التسويقية
+                </CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  إدارة ومتابعة جميع الحملات
+                </p>
+              </div>
+            </div>
+            <Badge variant="secondary" className="text-xs">
+              {items.length} حملة
+            </Badge>
+          </div>
         </CardHeader>
-        <CardContent className="pt-0">
-          <div className="overflow-x-auto">
+
+        <CardContent className="pt-6">
+          <div className="overflow-hidden rounded-lg border border-slate-200">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="text-right">الحملة</TableHead>
-                  <TableHead className="text-right">الخصم</TableHead>
-                  <TableHead className="text-right">الفترة</TableHead>
-                  <TableHead className="text-right">القنوات</TableHead>
-                  <TableHead className="text-right">الشحن</TableHead>
-                  <TableHead className="text-right">الحالة</TableHead>
-                  <TableHead className="text-right">إجراءات</TableHead>
+                <TableRow className="bg-slate-50 hover:bg-slate-50">
+                  <TableHead className="text-right text-xs font-semibold text-slate-700">
+                    المنتج
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-slate-700">
+                    الخصم
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-slate-700">
+                    التاريخ
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-slate-700">
+                    القنوات
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-slate-700">
+                    الحالة
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-slate-700">
+                    التفعيل
+                  </TableHead>
+                  <TableHead className="text-center text-xs font-semibold text-slate-700">
+                    الإجراءات
+                  </TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
                 {loading && (
                   <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="py-6 text-center text-sm"
-                    >
-                      جاري التحميل...
+                    <TableCell colSpan={7}>
+                      <LoadingState message="جاري تحميل الحملات" />
                     </TableCell>
                   </TableRow>
                 )}
 
                 {!loading && items.length === 0 && (
                   <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="py-6 text-center text-sm"
-                    >
-                      ما فيه حملات حالياً. ابدأ بإنشاء حملة من المنتجات ذات
-                      الاهتمام العالي.
+                    <TableCell colSpan={7}>
+                      <EmptyState
+                        icon={Package}
+                        title="لا توجد حملات حالياً"
+                        description="ابدأ بإنشاء حملة من المنتجات ذات الاهتمام العالي."
+                      />
                     </TableCell>
                   </TableRow>
                 )}
 
                 {!loading &&
                   items.map((c) => (
-                    <TableRow key={c.id}>
-                      {/* الحملة */}
-                      <TableCell className="max-w-[220px]">
-                        <div className="flex flex-col gap-1">
-                          <span className="line-clamp-2 text-sm font-medium">
+                    <TableRow
+                      key={c.id}
+                      className="hover:bg-slate-50/50 border-b border-slate-100 last:border-0"
+                    >
+                      <TableCell className="max-w-[200px]">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="line-clamp-2 text-sm font-medium text-slate-900">
                             {c.product_title || c.product_id}
                           </span>
                           {c.product_url && (
@@ -226,40 +359,72 @@ export function CampaignsList({ refreshKey }: Props) {
                               href={c.product_url}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-xs text-muted-foreground underline underline-offset-4"
+                              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 w-fit"
                             >
-                              عرض المنتج
+                              <span>عرض المنتج</span>
+                              <ExternalLink className="h-3 w-3" />
                             </a>
                           )}
                         </div>
                       </TableCell>
 
-                      {/* الخصم */}
-                      <TableCell className="text-sm">
+                      <TableCell>
                         {c.discount_type === "coupon" ? (
-                          <>كوبون – تقريباً %{Math.round(c.discount_percent)}</>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <Ticket className="h-3.5 w-3.5 text-amber-600" />
+                              <span className="text-xs font-medium text-slate-700">
+                                كوبون
+                              </span>
+                            </div>
+                            <Badge variant="secondary" className="text-xs w-fit">
+                              {Math.round(c.discount_percent)}%
+                            </Badge>
+                            {c.coupon_free_shipping && (
+                              <div className="flex items-center gap-1 text-xs text-sky-700">
+                                <Truck className="h-3 w-3" />
+                                <span>شحن مجاني</span>
+                              </div>
+                            )}
+                          </div>
                         ) : (
-                          <>
-                            من {c.original_price} إلى {c.new_price} ر.س{" "}
-                            <span className="text-xs text-muted-foreground">
-                              (خصم %{Math.round(c.discount_percent)})
-                            </span>
-                          </>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <TrendingDown className="h-3.5 w-3.5 text-emerald-600" />
+                              <span className="text-xs font-medium">تخفيض سعر</span>
+                            </div>
+                            <div className="text-xs text-slate-600">
+                              <span className="line-through">{c.original_price}</span>
+                              <span className="mx-1">←</span>
+                              <span className="font-bold text-emerald-700">{c.new_price}</span>
+                            </div>
+                            <Badge variant="secondary" className="text-xs w-fit">
+                              {Math.round(c.discount_percent)}%
+                            </Badge>
+                          </div>
                         )}
                       </TableCell>
 
-                      {/* الفترة */}
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                        {new Date(c.starts_at).toLocaleString("ar-SA")}
-                        {c.ends_at && (
-                          <>
-                            <br />
-                            حتى {new Date(c.ends_at).toLocaleString("ar-SA")}
-                          </>
-                        )}
+                      <TableCell>
+                        <div className="flex flex-col gap-1 text-xs text-slate-600">
+                          <div>
+                            {new Date(c.starts_at).toLocaleDateString("ar-SA", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </div>
+                          {c.ends_at && (
+                            <div className="text-slate-500">
+                              إلى{" "}
+                              {new Date(c.ends_at).toLocaleDateString("ar-SA", {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
 
-                      {/* القنوات */}
                       <TableCell>
                         <ChannelsBadges
                           send_onsite={c.send_onsite}
@@ -268,177 +433,103 @@ export function CampaignsList({ refreshKey }: Props) {
                         />
                       </TableCell>
 
-                      {/* الشحن */}
-                      <TableCell className="text-xs">
-                        {c.discount_type === "coupon" && c.coupon_free_shipping
-                          ? "شحن مجاني"
-                          : c.discount_type === "coupon"
-                          ? "بدون"
-                          : "—"}
-                      </TableCell>
-
-                      {/* الحالة */}
-                      <TableCell className="text-xs">
+                      <TableCell>
                         <StatusBadge status={c.status} />
                       </TableCell>
 
-                      {/* الإجراءات */}
-                      <TableCell className="text-xs">
-                        <div className="flex flex-col items-end gap-2">
-                          {/* تشغيل / إيقاف */}
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={c.status === "active"}
-                              onCheckedChange={(checked) =>
-                                handleToggleStatus(c, checked)
-                              }
-                            />
-                            <span className="text-[11px] text-muted-foreground">
-                              {c.status === "active"
-                                ? "مفعّلة"
-                                : "موقفة مؤقتاً"}
-                            </span>
-                          </div>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={c.status === "active"}
+                            onCheckedChange={(checked) =>
+                              handleToggleStatus(c, checked)
+                            }
+                          />
+                          <span className="text-xs text-slate-600">
+                            {c.status === "active" ? "مفعّلة" : "موقفة"}
+                          </span>
+                        </div>
+                      </TableCell>
 
-                          {/* أزرار العمليات */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              className="text-xs text-primary underline underline-offset-4"
-                              onClick={() => {
-                                setEditingCampaign(c);
-                                setEditSheetOpen(true);
-                              }}
-                            >
-                              تعديل
-                            </button>
+                      <TableCell>
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs text-blue-700 hover:bg-blue-100 font-medium"
+                            onClick={() => {
+                              setEditingCampaign(c);
+                              setEditSheetOpen(true);
+                            }}
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                            تعديل
+                          </button>
 
-                            <span className="text-muted-foreground">/</span>
-
-                            <button
-                              type="button"
-                              className="text-xs text-destructive underline underline-offset-4"
-                              onClick={() => {
-                                setDeletingCampaign(c);
-                                setDeleteDialogOpen(true);
-                              }}
-                            >
-                              حذف
-                            </button>
-
-                            <span className="text-muted-foreground">/</span>
-
-                            <button
-                              type="button"
-                              className="text-xs text-muted-foreground underline underline-offset-4"
-                              onClick={() => openReport(c)}
-                            >
-                              تقرير الحملة
-                            </button>
-
-                            <span className="text-muted-foreground">/</span>
-
-                            {/* زر بناء العملاء المستهدفين */}
-                            <button
-                              type="button"
-                              className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] text-primary hover:bg-primary/5"
-                              onClick={async () => {
-                                try {
-                                  const res = await fetch(
-                                    `/api/dashboard/price-drop/campaigns/${c.id}/build-targets`,
-                                    {
-                                      method: "POST",
-                                      headers: {
-                                        "Content-Type": "application/json",
-                                      },
-                                    },
-                                  );
-
-                                  const json = await res
-                                    .json()
-                                    .catch(() => ({}));
-
-                                  if (!res.ok) {
-                                    console.error(
-                                      "failed to build targets",
-                                      json,
-                                    );
-                                    alert(
-                                      "تعذر بناء العملاء المستهدفين، تأكد من وجود مشاهدات للمنتج.",
-                                    );
-                                    return;
-                                  }
-
-                                  const created = json.created ?? 0;
-
-                                  alert(
-                                    created > 0
-                                      ? `تم بنجاح بناء العملاء المستهدفين لهذه الحملة.\nعدد العملاء المضافين: ${created}`
-                                      : "لا يوجد عملاء جدد يمكن ضمّهم لهذه الحملة حالياً.",
-                                  );
-
-                                  await reload();
-                                } catch (e) {
-                                  console.error(e);
-                                  alert(
-                                    "حدث خطأ غير متوقع أثناء بناء العملاء المستهدفين.",
-                                  );
-                                }
-                              }}
-                            >
-                              بناء العملاء المستهدفين
-                            </button>
-
-                            {/* زر بناء رسائل الحملة */}
-                            <button
-                              type="button"
-                              className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] text-primary hover:bg-primary/5"
-                              onClick={async () => {
-                                try {
-                                  const res = await fetch(
-                                    `/api/dashboard/price-drop/campaigns/${c.id}/messages`,
-                                    {
-                                      method: "POST",
-                                      headers: {
-                                        "Content-Type": "application/json",
-                                      },
-                                    },
-                                  );
-
-                                  const json = await res
-                                    .json()
-                                    .catch(() => ({}));
-
-                                  if (!res.ok) {
-                                    console.error(
-                                      "failed to build messages",
-                                      json,
-                                    );
-                                    alert(
-                                      "تعذر بناء رسائل الحملة، تأكد من وجود عملاء مستهدفين.",
-                                    );
-                                    return;
-                                  }
-
-                                  const createdEmail =
-                                    json.created_email ?? 0;
-                                  const createdWhatsapp =
-                                    json.created_whatsapp ?? 0;
-
-                                  alert(
-                                    `تم بناء رسائل الحملة.\nإيميل: ${createdEmail}\nواتساب: ${createdWhatsapp}`,
-                                  );
-                                } catch (e) {
-                                  console.error(e);
-                                  alert(
-                                    "حدث خطأ غير متوقع أثناء بناء رسائل الحملة.",
-                                  );
-                                }
-                              }}
-                            >
-                              بناء رسائل الحملة
-                            </button>
-                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex items-center justify-center rounded-lg hover:bg-slate-100 p-1.5"
+                              >
+                                <MoreVertical className="h-4 w-4 text-slate-600" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => openReport(c)}>
+                                <FileText className="h-4 w-4 ml-2" />
+                                عرض التقرير
+                              </DropdownMenuItem>
+                              
+                              <DropdownMenuSeparator />
+                              
+                              <DropdownMenuItem
+                                disabled={buildingTargets === c.id}
+                                onClick={() => handleBuildTargets(c)}
+                              >
+                                {buildingTargets === c.id ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                                    جاري البناء...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Users className="h-4 w-4 ml-2" />
+                                    بناء العملاء
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              
+                              <DropdownMenuItem
+                                disabled={buildingMessages === c.id}
+                                onClick={() => handleBuildMessages(c)}
+                              >
+                                {buildingMessages === c.id ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                                    جاري البناء...
+                                  </>
+                                ) : (
+                                  <>
+                                    <MessageSquare className="h-4 w-4 ml-2" />
+                                    بناء الرسائل
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              
+                              <DropdownMenuSeparator />
+                              
+                              <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600"
+                                onClick={() => {
+                                  setDeletingCampaign(c);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 ml-2" />
+                                حذف الحملة
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -464,10 +555,17 @@ export function CampaignsList({ refreshKey }: Props) {
       )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent dir="rtl">
+        <AlertDialogContent dir="rtl" className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>حذف الحملة</AlertDialogTitle>
-            <AlertDialogDescription>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="rounded-lg bg-red-600 p-2.5">
+                <AlertCircle className="h-5 w-5 text-white" />
+              </div>
+              <AlertDialogTitle className="text-lg font-bold text-slate-900">
+                حذف الحملة
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-sm text-slate-600 text-right">
               هل أنت متأكد من حذف هذه الحملة؟ سيتم إيقاف تشغيلها وحذف الأهداف
               المرتبطة بها، ولا يمكن التراجع عن هذا الإجراء.
             </AlertDialogDescription>
@@ -476,9 +574,16 @@ export function CampaignsList({ refreshKey }: Props) {
             <AlertDialogAction
               disabled={deleteLoading}
               onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-red-600 hover:bg-red-700"
             >
-              {deleteLoading ? "جاري الحذف..." : "نعم، حذف الحملة"}
+              {deleteLoading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  جاري الحذف...
+                </span>
+              ) : (
+                "نعم، حذف الحملة"
+              )}
             </AlertDialogAction>
             <AlertDialogCancel disabled={deleteLoading}>
               إلغاء
@@ -497,16 +602,37 @@ export function CampaignsList({ refreshKey }: Props) {
 }
 
 function StatusBadge({ status }: { status: PriceDropCampaign["status"] }) {
-  const text =
-    status === "active"
-      ? "نشطة"
-      : status === "draft"
-      ? "مسودة"
-      : status === "paused"
-      ? "موقفة مؤقتاً"
-      : status === "finished"
-      ? "منتهية"
-      : "ملغاة";
+  const config = {
+    active: {
+      text: "نشطة",
+      className: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    },
+    draft: {
+      text: "مسودة",
+      className: "bg-slate-100 text-slate-700 border-slate-200",
+    },
+    paused: {
+      text: "موقفة",
+      className: "bg-amber-100 text-amber-800 border-amber-200",
+    },
+    finished: {
+      text: "منتهية",
+      className: "bg-sky-100 text-sky-800 border-sky-200",
+    },
+    cancelled: {
+      text: "ملغاة",
+      className: "bg-red-100 text-red-800 border-red-200",
+    },
+  };
 
-  return <Badge className="text-[11px]">{text}</Badge>;
+  const current = config[status] || config.draft;
+
+  return (
+    <Badge
+      variant="outline"
+      className={`text-xs font-medium border ${current.className}`}
+    >
+      {current.text}
+    </Badge>
+  );
 }

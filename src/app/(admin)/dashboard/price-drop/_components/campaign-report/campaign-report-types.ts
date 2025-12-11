@@ -43,7 +43,7 @@ export type CampaignReportStats = {
 export type CampaignReportCustomerRow = {
   id: number;
   salla_customer_id: string | null;
-  customer_name: string | null; // 👈 هنا الاسم
+  customer_name: string | null;
   customer_email: string | null;
   whatsapp_number: string | null;
   status: TargetStatus;
@@ -58,6 +58,11 @@ export type CampaignReportCustomerRow = {
   first_click_at: string | null;
   first_close_at: string | null;
   first_order_at: string | null;
+
+  // 👇 حالة الإيميل لهذا العميل (من price_drop_messages)
+  email_delivered_at: string | null;
+  email_failed_at: string | null;
+  email_opened_at: string | null;
 };
 
 export type OnsiteFunnelStats = {
@@ -67,11 +72,20 @@ export type OnsiteFunnelStats = {
   orders: number;
 };
 
+export type EmailFunnelStats = {
+  total: number;
+  sent: number;
+  delivered: number;
+  failed: number;
+  opened: number;
+};
+
 export type CampaignReportData = {
   campaign: CampaignSummary;
   stats: CampaignReportStats;
   customers: CampaignReportCustomerRow[];
   onsite_funnel: OnsiteFunnelStats;
+  email_funnel: EmailFunnelStats;
 };
 
 export type DatePreset = "7d" | "30d" | "all";
