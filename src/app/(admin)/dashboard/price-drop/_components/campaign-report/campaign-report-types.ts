@@ -43,6 +43,7 @@ export type CampaignReportStats = {
 export type CampaignReportCustomerRow = {
   id: number;
   salla_customer_id: string | null;
+  customer_name: string | null; // 👈 هنا الاسم
   customer_email: string | null;
   whatsapp_number: string | null;
   status: TargetStatus;
@@ -53,12 +54,24 @@ export type CampaignReportCustomerRow = {
   whatsapp_sent_at: string | null;
   converted_at: string | null;
   conversion_order_id: string | null;
+  first_impression_at: string | null;
+  first_click_at: string | null;
+  first_close_at: string | null;
+  first_order_at: string | null;
+};
+
+export type OnsiteFunnelStats = {
+  impressions: number;
+  clicks: number;
+  closes: number;
+  orders: number;
 };
 
 export type CampaignReportData = {
   campaign: CampaignSummary;
   stats: CampaignReportStats;
   customers: CampaignReportCustomerRow[];
+  onsite_funnel: OnsiteFunnelStats;
 };
 
 export type DatePreset = "7d" | "30d" | "all";
@@ -67,7 +80,7 @@ export function formatDate(value: string | null | undefined) {
   if (!value) return "-";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString("ar-SA", {
+  return d.toLocaleString("ar-EG", {
     dateStyle: "short",
     timeStyle: "short",
   });

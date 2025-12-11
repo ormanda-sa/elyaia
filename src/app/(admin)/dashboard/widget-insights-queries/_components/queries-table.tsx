@@ -223,7 +223,7 @@ export function QueriesTable() {
               <div className="flex items-center gap-2">
                 <span>
                   عرض {currentFrom} إلى {currentTo} من{" "}
-                  {total.toLocaleString("ar-SA")} حدث
+                  {total.toLocaleString("ar-EG")} حدث
                 </span>
               </div>
 

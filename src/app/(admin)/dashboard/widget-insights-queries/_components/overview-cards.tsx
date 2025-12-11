@@ -67,7 +67,7 @@ export function OverviewCards({ days }: { days: number }) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {queriesCount.toLocaleString("ar-SA")}
+            {queriesCount.toLocaleString("ar-EG")}
           </div>
           <p className="text-xs text-muted-foreground">
             مجموع العبارات المختلفة التي استخدمها الزوّار في الويدجت.
@@ -83,7 +83,7 @@ export function OverviewCards({ days }: { days: number }) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {searchesSum.toLocaleString("ar-SA")}
+            {searchesSum.toLocaleString("ar-EG")}
           </div>
           <p className="text-xs text-muted-foreground">
             مجموع عدد المرّات التي تم فيها استخدام عبارات الفلتر في الفترة

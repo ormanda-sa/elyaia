@@ -1,3 +1,4 @@
+// FILE: src/app/(admin)/dashboard/price-drop/_components/campaigns-list.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -14,7 +15,6 @@ import {
 import { ChannelsBadges } from "./channels-badges";
 import { Badge } from "@/components/ui/badge";
 import { CreateCampaignSheet } from "./create-campaign-sheet";
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,12 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
 import { Switch } from "@/components/ui/switch";
-
-// 👇 الإضافة الجديدة
- 
-
 import { CampaignReportDialog } from "./campaign-report-dialog";
 import type { CampaignSummary } from "./campaign-report/campaign-report-types";
 
@@ -42,18 +37,15 @@ export function CampaignsList({ refreshKey }: Props) {
   const [items, setItems] = useState<PriceDropCampaign[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // للحفظ بعد التعديل
   const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] =
     useState<PriceDropCampaign | null>(null);
 
-  // حالات الحذف
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingCampaign, setDeletingCampaign] =
     useState<PriceDropCampaign | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // 👇 حالات تقرير الحملة
   const [reportOpen, setReportOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] =
     useState<CampaignSummary | null>(null);
@@ -62,7 +54,6 @@ export function CampaignsList({ refreshKey }: Props) {
     const summary: CampaignSummary = {
       id: campaign.id,
       product_title: campaign.product_title,
-      // لو ما عندك product_image_url في التايب، عادي خله null
       product_image_url: (campaign as any).product_image_url ?? null,
       product_url: campaign.product_url,
       discount_type: campaign.discount_type as any,
@@ -118,7 +109,6 @@ export function CampaignsList({ refreshKey }: Props) {
     };
   }, [refreshKey]);
 
-  // تشغيل / إيقاف الحملة
   const handleToggleStatus = async (
     campaign: PriceDropCampaign,
     checked: boolean,
@@ -152,7 +142,6 @@ export function CampaignsList({ refreshKey }: Props) {
     }
   };
 
-  // تنفيذ الحذف بعد التأكيد
   const handleDelete = async () => {
     if (!deletingCampaign) return;
     setDeleteLoading(true);
@@ -295,8 +284,8 @@ export function CampaignsList({ refreshKey }: Props) {
 
                       {/* الإجراءات */}
                       <TableCell className="text-xs">
-                        <div className="flex items-center justify-end gap-4">
-                          {/* السويتش + حالة نصية صغيرة */}
+                        <div className="flex flex-col items-end gap-2">
+                          {/* تشغيل / إيقاف */}
                           <div className="flex items-center gap-2">
                             <Switch
                               checked={c.status === "active"}
@@ -311,8 +300,8 @@ export function CampaignsList({ refreshKey }: Props) {
                             </span>
                           </div>
 
-                          {/* أزرار تعديل / حذف / تقرير الحملة */}
-                          <div className="flex items-center gap-2">
+                          {/* أزرار العمليات */}
+                          <div className="flex flex-wrap items-center gap-2">
                             <button
                               type="button"
                               className="text-xs text-primary underline underline-offset-4"
@@ -346,6 +335,109 @@ export function CampaignsList({ refreshKey }: Props) {
                             >
                               تقرير الحملة
                             </button>
+
+                            <span className="text-muted-foreground">/</span>
+
+                            {/* زر بناء العملاء المستهدفين */}
+                            <button
+                              type="button"
+                              className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] text-primary hover:bg-primary/5"
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch(
+                                    `/api/dashboard/price-drop/campaigns/${c.id}/build-targets`,
+                                    {
+                                      method: "POST",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                      },
+                                    },
+                                  );
+
+                                  const json = await res
+                                    .json()
+                                    .catch(() => ({}));
+
+                                  if (!res.ok) {
+                                    console.error(
+                                      "failed to build targets",
+                                      json,
+                                    );
+                                    alert(
+                                      "تعذر بناء العملاء المستهدفين، تأكد من وجود مشاهدات للمنتج.",
+                                    );
+                                    return;
+                                  }
+
+                                  const created = json.created ?? 0;
+
+                                  alert(
+                                    created > 0
+                                      ? `تم بنجاح بناء العملاء المستهدفين لهذه الحملة.\nعدد العملاء المضافين: ${created}`
+                                      : "لا يوجد عملاء جدد يمكن ضمّهم لهذه الحملة حالياً.",
+                                  );
+
+                                  await reload();
+                                } catch (e) {
+                                  console.error(e);
+                                  alert(
+                                    "حدث خطأ غير متوقع أثناء بناء العملاء المستهدفين.",
+                                  );
+                                }
+                              }}
+                            >
+                              بناء العملاء المستهدفين
+                            </button>
+
+                            {/* زر بناء رسائل الحملة */}
+                            <button
+                              type="button"
+                              className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] text-primary hover:bg-primary/5"
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch(
+                                    `/api/dashboard/price-drop/campaigns/${c.id}/messages`,
+                                    {
+                                      method: "POST",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                      },
+                                    },
+                                  );
+
+                                  const json = await res
+                                    .json()
+                                    .catch(() => ({}));
+
+                                  if (!res.ok) {
+                                    console.error(
+                                      "failed to build messages",
+                                      json,
+                                    );
+                                    alert(
+                                      "تعذر بناء رسائل الحملة، تأكد من وجود عملاء مستهدفين.",
+                                    );
+                                    return;
+                                  }
+
+                                  const createdEmail =
+                                    json.created_email ?? 0;
+                                  const createdWhatsapp =
+                                    json.created_whatsapp ?? 0;
+
+                                  alert(
+                                    `تم بناء رسائل الحملة.\nإيميل: ${createdEmail}\nواتساب: ${createdWhatsapp}`,
+                                  );
+                                } catch (e) {
+                                  console.error(e);
+                                  alert(
+                                    "حدث خطأ غير متوقع أثناء بناء رسائل الحملة.",
+                                  );
+                                }
+                              }}
+                            >
+                              بناء رسائل الحملة
+                            </button>
                           </div>
                         </div>
                       </TableCell>
@@ -367,13 +459,10 @@ export function CampaignsList({ refreshKey }: Props) {
           }}
           product={null}
           existingCampaign={editingCampaign}
-          onUpdated={() => {
-            reload();
-          }}
+          onUpdated={reload}
         />
       )}
 
-      {/* بوب أب تأكيد حذف الحملة */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent dir="rtl">
           <AlertDialogHeader>
@@ -398,7 +487,6 @@ export function CampaignsList({ refreshKey }: Props) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* بوب أب تقرير الحملة */}
       <CampaignReportDialog
         open={reportOpen}
         onOpenChange={setReportOpen}
@@ -408,11 +496,7 @@ export function CampaignsList({ refreshKey }: Props) {
   );
 }
 
-function StatusBadge({
-  status,
-}: {
-  status: PriceDropCampaign["status"];
-}) {
+function StatusBadge({ status }: { status: PriceDropCampaign["status"] }) {
   const text =
     status === "active"
       ? "نشطة"

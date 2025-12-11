@@ -88,6 +88,11 @@ const seoItems: NavItem[] = [
     icon: <PlugInIcon />,
     name: "الاتصال مع سلة",
     path: "/dashboard/salla",
+  } ,
+  {
+    icon: <PlugInIcon />,
+    name: "اعدادت الايميل والوتساب",
+    path: "/dashboard/settings",
   } 
 ];
 

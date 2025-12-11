@@ -1,3 +1,5 @@
+// FILE: src/app/(admin)/dashboard/price-drop/_components/campaign-report-dialog.tsx
+
 "use client";
 
 import * as React from "react";
@@ -7,6 +9,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+
+import { Button } from "@/components/ui/button";
 
 import {
   CampaignSummary,
@@ -33,11 +37,86 @@ export function CampaignReportDialog({ open, onOpenChange, campaign }: Props) {
     preset,
   });
 
+  const campaignId = campaign?.id ?? null;
+
+  async function handleBuildMessages() {
+    if (!campaignId) return;
+    try {
+      const res = await fetch(
+        `/api/dashboard/price-drop/campaigns/${campaignId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error("[build-messages] error", json);
+        alert("تعذر بناء رسائل الحملة، تأكد من وجود عملاء مستهدفين.");
+        return;
+      }
+
+      const createdEmail = json.created_email ?? 0;
+      const createdWhatsapp = json.created_whatsapp ?? 0;
+
+      alert(
+        `تم بناء رسائل الحملة.\nإيميل: ${createdEmail}\nواتساب: ${createdWhatsapp}`,
+      );
+    } catch (e) {
+      console.error(e);
+      alert("حدث خطأ أثناء بناء رسائل الحملة.");
+    }
+  }
+
+  async function handleSendEmails() {
+    try {
+      const res = await fetch(
+        `/api/dashboard/price-drop/messages/send-email`,
+        { method: "POST" },
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error("[send-email] error", json);
+        alert("تعذر إرسال الإيميلات، راجع إعدادات SMTP أو سجل الأخطاء.");
+        return;
+      }
+      alert(
+        `تمت محاولة إرسال الإيميلات.\nنجاح: ${json.sent}\nفشل: ${json.failed}\nتجاوز: ${json.skipped}`,
+      );
+    } catch (e) {
+      console.error(e);
+      alert("حدث خطأ أثناء إرسال الإيميلات.");
+    }
+  }
+
+  async function handleSendWhatsapp() {
+    try {
+      const res = await fetch(
+        `/api/dashboard/price-drop/messages/send-whatsapp`,
+        { method: "POST" },
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error("[send-whatsapp] error", json);
+        alert("تعذر إرسال رسائل الواتساب، راجع إعدادات الواتساب أو سجل الأخطاء.");
+        return;
+      }
+      alert(
+        `تمت محاولة إرسال رسائل الواتساب.\nنجاح: ${json.sent}\nفشل: ${json.failed}\nتجاوز: ${json.skipped}`,
+      );
+    } catch (e) {
+      console.error(e);
+      alert("حدث خطأ أثناء إرسال رسائل الواتساب.");
+    }
+  }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto flex max-h-[90vh] min-h-[95vh] flex-col overflow-hidden rounded-t-3xl border-t bg-background px-6"
+        className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] min-h-[95vh] flex-col overflow-hidden rounded-t-3xl border-t bg-background px-6 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom"
       >
         <SheetHeader className="mb-3 flex flex-col gap-1.5 p-4 text-right">
           <SheetTitle className="text-base font-semibold">
@@ -67,7 +146,54 @@ export function CampaignReportDialog({ open, onOpenChange, campaign }: Props) {
 
           {!loading && !error && data && (
             <div className="flex flex-col gap-6">
-              <CampaignReportSummary stats={data.stats} />
+              {/* كروت الإحصائيات + الفانل */}
+              <CampaignReportSummary
+                stats={data.stats}
+                onsite_funnel={data.onsite_funnel}
+              />
+
+              {/* قسم رسائل الحملة */}
+              <div className="rounded-lg border bg-card p-3 text-xs">
+                <div className="mb-2 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="text-sm font-medium">
+                      رسائل الحملة (Email / WhatsApp)
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      استخدم الأزرار لبناء رسائل الحملة من العملاء المستهدفين ثم إرسالها حسب القنوات المفعّلة.
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!campaignId}
+                      onClick={handleBuildMessages}
+                    >
+                      بناء رسائل الحملة
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSendEmails}
+                    >
+                      إرسال الإيميلات
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSendWhatsapp}
+                    >
+                      إرسال رسائل واتساب
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* جدول العملاء */}
               <CampaignReportCustomersTable
                 customers={data.customers}
                 campaign={data.campaign}

@@ -28,7 +28,8 @@ export function CampaignReportCustomersTable({ customers, campaign }: Props) {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium">تفاصيل العملاء (On-site أولاً)</h3>
         <span className="text-xs text-muted-foreground">
-          يظهر جميع الـ targets مع حالة المشاهدة والتحويل في الفترة المختارة
+          يظهر جميع الـ targets مع حالة المشاهدة والتحويل وسلوك الإعلان في الفترة
+          المختارة
         </span>
       </div>
 
@@ -36,9 +37,9 @@ export function CampaignReportCustomersTable({ customers, campaign }: Props) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[180px]">العميل</TableHead>
+              <TableHead className="w-[200px]">العميل</TableHead>
               <TableHead>قناة الإشعار</TableHead>
-              <TableHead>مشاهدة On-site</TableHead>
+              <TableHead>مشاهدة On-site / سلوك الإعلان</TableHead>
               <TableHead>تحويل</TableHead>
               <TableHead>رقم الطلب</TableHead>
               <TableHead>نوع العميل</TableHead>
@@ -61,7 +62,10 @@ export function CampaignReportCustomersTable({ customers, campaign }: Props) {
               <TableRow key={c.id}>
                 <TableCell className="text-xs">
                   <div className="flex flex-col gap-0.5">
-                    <span className="font-medium">
+                    {c.customer_name && (
+                      <span className="font-medium">{c.customer_name}</span>
+                    )}
+                    <span className="text-[11px] text-muted-foreground">
                       {c.salla_customer_id || "عميل بدون رقم Salla"}
                     </span>
                     {c.customer_email && (
@@ -98,23 +102,44 @@ export function CampaignReportCustomersTable({ customers, campaign }: Props) {
                 </TableCell>
 
                 <TableCell className="text-xs">
-                  {c.onsite_seen_at ? (
-                    <Badge
-                      variant="outline"
-                      className="border-green-500 text-[11px] text-green-600"
-                    >
-                      شاهد العرض
-                    </Badge>
-                  ) : (
-                    <span className="text-[11px] text-muted-foreground">
-                      لم نشاهد له زيارة مؤكدة
-                    </span>
-                  )}
-                  {c.onsite_seen_at && (
-                    <div className="mt-0.5 text-[11px] text-muted-foreground">
-                      {formatDate(c.onsite_seen_at)}
-                    </div>
-                  )}
+                  <div className="flex flex-col gap-0.5">
+                    {c.first_impression_at ? (
+                      <Badge
+                        variant="outline"
+                        className="border-green-500 text-[11px] text-green-600"
+                      >
+                        شاهد البوب أب
+                      </Badge>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">
+                        لم يظهر له البوب أب بعد
+                      </span>
+                    )}
+
+                    {c.first_impression_at && (
+                      <span className="text-[11px] text-muted-foreground">
+                        أول ظهور: {formatDate(c.first_impression_at)}
+                      </span>
+                    )}
+
+                    {c.first_click_at && (
+                      <span className="text-[11px] text-blue-600">
+                        نقر على الإعلان: {formatDate(c.first_click_at)}
+                      </span>
+                    )}
+
+                    {!c.first_click_at && c.first_close_at && (
+                      <span className="text-[11px] text-muted-foreground">
+                        أغلق الإعلان بدون نقر: {formatDate(c.first_close_at)}
+                      </span>
+                    )}
+
+                    {c.first_order_at && (
+                      <span className="text-[11px] text-emerald-600">
+                        طلب بعد الإعلان: {formatDate(c.first_order_at)}
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
 
                 <TableCell className="text-xs">

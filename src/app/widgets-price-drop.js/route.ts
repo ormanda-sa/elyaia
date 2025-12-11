@@ -95,7 +95,7 @@ export async function GET(_req: NextRequest) {
       if (value == null) return null;
       var num = Number(value);
       if (!isFinite(num)) return null;
-      return num.toLocaleString("ar-SA", {
+      return num.toLocaleString("ar-EG", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });

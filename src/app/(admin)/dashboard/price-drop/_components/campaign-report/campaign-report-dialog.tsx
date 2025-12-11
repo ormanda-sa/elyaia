@@ -20,6 +20,9 @@ import { CampaignReportFilters } from "./campaign-report-filters";
 import { CampaignReportSummary } from "./campaign-report-summary";
 import { CampaignReportCustomersTable } from "./campaign-report-customers-table";
 
+// 👇 جديد: استيراد ملخص رسائل الحملة
+import { CampaignMessagesSummary } from "../campaign-messages-summary";
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -60,7 +63,14 @@ export function CampaignReportDialog({ open, onOpenChange, campaign }: Props) {
 
         {!loading && !error && data && (
           <div className="flex flex-col gap-6">
-            <CampaignReportSummary stats={data.stats} />
+            <CampaignReportSummary
+              stats={data.stats}
+              onsite_funnel={data.onsite_funnel}
+            />
+
+            {/* 👇 جديد: ملخص رسائل Email / WhatsApp للحملة */}
+            <CampaignMessagesSummary open={open} campaign={campaign} />
+
             <CampaignReportCustomersTable
               customers={data.customers}
               campaign={data.campaign}

@@ -38,7 +38,7 @@ export function SnapshotButton() {
 
       {lastUpdated && (
         <p className="text-xs text-muted-foreground">
-          آخر تحديث: {new Date(lastUpdated).toLocaleString("ar-SA")}
+          آخر تحديث: {new Date(lastUpdated).toLocaleString("ar-EG")}
         </p>
       )}
 
