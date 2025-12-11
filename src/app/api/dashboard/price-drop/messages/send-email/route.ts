@@ -151,8 +151,9 @@ export async function POST(_req: NextRequest) {
         }),
       });
 
+      const body = await res.json().catch(() => ({} as any));
+
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         console.error("[send-email] resendError", body);
 
         const { error: updErrFail } = await supabase
@@ -172,6 +173,9 @@ export async function POST(_req: NextRequest) {
         continue;
       }
 
+      // 👈 نقرأ id من Resend (email_id) ونخزّنه
+      const emailProviderId = body.id as string | undefined;
+
       // 4) نحدّث الرسالة إلى sent
       const { error: updErr } = await supabase
         .from("price_drop_messages")
@@ -179,6 +183,7 @@ export async function POST(_req: NextRequest) {
           status: "sent",
           sent_at: new Date().toISOString(),
           error_message: null,
+          email_provider_id: emailProviderId ?? null,
         })
         .eq("id", m.id);
 

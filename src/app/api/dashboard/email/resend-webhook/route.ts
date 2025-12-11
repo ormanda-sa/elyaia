@@ -13,16 +13,10 @@ export async function POST(req: NextRequest) {
 
   const type = payload?.type as string | undefined;
   const data = payload?.data || {};
-  const metadata = data?.metadata || {};
-  const messageId = metadata.price_drop_message_id as number | string | undefined;
+  // 👇 نستخدم email_id من Resend بدل metadata
+  const emailId = data.email_id as string | undefined;
 
-  if (!type || !messageId) {
-    // ما نقدر نربط الحدث برسالة معيّنة
-    return NextResponse.json({ ok: true });
-  }
-
-  const idNum = Number(messageId);
-  if (Number.isNaN(idNum)) {
+  if (!type || !emailId) {
     return NextResponse.json({ ok: true });
   }
 
@@ -35,7 +29,7 @@ export async function POST(req: NextRequest) {
       .update({
         delivered_at: nowIso,
       })
-      .eq("id", idNum);
+      .eq("email_provider_id", emailId);
   } else if (type === "email.failed") {
     // فشل
     const errorMsg =
@@ -51,7 +45,7 @@ export async function POST(req: NextRequest) {
         failed_at: nowIso,
         error_message: errorMsg,
       })
-      .eq("id", idNum);
+      .eq("email_provider_id", emailId);
   } else if (type === "email.opened") {
     // أول فتح
     await supabase
@@ -59,7 +53,7 @@ export async function POST(req: NextRequest) {
       .update({
         opened_at: nowIso,
       })
-      .eq("id", idNum)
+      .eq("email_provider_id", emailId)
       .is("opened_at", null);
   }
 

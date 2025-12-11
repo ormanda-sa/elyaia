@@ -1,5 +1,3 @@
-// FILE: src/app/(admin)/dashboard/price-drop/_components/campaign-report-dialog.tsx
-
 "use client";
 
 import * as React from "react";
@@ -21,6 +19,12 @@ import { CampaignReportHeader } from "./campaign-report/campaign-report-header";
 import { CampaignReportFilters } from "./campaign-report/campaign-report-filters";
 import { CampaignReportSummary } from "./campaign-report/campaign-report-summary";
 import { CampaignReportCustomersTable } from "./campaign-report/campaign-report-customers-table";
+import {
+  Hammer,
+  Send,
+  MessageCircle,
+  Loader2,
+} from "lucide-react";
 
 type Props = {
   open: boolean;
@@ -100,7 +104,9 @@ export function CampaignReportDialog({ open, onOpenChange, campaign }: Props) {
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         console.error("[send-whatsapp] error", json);
-        alert("تعذر إرسال رسائل الواتساب، راجع إعدادات الواتساب أو سجل الأخطاء.");
+        alert(
+          "تعذر إرسال رسائل الواتساب، راجع إعدادات الواتساب أو سجل الأخطاء.",
+        );
         return;
       }
       alert(
@@ -116,51 +122,88 @@ export function CampaignReportDialog({ open, onOpenChange, campaign }: Props) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] min-h-[95vh] flex-col overflow-hidden rounded-t-3xl border-t bg-background px-6 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom"
+        className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-x-0 bottom-0 z-50 flex max-h-[96vh] min-h-[96vh] flex-col overflow-hidden rounded-t-3xl border-t bg-gradient-to-b from-gray-50 to-white shadow-2xl transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom"
       >
-        <SheetHeader className="mb-3 flex flex-col gap-1.5 p-4 text-right">
-          <SheetTitle className="text-base font-semibold">
-            تقرير الحملة
-          </SheetTitle>
+        <SheetHeader className="mb-2 flex flex-col gap-3 border-b bg-white px-6 py-4 shadow-sm">
+          <div className="flex items-center justify-between gap-4">
+            <SheetTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
+                <svg
+                  className="h-4 w-4 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                  />
+                </svg>
+              </div>
+              تقرير الحملة
+            </SheetTitle>
 
-          {/* هيدر الحملة (اسم، صورة، حالة، قنوات) */}
+            <CampaignReportFilters preset={preset} onChange={setPreset} />
+          </div>
+
           <CampaignReportHeader campaign={campaign} />
         </SheetHeader>
 
-        {/* فلتر الفترات */}
-        <CampaignReportFilters preset={preset} onChange={setPreset} />
-
-        {/* المحتوى الرئيسي */}
-        <div className="flex-1 overflow-auto pb-4">
+        <div className="flex-1 overflow-auto px-6 py-4">
           {loading && (
-            <div className="py-12 text-center text-sm text-muted-foreground">
-              جاري تحميل تقرير الحملة...
+            <div className="flex items-center justify-center py-20">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+                <p className="text-sm font-medium text-gray-600">
+                  جاري تحميل تقرير الحملة...
+                </p>
+              </div>
             </div>
           )}
 
           {!loading && error && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-              {error}
+            <div className="rounded-xl border-2 border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
+              <div className="flex items-center gap-2">
+                <svg
+                  className="h-5 w-5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                {error}
+              </div>
             </div>
           )}
 
           {!loading && !error && data && (
-            <div className="flex flex-col gap-6">
-              {/* كروت الإحصائيات + الفانل */}
+            <div className="flex flex-col gap-5">
               <CampaignReportSummary
                 stats={data.stats}
                 onsite_funnel={data.onsite_funnel}
+                email_funnel={(data as any).email_funnel}
               />
 
-              {/* قسم رسائل الحملة */}
-              <div className="rounded-lg border bg-card p-3 text-xs">
-                <div className="mb-2 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <div className="text-sm font-medium">
-                      رسائل الحملة (Email / WhatsApp)
+              <div className="rounded-xl border-2 border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+                <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-orange-100 to-orange-50 border border-orange-200">
+                      <Hammer className="h-5 w-5 text-orange-600" />
                     </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      استخدم الأزرار لبناء رسائل الحملة من العملاء المستهدفين ثم إرسالها حسب القنوات المفعّلة.
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900">
+                        رسائل الحملة (Email / WhatsApp)
+                      </div>
+                      <div className="text-xs text-gray-600 mt-0.5">
+                        استخدم الأزرار لبناء رسائل الحملة من العملاء المستهدفين
+                        ثم إرسالها حسب القنوات المفعّلة.
+                      </div>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -170,7 +213,9 @@ export function CampaignReportDialog({ open, onOpenChange, campaign }: Props) {
                       variant="outline"
                       disabled={!campaignId}
                       onClick={handleBuildMessages}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium shadow-sm hover:shadow transition-all"
                     >
+                      <Hammer className="h-3.5 w-3.5" />
                       بناء رسائل الحملة
                     </Button>
                     <Button
@@ -178,7 +223,9 @@ export function CampaignReportDialog({ open, onOpenChange, campaign }: Props) {
                       size="sm"
                       variant="outline"
                       onClick={handleSendEmails}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium shadow-sm hover:shadow transition-all"
                     >
+                      <Send className="h-3.5 w-3.5" />
                       إرسال الإيميلات
                     </Button>
                     <Button
@@ -186,14 +233,15 @@ export function CampaignReportDialog({ open, onOpenChange, campaign }: Props) {
                       size="sm"
                       variant="outline"
                       onClick={handleSendWhatsapp}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium shadow-sm hover:shadow transition-all"
                     >
+                      <MessageCircle className="h-3.5 w-3.5" />
                       إرسال رسائل واتساب
                     </Button>
                   </div>
                 </div>
               </div>
 
-              {/* جدول العملاء */}
               <CampaignReportCustomersTable
                 customers={data.customers}
                 campaign={data.campaign}
