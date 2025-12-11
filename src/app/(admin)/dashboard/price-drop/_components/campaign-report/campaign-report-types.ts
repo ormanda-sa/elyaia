@@ -63,6 +63,7 @@ export type CampaignReportCustomerRow = {
   email_delivered_at: string | null;
   email_failed_at: string | null;
   email_opened_at: string | null;
+  email_clicked_at: string | null; // 👈 جديد
 };
 
 export type OnsiteFunnelStats = {
@@ -78,6 +79,7 @@ export type EmailFunnelStats = {
   delivered: number;
   failed: number;
   opened: number;
+  clicked: number; // 👈 جديد
 };
 
 export type CampaignReportData = {

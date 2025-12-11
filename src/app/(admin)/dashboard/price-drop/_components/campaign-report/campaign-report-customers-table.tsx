@@ -82,10 +82,10 @@ export function CampaignReportCustomersTable({ customers, campaign }: Props) {
                   </div>
                 </TableCell>
 
-                {/* قناة الإشعار: حالة الإيميل + الواتساب + On-site */}
+                {/* قناة الإشعار: حالة الإيميل + الواتساب + On-site + الكليك */}
                 <TableCell className="text-xs">
                   <div className="flex flex-col gap-1">
-                    {/* حالة الإيميل */}
+                    {/* حالة الإيميل (إرسال / تسليم / فشل) */}
                     {c.customer_email ? (
                       c.email_failed_at ? (
                         <div className="flex items-center justify-between gap-1">
@@ -132,6 +132,29 @@ export function CampaignReportCustomersTable({ customers, campaign }: Props) {
                       <span className="text-[11px] text-muted-foreground">
                         لا يوجد إيميل لهذا العميل
                       </span>
+                    )}
+
+                    {/* هل ضغط على رابط الإيميل؟ */}
+                    {c.customer_email && (
+                      <div className="flex items-center justify-between gap-1">
+                        {c.email_clicked_at ? (
+                          <>
+                            <Badge
+                              variant="outline"
+                              className="border-amber-500 text-[11px] text-amber-700"
+                            >
+                              ضغط على العرض من الإيميل
+                            </Badge>
+                            <span className="text-[10px] text-muted-foreground">
+                              {formatDate(c.email_clicked_at)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground">
+                            لم يضغط على رابط الإيميل بعد
+                          </span>
+                        )}
+                      </div>
                     )}
 
                     {/* حالة الواتساب */}

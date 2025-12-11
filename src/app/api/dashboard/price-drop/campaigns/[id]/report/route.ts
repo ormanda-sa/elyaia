@@ -77,10 +77,11 @@ type CampaignReportCustomerRow = {
   first_close_at: string | null;
   first_order_at: string | null;
 
-  // 👇 حالة الإيميل لهذا الـ target
+  // حالة الإيميل لهذا الـ target
   email_delivered_at: string | null;
   email_failed_at: string | null;
   email_opened_at: string | null;
+  email_clicked_at: string | null; // 👈 جديد
 };
 
 type OnsiteFunnelStats = {
@@ -96,6 +97,7 @@ type EmailFunnelStats = {
   delivered: number;
   failed: number;
   opened: number;
+  clicked: number; // 👈 جديد
 };
 
 type CampaignReportResponse = {
@@ -273,7 +275,7 @@ export async function GET(
       }
     }
 
-    // 👇 Email funnel + خريطة لكل target_id
+    // 👇 Email funnel + خريطة لكل target_id (مع clicked_at)
     const { data: emailMessages, error: emailError } = await supabase
       .from("price_drop_messages")
       .select(
@@ -285,6 +287,7 @@ export async function GET(
         delivered_at,
         failed_at,
         opened_at,
+        clicked_at,
         target:price_drop_targets!inner(
           campaign_id,
           store_id
@@ -305,6 +308,7 @@ export async function GET(
       delivered: 0,
       failed: 0,
       opened: 0,
+      clicked: 0,
     };
 
     const emailByTarget: Record<
@@ -314,6 +318,7 @@ export async function GET(
         delivered_at: string | null;
         failed_at: string | null;
         opened_at: string | null;
+        clicked_at: string | null;
       }
     > = {};
 
@@ -324,6 +329,7 @@ export async function GET(
         if (m.delivered_at) email_funnel.delivered += 1;
         if (m.failed_at) email_funnel.failed += 1;
         if (m.opened_at) email_funnel.opened += 1;
+        if (m.clicked_at) email_funnel.clicked += 1;
 
         const tid = m.target_id as number | null;
         if (tid) {
@@ -332,6 +338,7 @@ export async function GET(
             delivered_at: m.delivered_at,
             failed_at: m.failed_at,
             opened_at: m.opened_at,
+            clicked_at: m.clicked_at,
           };
         }
       }
@@ -408,6 +415,7 @@ export async function GET(
         email_delivered_at: emailInfo?.delivered_at ?? null,
         email_failed_at: emailInfo?.failed_at ?? null,
         email_opened_at: emailInfo?.opened_at ?? null,
+        email_clicked_at: emailInfo?.clicked_at ?? null,
       };
     });
 

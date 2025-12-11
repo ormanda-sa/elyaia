@@ -39,6 +39,7 @@ type EmailFunnelStats = {
   delivered: number;
   failed: number;
   opened: number;
+  clicked: number; // 👈 جديد
 };
 
 type Props = {
@@ -58,6 +59,7 @@ export function CampaignReportSummary({
     delivered: 0,
     failed: 0,
     opened: 0,
+    clicked: 0,
   };
   const deliveredNotOpened = Math.max(email.delivered - email.opened, 0);
 
@@ -149,7 +151,7 @@ export function CampaignReportSummary({
             أداء الإيميل (Email Funnel)
           </h3>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
           <SummaryCard
             icon={<Mail className="h-5 w-5" />}
             label="إجمالي رسائل الإيميل"
@@ -182,6 +184,12 @@ export function CampaignReportSummary({
             color="teal"
             extra={`وصلت ولم تُفتح: ${deliveredNotOpened}`}
           />
+          <SummaryCard
+            icon={<MousePointerClick className="h-5 w-5" />}
+            label="نقرات من الإيميل (Email Clicks)"
+            value={email.clicked}
+            color="amber"
+          />
         </div>
       </section>
     </div>
@@ -199,7 +207,17 @@ function SummaryCard({
   icon: React.ReactNode;
   label: string;
   value: number;
-  color?: "blue" | "green" | "teal" | "purple" | "emerald" | "orange" | "amber" | "slate" | "cyan" | "red";
+  color?:
+    | "blue"
+    | "green"
+    | "teal"
+    | "purple"
+    | "emerald"
+    | "orange"
+    | "amber"
+    | "slate"
+    | "cyan"
+    | "red";
   highlight?: "error";
   extra?: string;
 }) {
@@ -220,7 +238,7 @@ function SummaryCard({
     <div className="group relative overflow-hidden rounded-xl border-2 bg-white p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <div className="text-xs font-medium text-gray-600 leading-relaxed mb-3">
+          <div className="mb-3 text-xs font-medium leading-relaxed text-gray-600">
             {label}
           </div>
           <div
@@ -231,18 +249,24 @@ function SummaryCard({
             {value.toLocaleString()}
           </div>
           {extra && (
-            <div className="mt-2 text-xs text-gray-500 bg-gray-50 rounded-md px-2 py-1 inline-block">
+            <div className="mt-2 inline-block rounded-md bg-gray-50 px-2 py-1 text-xs text-gray-500">
               {extra}
             </div>
           )}
         </div>
-        <div className={`rounded-lg p-2.5 ${colorClasses[color]} transition-transform duration-300 group-hover:scale-110`}>
+        <div
+          className={`rounded-lg p-2.5 ${colorClasses[color]} transition-transform duration-300 group-hover:scale-110`}
+        >
           {icon}
         </div>
       </div>
-      <div className={`absolute bottom-0 left-0 right-0 h-1 ${
-        highlight === "error" ? "bg-red-500" : `bg-gradient-to-r from-${color}-400 to-${color}-600`
-      }`}></div>
+      <div
+        className={`absolute bottom-0 left-0 right-0 h-1 ${
+          highlight === "error"
+            ? "bg-red-500"
+            : `bg-gradient-to-r from-${color}-400 to-${color}-600`
+        }`}
+      ></div>
     </div>
   );
 }

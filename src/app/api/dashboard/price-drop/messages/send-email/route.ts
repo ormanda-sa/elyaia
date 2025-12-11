@@ -70,6 +70,7 @@ export async function POST(_req: NextRequest) {
           id,
           product_title,
           product_url,
+          product_image_url,
           discount_type,
           discount_percent,
           original_price,
@@ -119,6 +120,7 @@ export async function POST(_req: NextRequest) {
       id: number;
       product_title: string | null;
       product_url: string | null;
+      product_image_url: string | null;
       discount_type: "price" | "coupon";
       discount_percent: string | null;
       original_price: string | null;
@@ -127,8 +129,20 @@ export async function POST(_req: NextRequest) {
       ends_at: string | null;
     };
 
+    // رابط تتبع النقر من الإيميل
+    const trackingUrl =
+      c.product_url
+        ? `https://elyaia.vercel.app/api/dashboard/price-drop/email-click?m=${m.id}&redirect=${encodeURIComponent(
+            c.product_url,
+          )}`
+        : "#";
+
     const subject = buildEmailSubject(c);
-    const bodyText = buildEmailBody(c, fromName);
+    const { text: bodyText, html: bodyHtml } = buildEmailBodies(
+      c,
+      fromName,
+      trackingUrl,
+    );
 
     try {
       // 3) نرسل عبر Resend HTTP API + metadata للـ Webhooks
@@ -143,6 +157,7 @@ export async function POST(_req: NextRequest) {
           to: [email],
           subject,
           text: bodyText,
+          html: bodyHtml,
           metadata: {
             price_drop_message_id: m.id,
             campaign_id: c.id,
@@ -236,10 +251,15 @@ function buildEmailSubject(c: {
   return `عرض خاص على ${title}`;
 }
 
-function buildEmailBody(
+/**
+ * يبني نص بسيط + HTML على شكل بطاقة منتج
+ * حالياً لمنتج واحد، وبعدين تقدر توسعها لعدة منتجات في نفس الإيميل.
+ */
+function buildEmailBodies(
   c: {
     product_title: string | null;
     product_url: string | null;
+    product_image_url: string | null;
     discount_type: "price" | "coupon";
     discount_percent: string | null;
     original_price: string | null;
@@ -248,37 +268,184 @@ function buildEmailBody(
     ends_at: string | null;
   },
   storeName: string,
-): string {
+  trackingUrl: string,
+): { text: string; html: string } {
   const title = c.product_title || "المنتج اللي شفته قبل";
-  const url = c.product_url || "#";
+  const url = trackingUrl || c.product_url || "#";
 
-  let body = `مرحبًا 👋\n\n`;
-  body += `لاحظنا إنك مهتم بالمنتج: ${title}\n\n`;
+  // تنسيق التاريخ
+  const endsAtLabel =
+    c.ends_at != null
+      ? new Date(c.ends_at).toLocaleString("ar-SA", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })
+      : null;
+
+  // ===== نص عادي (text) =====
+  let text = `مرحبًا 👋\n\n`;
+  text += `لاحظنا إنك مهتم بالمنتج: ${title}\n\n`;
 
   if (c.discount_type === "price") {
-    if (c.original_price && c.new_price) {
-      body += `نزلنا سعره من ${c.original_price} إلى ${c.new_price} ريال`;
+    if (c.original_price && c.new_price && c.original_price !== c.new_price) {
+      text += `نزلنا سعره من ${c.original_price} إلى ${c.new_price} ريال`;
     } else {
-      body += `عليه خصم خاص الآن.`;
+      text += `عليه خصم خاص الآن.`;
     }
     if (c.discount_percent) {
-      body += ` (خصم ${c.discount_percent}٪)`;
+      text += ` (خصم ${c.discount_percent}٪)`;
     }
-    body += `.\n\n`;
+    text += `.\n\n`;
   } else if (c.discount_type === "coupon" && c.coupon_code) {
-    body += `فعّل كوبون الخصم: ${c.coupon_code}\n`;
+    text += `فعّل كوبون الخصم: ${c.coupon_code}\n`;
     if (c.discount_percent) {
-      body += `يعطيك خصم ${c.discount_percent}٪ على السعر.\n`;
+      text += `يعطيك خصم ${c.discount_percent}٪ على السعر.\n`;
     }
-    body += `\n`;
+    text += `\n`;
   }
 
-  if (c.ends_at) {
-    body += `العرض لفترة محدودة حتى: ${c.ends_at}\n\n`;
+  if (endsAtLabel) {
+    text += `العرض لفترة محدودة حتى: ${endsAtLabel}\n\n`;
   }
 
-  body += `تقدر تروح للمنتج من هنا:\n${url}\n\n`;
-  body += `تحياتنا,\n${storeName}\n`;
+  text += `تقدر تشوف تفاصيل العرض من هنا:\n${url}\n\n`;
+  text += `تحياتنا,\n${storeName}\n`;
 
-  return body;
+  // ===== HTML كبطاقة منتج =====
+  const safeOriginal =
+    c.original_price != null ? `${c.original_price} ريال` : "";
+  const safeNew = c.new_price != null ? `${c.new_price} ريال` : "";
+  const hasPriceDrop =
+    c.discount_type === "price" &&
+    !!c.original_price &&
+    !!c.new_price &&
+    c.original_price !== c.new_price;
+
+  // لو فيه رابط صورة نستخدمه، غير كذا ما نعرض صورة
+  const hasImage = !!(c.product_image_url && c.product_image_url.trim());
+  const imageCell = hasImage
+    ? `
+      <td style="padding:12px 10px;" width="120">
+        <img src="${c.product_image_url}" alt="${title}"
+          style="width:100%;max-width:110px;border-radius:8px;display:block;object-fit:cover;border:1px solid #e5e7eb;" />
+      </td>
+    `
+    : "";
+
+  const detailsCell = `
+      <td style="padding:12px 10px;">
+        <h2 style="margin:0 0 8px 0;font-size:15px;color:#111827;">${title}</h2>
+
+        ${
+          hasPriceDrop
+            ? `
+        <p style="margin:0 0 4px 0;font-size:13px;color:#111827;">
+          <span style="color:#9ca3af;text-decoration:line-through;">${safeOriginal}</span>
+          <span style="margin-right:6px;color:#16a34a;font-weight:600;">${safeNew}</span>
+        </p>
+        `
+            : c.new_price
+            ? `
+        <p style="margin:0 0 4px 0;font-size:13px;color:#111827;">
+          السعر: <span style="color:#16a34a;font-weight:600;">${safeNew}</span>
+        </p>
+        `
+            : ""
+        }
+
+        ${
+          c.discount_type === "coupon" && c.coupon_code
+            ? `
+        <p style="margin:4px 0 4px 0;font-size:12px;color:#111827;">
+          كوبون الخصم:
+          <span style="display:inline-block;padding:2px 8px;border-radius:999px;background-color:#f97316;color:#ffffff;font-weight:600;">
+            ${c.coupon_code}
+          </span>
+          ${
+            c.discount_percent
+              ? `<span style="margin-right:4px;color:#f97316;">(${c.discount_percent}٪)</span>`
+              : ""
+          }
+        </p>
+        `
+            : ""
+        }
+
+        ${
+          endsAtLabel
+            ? `
+        <p style="margin:4px 0 0 0;font-size:11px;color:#6b7280;">
+          العرض ينتهي في: ${endsAtLabel}
+        </p>
+        `
+            : ""
+        }
+      </td>
+  `;
+
+  const html = `
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <body style="margin:0;padding:0;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:16px 0;">
+      <tr>
+        <td align="center">
+          <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+            <tr>
+              <td style="padding:16px 20px 8px 20px;">
+                <p style="margin:0 0 8px 0;font-size:14px;color:#111827;">مرحبًا 👋</p>
+                <p style="margin:0;font-size:13px;color:#4b5563;">
+                  لاحظنا إنك مهتم بالمنتج التالي 👇
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:0 16px 16px 16px;">
+                <!-- بطاقة المنتج -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:10px;border:1px solid #e5e7eb;background-color:#f9fafb;">
+                  <tr>
+                    ${hasImage ? imageCell + detailsCell : detailsCell}
+                  </tr>
+
+                  <tr>
+                    <td colspan="2" style="padding:0 14px 12px 14px;">
+                      <!-- زر عرض المنتج -->
+                      <a href="${url}"
+                         style="
+                           display:inline-block;
+                           padding:10px 20px;
+                           border-radius:999px;
+                           background:linear-gradient(to left,#f97316,#fb923c);
+                           color:#ffffff;
+                           font-size:13px;
+                           font-weight:600;
+                           text-decoration:none;
+                           margin-top:6px;
+                           text-align:center;
+                         ">
+                        شوف العرض الآن في المتجر
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:10px 20px 14px 20px;">
+                <p style="margin:0;font-size:11px;color:#9ca3af;">
+                  مع تحيات <span style="color:#111827;font-weight:500;">${storeName}</span>
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+`.trim();
+
+  return { text, html };
 }
