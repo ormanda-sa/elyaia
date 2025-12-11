@@ -124,12 +124,12 @@ export function CampaignReportDialog({ open, onOpenChange, campaign }: Props) {
         side="bottom"
         className="data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-x-0 bottom-0 z-50 flex max-h-[96vh] min-h-[96vh] flex-col overflow-hidden rounded-t-3xl border-t bg-gradient-to-b from-gray-50 to-white shadow-2xl transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom"
       >
-        <SheetHeader className="mb-2 flex flex-col gap-3 border-b bg-white px-6 py-4 shadow-sm">
-          <div className="flex items-center justify-between gap-4">
-            <SheetTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md">
+        <SheetHeader className="mb-2 border-b bg-white px-4 py-2.5 shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <SheetTitle className="text-base font-bold text-gray-900 flex items-center gap-2 shrink-0">
+              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
                 <svg
-                  className="h-4 w-4 text-white"
+                  className="h-3.5 w-3.5 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -151,7 +151,7 @@ export function CampaignReportDialog({ open, onOpenChange, campaign }: Props) {
           <CampaignReportHeader campaign={campaign} />
         </SheetHeader>
 
-        <div className="flex-1 overflow-auto px-6 py-4">
+        <div className="flex-1 overflow-auto px-4 py-3">
           {loading && (
             <div className="flex items-center justify-center py-20">
               <div className="flex flex-col items-center gap-3">
@@ -183,24 +183,24 @@ export function CampaignReportDialog({ open, onOpenChange, campaign }: Props) {
           )}
 
           {!loading && !error && data && (
-            <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-3">
               <CampaignReportSummary
                 stats={data.stats}
                 onsite_funnel={data.onsite_funnel}
                 email_funnel={(data as any).email_funnel}
               />
 
-              <div className="rounded-xl border-2 border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
-                <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-orange-100 to-orange-50 border border-orange-200">
-                      <Hammer className="h-5 w-5 text-orange-600" />
+              <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm hover:shadow transition-shadow">
+                <div className="mb-2 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div className="flex items-start gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-100 to-orange-50 border border-orange-200">
+                      <Hammer className="h-4 w-4 text-orange-600" />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-gray-900">
+                      <div className="text-xs font-semibold text-gray-900">
                         رسائل الحملة (Email / WhatsApp)
                       </div>
-                      <div className="text-xs text-gray-600 mt-0.5">
+                      <div className="text-xs text-gray-500 mt-0.5">
                         استخدم الأزرار لبناء رسائل الحملة من العملاء المستهدفين
                         ثم إرسالها حسب القنوات المفعّلة.
                       </div>

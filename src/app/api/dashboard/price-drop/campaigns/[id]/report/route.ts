@@ -268,13 +268,26 @@ export async function GET(
       }
     }
 
-    // 👇 Email funnel من price_drop_messages
+    // 👇 Email funnel من JOIN بين messages و targets
     const { data: emailMessages, error: emailError } = await supabase
       .from("price_drop_messages")
-      .select("id, channel, sent_at, delivered_at, failed_at, opened_at")
-      .eq("store_id", storeId)
-      .eq("campaign_id", campaignId)
-      .eq("channel", "email");
+      .select(
+        `
+        id,
+        channel,
+        sent_at,
+        delivered_at,
+        failed_at,
+        opened_at,
+        target:price_drop_targets!inner(
+          campaign_id,
+          store_id
+        )
+      `,
+      )
+      .eq("channel", "email")
+      .eq("target.campaign_id", campaignId)
+      .eq("target.store_id", storeId);
 
     if (emailError) {
       console.error("emailError", emailError);
