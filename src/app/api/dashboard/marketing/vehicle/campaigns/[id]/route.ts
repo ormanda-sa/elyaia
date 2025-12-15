@@ -3,6 +3,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import { getCurrentStoreId } from "@/lib/currentStore";
 
+function normalizeOnsitePaths(input: any): string | null {
+  const raw = String(input ?? "").trim();
+  if (!raw) return null;
+
+  const lines = raw
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (!lines.length) return null;
+  return lines.join("\n");
+}
+
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params;
@@ -49,10 +62,21 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       "discount_percent",
       "ends_at",
       "starts_at",
+
+      // ✅ جديد
+      "onsite_paths",
     ];
 
     for (const k of allowed) {
-      if (k in body) patch[k] = body[k];
+      if (!(k in body)) continue;
+
+      // ✅ normalize onsite_paths
+      if (k === "onsite_paths") {
+        patch[k] = normalizeOnsitePaths(body[k]);
+        continue;
+      }
+
+      patch[k] = body[k];
     }
 
     const { error } = await supabase

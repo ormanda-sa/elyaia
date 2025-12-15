@@ -47,6 +47,9 @@ export function CreateCampaignDialog({
   const [lookbackDays, setLookbackDays] = useState(7);
   const [minSignals, setMinSignals] = useState(1);
 
+  // ✅ فلتر صفحات العرض داخل المتجر (سطر لكل مسار)
+  const [onsitePaths, setOnsitePaths] = useState<string>("");
+
   const isPublic = audience === "public";
 
   const scopeReady = useMemo(() => {
@@ -100,6 +103,10 @@ export function CreateCampaignDialog({
         only_customers: isPublic ? true : !!onlyCustomers,
         lookback_days: isPublic ? 7 : lookbackDays,
         min_signals: isPublic ? 1 : minSignals,
+
+        // ✅ فلتر صفحات العرض داخل المتجر (اختياري)
+        // سطر لكل مسار مثل: /category/VAwynW
+        onsite_paths: onsitePaths.trim() ? onsitePaths.trim() : null,
       };
 
       const res = await fetch("/api/dashboard/marketing/vehicle/campaigns", {
@@ -247,6 +254,24 @@ export function CreateCampaignDialog({
                   الإيميل/الواتساب للجمهور المستهدف فقط.
                 </div>
               )}
+            </div>
+
+            {/* ✅ On-site paths (فلتر الصفحات) */}
+            <div className="rounded-2xl border p-4 space-y-2">
+              <div className="font-semibold">فلتر صفحات العرض داخل المتجر</div>
+              <div className="text-xs text-muted-foreground">
+                اكتب <span className="font-medium">مسار واحد لكل سطر</span>. إذا تركته فاضي، الحملة تطلع في كل الصفحات.
+              </div>
+              <textarea
+                className="w-full min-h-[96px] rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                value={onsitePaths}
+                onChange={(e) => setOnsitePaths(e.target.value)}
+                placeholder={`/category/VAwynW
+/products`}
+              />
+              <div className="text-xs text-muted-foreground">
+                مثال: لو تبغاها على قسم محدد في سلة، غالبًا المسار يكون مثل <span className="font-mono">/category/VAwynW</span>.
+              </div>
             </div>
 
             {/* Targeting */}

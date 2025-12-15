@@ -1,3 +1,4 @@
+// FILE: src/app/api/widget/marketing/check/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -25,7 +26,6 @@ function extractSallaCategoryId(page_url: string | null): string | null {
   const u = safeUrl(page_url);
   if (!u) return null;
 
-  // الشكل اللي عندك: filters[category_id]
   const v =
     u.searchParams.get("filters[category_id]") ||
     u.searchParams.get("category_id");
@@ -35,7 +35,25 @@ function extractSallaCategoryId(page_url: string | null): string | null {
 
 function normalizePath(p: string) {
   if (!p) return "/";
+  try {
+    if (p.startsWith("http")) return new URL(p).pathname || "/";
+  } catch {}
   return p.startsWith("/") ? p : "/" + p;
+}
+
+function parseAllowedPaths(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  return String(raw)
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map(normalizePath);
+}
+
+function pathAllowed(currentPath: string, allowed: string[]) {
+  if (!allowed.length) return true; // فاضي = كل الصفحات
+  const p = normalizePath(currentPath);
+  return allowed.some((prefix) => p.startsWith(prefix));
 }
 
 export async function GET(req: NextRequest) {
@@ -57,7 +75,7 @@ export async function GET(req: NextRequest) {
   const now = new Date();
   const currentCategoryId = extractSallaCategoryId(page_url);
 
-  // 1) نجيب الحملات النشطة (مع سحب salla_category_id من model)
+  // 1) نجيب الحملات النشطة + onsite_paths
   const { data: campaigns, error: campErr } = await sp
     .from("marketing_campaigns_vehicle")
     .select(
@@ -67,6 +85,7 @@ export async function GET(req: NextRequest) {
       audience_mode,
       send_onsite, onsite_enabled, onsite_variant, onsite_headline, onsite_body, onsite_cta_text, onsite_cta_url,
       starts_at, ends_at, updated_at,
+      onsite_paths,
       model:filter_models ( salla_category_id ),
       year:filter_years ( salla_category_year_id, salla_year_id ),
       brand:filter_brands ( salla_company_id )
@@ -82,7 +101,7 @@ export async function GET(req: NextRequest) {
   }
   if (!campaigns?.length) return NextResponse.json({ show: false });
 
-  // 2) فلترة وقت + فلترة “القسم” حسب category_id (إذا الرابط فيه category_id)
+  // 2) فلترة وقت + فلترة الصفحات onsite_paths + فلترة القسم حسب category_id
   const eligible: any[] = [];
   for (const c of campaigns as any[]) {
     const starts = c.starts_at ? new Date(c.starts_at) : null;
@@ -92,21 +111,20 @@ export async function GET(req: NextRequest) {
 
     if (typeof c.onsite_enabled === "boolean" && c.onsite_enabled === false) continue;
 
-    // أهم جزء: ربط Scope بالموقع الحقيقي
-    // - لو scope_level = model: لازم category_id الموجود بالرابط يساوي filter_models.salla_category_id
+    // ✅ فلتر صفحات العرض داخل المتجر
+    const allowed = parseAllowedPaths(c.onsite_paths);
+    if (!pathAllowed(path, allowed)) continue;
+
+    // ✅ ربط Scope بالموقع الحقيقي (سلة)
+    // - scope_level=model: لازم category_id من الرابط يساوي filter_models.salla_category_id
     if (c.scope_level === "model") {
       const campaignCat = c.model?.salla_category_id || null;
 
-      // إذا ما فيه category_id في الرابط: ما نعرض حملة “قسم” (لأنك قلت تبغاه على قسم محدد)
-      if (!currentCategoryId) continue;
-
-      // إذا الحملة ما عندها salla_category_id مضبوط: ما نعرض
-      if (!campaignCat) continue;
-
+      if (!currentCategoryId) continue;   // لازم رابط قسم حقيقي
+      if (!campaignCat) continue;         // لازم موديل مربوط بسلة
       if (String(campaignCat) !== String(currentCategoryId)) continue;
     }
 
-    // (اختياري لاحقًا) scope_level = brand/year نربطه على year_id/brand_id بطريقة مشابهة
     eligible.push(c);
   }
 
@@ -203,4 +221,3 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ show: false });
 }
- 

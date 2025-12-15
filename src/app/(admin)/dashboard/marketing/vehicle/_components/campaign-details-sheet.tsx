@@ -83,6 +83,9 @@ export function CampaignDetailsSheet({
   const [lookbackDays, setLookbackDays] = useState(7);
   const [minSignals, setMinSignals] = useState(1);
 
+  // ✅ جديد: فلتر صفحات العرض داخل المتجر
+  const [onsitePaths, setOnsitePaths] = useState<string>("");
+
   const targeted = useMemo(() => item?.audience_mode === "targeted", [item]);
 
   // ✅ قفل منطقي: لو Email/WhatsApp ON => لازم عملاء فقط
@@ -119,6 +122,9 @@ export function CampaignDetailsSheet({
       setOnlyCustomers(!!json.item.only_customers);
       setLookbackDays(Number(json.item.lookback_days ?? 7));
       setMinSignals(Number(json.item.min_signals ?? 1));
+
+      // ✅ جديد
+      setOnsitePaths(String(json.item.onsite_paths ?? "").trim());
     } catch (e: any) {
       setError(e?.message || "حدث خطأ");
     } finally {
@@ -162,6 +168,7 @@ export function CampaignDetailsSheet({
           only_customers: !!item.only_customers,
           lookback_days: Number(item.lookback_days ?? 7),
           min_signals: Number(item.min_signals ?? 1),
+          onsite_paths: String(item.onsite_paths ?? "").trim(),
         }
       : null;
 
@@ -175,6 +182,9 @@ export function CampaignDetailsSheet({
         send_onsite: sendOnsite,
         send_email: sendEmail,
         send_whatsapp: sendWhatsapp,
+
+        // ✅ جديد: فلتر صفحات العرض داخل المتجر
+        onsite_paths: onsitePaths.trim() ? onsitePaths.trim() : null,
       };
 
       if (targeted) {
@@ -202,6 +212,7 @@ export function CampaignDetailsSheet({
           prev.lookback_days !== lookbackDays ||
           prev.min_signals !== minSignals;
 
+        // ✅ إذا تغيّر الاستهداف نحدّث targets
         if (targetingChanged) {
           await refreshTargets();
         }
@@ -334,6 +345,21 @@ export function CampaignDetailsSheet({
                 )}
               </div>
 
+              {/* ✅ On-site Paths */}
+              <div className="rounded-2xl border p-4 space-y-2">
+                <div className="font-semibold">فلتر صفحات العرض داخل المتجر</div>
+                <div className="text-xs text-muted-foreground">
+                  اكتب <b>مسار واحد لكل سطر</b>. إذا تركته فاضي، الحملة تطلع في كل الصفحات.
+                </div>
+                <textarea
+                  className="w-full min-h-[96px] rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                  value={onsitePaths}
+                  onChange={(e) => setOnsitePaths(e.target.value)}
+                  placeholder={`/category/VAwynW
+/products`}
+                />
+              </div>
+
               {/* Targeting */}
               {targeted ? (
                 <div className="rounded-2xl border p-4 space-y-3">
@@ -403,7 +429,7 @@ export function CampaignDetailsSheet({
                   showOnlyCustomers={needsCustomerOnly ? true : onlyCustomers}
                 />
               )}
- 
+
               {/* Actions */}
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="secondary" onClick={() => onOpenChange(false)}>

@@ -14,6 +14,20 @@ function getServiceSupabase() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
+function normalizeOnsitePaths(input: any): string | null {
+  const raw = String(input ?? "").trim();
+  if (!raw) return null;
+
+  // سطر لكل مسار — ننظف السطور الفاضية
+  const lines = raw
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (!lines.length) return null;
+  return lines.join("\n");
+}
+
 // ✅ Refresh targets داخلي (بدون HTTP) + SYNC (يحذف غير المؤهلين pending/skipped)
 async function refreshTargetsInternal(opts: {
   supabase: ReturnType<typeof getServiceSupabase>;
@@ -219,6 +233,7 @@ export async function GET(req: NextRequest) {
         audience_mode, campaign_type,
         send_onsite, send_email, send_whatsapp,
         ends_at, starts_at, created_at,
+        onsite_paths,
         targets_last_refreshed_at, targets_last_refreshed_count,
         marketing_campaigns_targets(count)
       `)
@@ -283,6 +298,9 @@ export async function POST(req: NextRequest) {
       coupon_code: body.coupon_code ?? null,
       discount_percent: body.discount_percent ?? null,
       ends_at: body.ends_at ?? null,
+
+      // ✅ جديد: فلتر صفحات العرض داخل المتجر
+      onsite_paths: normalizeOnsitePaths(body.onsite_paths),
 
       status: "draft",
     };
@@ -364,4 +382,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-   
