@@ -97,7 +97,7 @@ const seoItems: NavItem[] = [
   },
   { 
     icon: <UserCircleIcon />,
-    name: "اعدادت  الايميل والوتساب",
+    name: "اعدادت الايميل والوتساب",
     path: "/dashboard/settings",
   },
 ];
