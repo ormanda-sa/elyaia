@@ -24,7 +24,7 @@ import {
   SubscriptionsIcon,
   PlansIcon,
 } from "@/components/icons/DashboardIcons";
-
+ 
 import SidebarWidget from "./SidebarWidget";
  
 type NavItem = {
