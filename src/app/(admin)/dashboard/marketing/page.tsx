@@ -6,5 +6,5 @@ export default function MarketingPage() {
       <MarketingTabs />
     </div>
   );
-}
+} 
      
