@@ -403,11 +403,7 @@ export function CampaignDetailsSheet({
                   showOnlyCustomers={needsCustomerOnly ? true : onlyCustomers}
                 />
               )}
-<<<<<<< HEAD
-
-=======
  
->>>>>>> 65799b0bb3b71bb68add31f0b8fce103009f09d3
               {/* Actions */}
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="secondary" onClick={() => onOpenChange(false)}>

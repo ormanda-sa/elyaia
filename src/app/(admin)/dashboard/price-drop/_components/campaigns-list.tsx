@@ -1,11 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-<<<<<<< HEAD
-import { PriceDropCampaign } from "../page";
-=======
 import type { PriceDropCampaign } from "../_types"; 
->>>>>>> 65799b0bb3b71bb68add31f0b8fce103009f09d3
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,

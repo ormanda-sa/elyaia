@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/marketing/refresh-targets?secret=CRON_SECRET",
-      "schedule": "*/20 * * * *" 
+      "schedule": "*/30 * * * *"
     }
   ]
 }
