@@ -13,9 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { VehicleScopePicker } from "./vehicle-scope-picker";
 
 type Audience = "public" | "targeted";
 type CampaignType = "message" | "discount";
+type ScopeLevel = "brand" | "model" | "year";
 
 export function CreateCampaignDialog({
   open,
@@ -32,7 +34,7 @@ export function CreateCampaignDialog({
   const [audience, setAudience] = useState<Audience>("public");
   const [type, setType] = useState<CampaignType>("message");
 
-  // ✅ On-site: إجباري فقط للجمهور العام (public)، اختياري للمستهدف (targeted)
+  // ✅ قنوات
   const [sendOnsite, setSendOnsite] = useState(true);
   const [sendEmail, setSendEmail] = useState(false);
   const [sendWhatsapp, setSendWhatsapp] = useState(false);
@@ -42,16 +44,37 @@ export function CreateCampaignDialog({
   const [lookbackDays, setLookbackDays] = useState(7);
   const [minSignals, setMinSignals] = useState(1);
 
-  // ✅ فلتر صفحات العرض داخل المتجر (سطر لكل مسار)
+  // ✅ عام فقط: فلتر صفحات العرض داخل المتجر
   const [onsitePaths, setOnsitePaths] = useState<string>("");
 
+  // ✅ مستهدف فقط: نطاق الإشارات
+  const [scopeLevel, setScopeLevel] = useState<ScopeLevel>("model");
+  const [scope, setScope] = useState<any>({ brand: null, model: null, year: null });
+
   const isPublic = audience === "public";
+  const isTargeted = audience === "targeted";
+
+  const scopeReady = useMemo(() => {
+    if (!scope.brand?.id) return false;
+    if (scopeLevel === "brand") return true;
+    if (scopeLevel === "model") return !!scope.model?.id;
+    return !!scope.model?.id && !!scope.year?.id;
+  }, [scope, scopeLevel]);
+
+  const hint = useMemo(() => {
+    const b = scope.brand?.label;
+    const m = scope.model?.label;
+    const y = scope.year?.label;
+    if (scopeLevel === "brand") return b || "";
+    if (scopeLevel === "model") return [b, m].filter(Boolean).join(" / ");
+    return [b, m, y].filter(Boolean).join(" / ");
+  }, [scope, scopeLevel]);
 
   function setAudienceMode(v: Audience) {
     setAudience(v);
 
     if (v === "public") {
-      // ✅ public: On-site إجباري + منع email/whatsapp
+      // ✅ عام: On-site إجباري + منع email/whatsapp
       setSendOnsite(true);
       setSendEmail(false);
       setSendWhatsapp(false);
@@ -59,21 +82,19 @@ export function CreateCampaignDialog({
   }
 
   const canSubmit = useMemo(() => {
-    // لازم يكون فيه مسار/رابط واحد على الأقل
-    return !!onsitePaths.trim();
-  }, [onsitePaths]);
+    // ✅ عام: لازم onsite_paths
+    if (isPublic) return !!onsitePaths.trim();
+    // ✅ مستهدف: لازم scope جاهز (إشارات)
+    return scopeReady;
+  }, [isPublic, onsitePaths, scopeReady]);
 
   async function submit() {
     if (!canSubmit) return;
+
     setSaving(true);
     try {
       const payload: any = {
-        title: title.trim() || "حملة داخل المتجر",
-        // ✅ نخليها ثابتة عشان عمود DB ما ينكسر + API يسمح إذا public + onsite_paths
-        scope_level: "model",
-        brand_id: null,
-        model_id: null,
-        year_id: null,
+        title: title.trim() || (isTargeted ? (hint || "حملة مستهدفة") : "حملة داخل المتجر"),
 
         audience_mode: audience,
         campaign_type: type,
@@ -83,14 +104,30 @@ export function CreateCampaignDialog({
         send_email: isPublic ? false : !!sendEmail,
         send_whatsapp: isPublic ? false : !!sendWhatsapp,
 
-        // ✅ targets فقط للمستهدف
+        // ✅ إعدادات الاستهداف (للمستهدف فقط)
         only_customers: isPublic ? true : !!onlyCustomers,
         lookback_days: isPublic ? 7 : lookbackDays,
         min_signals: isPublic ? 1 : minSignals,
-
-        // ✅ فلتر صفحات العرض داخل المتجر
-        onsite_paths: onsitePaths.trim() ? onsitePaths.trim() : null,
       };
+
+      if (isPublic) {
+        // ✅ عام: يعتمد على الرابط فقط
+        payload.scope_level = "model"; // ثابت فقط عشان قيود الجدول
+        payload.brand_id = null;
+        payload.model_id = null;
+        payload.year_id = null;
+
+        payload.onsite_paths = onsitePaths.trim() ? onsitePaths.trim() : null;
+      } else {
+        // ✅ مستهدف: يعتمد على الإشارات (brand/model/year)
+        payload.scope_level = scopeLevel;
+        payload.brand_id = scope.brand?.id ?? null;
+        payload.model_id = scope.model?.id ?? null;
+        payload.year_id = scope.year?.id ?? null;
+
+        // المستهدف ما نعتمد على onsite_paths
+        payload.onsite_paths = null;
+      }
 
       const res = await fetch("/api/dashboard/marketing/vehicle/campaigns", {
         method: "POST",
@@ -111,9 +148,11 @@ export function CreateCampaignDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl rounded-2xl">
         <DialogHeader>
-          <DialogTitle>إنشاء حملة داخل المتجر</DialogTitle>
+          <DialogTitle>إنشاء حملة</DialogTitle>
           <DialogDescription>
-            (ملاحظة: On-site إجباري للجمهور العام فقط — والحملة هنا تعتمد على رابط/مسار الصفحة)
+            {isPublic
+              ? "الجمهور العام: تعتمد على رابط/مسار الصفحة (On-site فقط)."
+              : "الجمهور المستهدف: يعتمد على إشارات السيارة (ماركة/موديل/سنة) ويمكن إرسال إيميل/واتساب."}
           </DialogDescription>
         </DialogHeader>
 
@@ -125,28 +164,63 @@ export function CreateCampaignDialog({
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder={"اكتب عنوانًا واضحًا للحملة"}
+                placeholder={isTargeted ? (hint || "اكتب عنوانًا واضحًا للحملة") : "اكتب عنوانًا واضحًا للحملة"}
               />
             </div>
 
-            {/* ✅ On-site paths */}
-            <div className="rounded-2xl border p-4 space-y-2">
-              <div className="font-semibold">فلتر صفحات العرض داخل المتجر</div>
-              <div className="text-xs text-muted-foreground">
-                اكتب <span className="font-medium">مسار واحد لكل سطر</span>. لازم تحط مسار/رابط واحد على الأقل.
-              </div>
-              <textarea
-                className="w-full min-h-[140px] rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                value={onsitePaths}
-                onChange={(e) => setOnsitePaths(e.target.value)}
-                placeholder={`https://darb.com.sa/category/VAwynW?filters[category_id]=1316078958
+            {/* ✅ عام: فلتر صفحات */}
+            {isPublic && (
+              <div className="rounded-2xl border p-4 space-y-2">
+                <div className="font-semibold">فلتر صفحات العرض داخل المتجر</div>
+                <div className="text-xs text-muted-foreground">
+                  اكتب <span className="font-medium">مسار واحد لكل سطر</span>. لازم تحط مسار/رابط واحد على الأقل.
+                </div>
+                <textarea
+                  className="w-full min-h-[140px] rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                  value={onsitePaths}
+                  onChange={(e) => setOnsitePaths(e.target.value)}
+                  placeholder={`https://darb.com.sa/category/VAwynW?filters[category_id]=1316078958
 /category/VAwynW
 /products`}
-              />
-              <div className="text-xs text-muted-foreground">
-                تقدر تحط رابط كامل أو مسار فقط. النظام يحوّل الرابط إلى مسار تلقائيًا (مثل <span className="font-mono">/category/VAwynW</span>).
+                />
+                <div className="text-xs text-muted-foreground">
+                  تقدر تحط رابط كامل أو مسار فقط. النظام يحوّل الرابط إلى مسار تلقائيًا (مثل{" "}
+                  <span className="font-mono">/category/VAwynW</span>).
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* ✅ مستهدف: نطاق الإشارات */}
+            {isTargeted && (
+              <div className="rounded-2xl border p-4 space-y-3">
+                <div className="font-semibold">نطاق الاستهداف (حسب إشارات السيارة)</div>
+
+                <div>
+                  <div className="text-sm font-medium mb-2">مستوى النطاق</div>
+                  <div className="flex flex-wrap gap-2">
+                    {(["brand", "model", "year"] as ScopeLevel[]).map((s) => (
+                      <Button
+                        key={s}
+                        type="button"
+                        variant={scopeLevel === s ? "default" : "secondary"}
+                        onClick={() => {
+                          setScopeLevel(s);
+                          setScope((prev: any) => ({ ...prev, year: null }));
+                        }}
+                      >
+                        {s}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <VehicleScopePicker scopeLevel={scopeLevel} value={scope} onChange={setScope} />
+
+                <div className="text-xs text-muted-foreground">
+                  هذا الاستهداف يعتمد على <b>visitor_vehicle_signals</b> (مو على الرابط).
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right */}
@@ -169,7 +243,7 @@ export function CreateCampaignDialog({
                 </Button>
                 <Button
                   type="button"
-                  variant={!isPublic ? "default" : "secondary"}
+                  variant={isTargeted ? "default" : "secondary"}
                   onClick={() => setAudienceMode("targeted")}
                 >
                   مستهدف
@@ -207,7 +281,7 @@ export function CreateCampaignDialog({
             <div className="rounded-2xl border p-4 space-y-3">
               <div className="font-semibold">قنوات الإرسال</div>
 
-              {/* ✅ public: إجباري + disabled */}
+              {/* ✅ عام: On-site إجباري */}
               {isPublic ? (
                 <div className="flex items-center justify-between text-sm">
                   <span>إظهار داخل المتجر (On-site) — إجباري للجمهور العام</span>
@@ -237,7 +311,7 @@ export function CreateCampaignDialog({
               )}
             </div>
 
-            {/* Targeting */}
+            {/* Targeting settings (targeted only) */}
             {isPublic ? (
               <div className="rounded-2xl border p-4 text-sm text-muted-foreground">
                 الجمهور العام لا يستخدم Targets.
@@ -268,6 +342,10 @@ export function CreateCampaignDialog({
                       onChange={(e) => setMinSignals(Number(e.target.value || 1))}
                     />
                   </div>
+                </div>
+
+                <div className="text-xs text-muted-foreground">
+                  ملاحظة: الإيميل/الواتساب يحتاجون بيانات تواصل، فإذا فعلتهم والنظام يقدر يجبر “عملاء فقط” تلقائيًا من الخلف.
                 </div>
               </div>
             )}
