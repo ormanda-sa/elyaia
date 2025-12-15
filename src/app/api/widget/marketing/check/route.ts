@@ -1,4 +1,3 @@
-// FILE: src/app/api/widget/marketing/check/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -12,33 +11,18 @@ function addHours(date: Date, hours: number) {
   return new Date(date.getTime() + hours * 60 * 60 * 1000);
 }
 
-function safeUrl(page_url: string | null) {
-  if (!page_url) return null;
-  try {
-    return new URL(page_url);
-  } catch {
-    return null;
-  }
-}
-
-// يطلع 1316078958 من filters[category_id]=1316078958
-function extractSallaCategoryId(page_url: string | null): string | null {
-  const u = safeUrl(page_url);
-  if (!u) return null;
-
-  const v =
-    u.searchParams.get("filters[category_id]") ||
-    u.searchParams.get("category_id");
-
-  return v && v.trim() ? v.trim() : null;
-}
-
 function normalizePath(p: string) {
   if (!p) return "/";
+  // لو دخل URL كامل: نأخذ pathname فقط
   try {
     if (p.startsWith("http")) return new URL(p).pathname || "/";
   } catch {}
-  return p.startsWith("/") ? p : "/" + p;
+
+  // لو دخل /path?x=1 أو /path#hash: نشيل query/hash
+  const cutQ = p.split("?")[0];
+  const cutH = cutQ.split("#")[0];
+  const clean = cutH.trim();
+  return clean.startsWith("/") ? clean : "/" + clean;
 }
 
 function parseAllowedPaths(raw: string | null | undefined): string[] {
@@ -73,24 +57,17 @@ export async function GET(req: NextRequest) {
   }
 
   const now = new Date();
-  const currentCategoryId = extractSallaCategoryId(page_url);
 
-  // 1) نجيب الحملات النشطة + onsite_paths
+  // 1) حملات نشطة + Onsite
   const { data: campaigns, error: campErr } = await sp
     .from("marketing_campaigns_vehicle")
-    .select(
-      `
+    .select(`
       id, store_id, title, status,
-      scope_level, brand_id, model_id, year_id,
       audience_mode,
       send_onsite, onsite_enabled, onsite_variant, onsite_headline, onsite_body, onsite_cta_text, onsite_cta_url,
       starts_at, ends_at, updated_at,
-      onsite_paths,
-      model:filter_models ( salla_category_id ),
-      year:filter_years ( salla_category_year_id, salla_year_id ),
-      brand:filter_brands ( salla_company_id )
-    `
-    )
+      onsite_paths
+    `)
     .eq("store_id", store_id)
     .eq("status", "active")
     .eq("send_onsite", true)
@@ -101,7 +78,7 @@ export async function GET(req: NextRequest) {
   }
   if (!campaigns?.length) return NextResponse.json({ show: false });
 
-  // 2) فلترة وقت + فلترة الصفحات onsite_paths + فلترة القسم حسب category_id
+  // 2) فلترة وقت + فلترة صفحات onsite_paths
   const eligible: any[] = [];
   for (const c of campaigns as any[]) {
     const starts = c.starts_at ? new Date(c.starts_at) : null;
@@ -111,31 +88,19 @@ export async function GET(req: NextRequest) {
 
     if (typeof c.onsite_enabled === "boolean" && c.onsite_enabled === false) continue;
 
-    // ✅ فلتر صفحات العرض داخل المتجر
     const allowed = parseAllowedPaths(c.onsite_paths);
     if (!pathAllowed(path, allowed)) continue;
-
-    // ✅ ربط Scope بالموقع الحقيقي (سلة)
-    // - scope_level=model: لازم category_id من الرابط يساوي filter_models.salla_category_id
-    if (c.scope_level === "model") {
-      const campaignCat = c.model?.salla_category_id || null;
-
-      if (!currentCategoryId) continue;   // لازم رابط قسم حقيقي
-      if (!campaignCat) continue;         // لازم موديل مربوط بسلة
-      if (String(campaignCat) !== String(currentCategoryId)) continue;
-    }
 
     eligible.push(c);
   }
 
   if (!eligible.length) return NextResponse.json({ show: false });
 
-  // 3) ترتيب: targeted أولاً ثم public
+  // 3) targeted أولاً (لو عندك)، ثم public
   eligible.sort((a, b) => (a.audience_mode === "targeted" ? -1 : 1));
 
-  // 4) Dedup + شروط targeted
+  // 4) Dedup + شرط targeted
   for (const c of eligible) {
-    // Dedup 24h
     const { data: impr } = await sp
       .from("marketing_campaigns_impressions")
       .select("id, expires_at")
@@ -147,7 +112,6 @@ export async function GET(req: NextRequest) {
     if (impr?.expires_at && new Date(impr.expires_at) > now) continue;
 
     let targetRow: any = null;
-
     if (c.audience_mode === "targeted") {
       const { data: t } = await sp
         .from("marketing_campaigns_targets")
@@ -201,7 +165,7 @@ export async function GET(req: NextRequest) {
       campaign_id: c.id,
       target_id: targetRow?.id ?? null,
       event_type: "impression",
-      meta: { path, page_url, category_id: currentCategoryId },
+      meta: { path, page_url },
     });
 
     return NextResponse.json({

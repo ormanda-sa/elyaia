@@ -13,9 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { VehicleScopePicker } from "./vehicle-scope-picker";
 
-type ScopeLevel = "brand" | "model" | "year";
 type Audience = "public" | "targeted";
 type CampaignType = "message" | "discount";
 
@@ -30,9 +28,6 @@ export function CreateCampaignDialog({
 }) {
   const [saving, setSaving] = useState(false);
 
-  const [scopeLevel, setScopeLevel] = useState<ScopeLevel>("model");
-  const [scope, setScope] = useState<any>({ brand: null, model: null, year: null });
-
   const [title, setTitle] = useState("");
   const [audience, setAudience] = useState<Audience>("public");
   const [type, setType] = useState<CampaignType>("message");
@@ -42,7 +37,7 @@ export function CreateCampaignDialog({
   const [sendEmail, setSendEmail] = useState(false);
   const [sendWhatsapp, setSendWhatsapp] = useState(false);
 
-  // ✅ للمستهدف: الافتراضي زوار + عملاء (أفضل للـ On-site)
+  // ✅ للمستهدف
   const [onlyCustomers, setOnlyCustomers] = useState(false);
   const [lookbackDays, setLookbackDays] = useState(7);
   const [minSignals, setMinSignals] = useState(1);
@@ -51,22 +46,6 @@ export function CreateCampaignDialog({
   const [onsitePaths, setOnsitePaths] = useState<string>("");
 
   const isPublic = audience === "public";
-
-  const scopeReady = useMemo(() => {
-    if (!scope.brand?.id) return false;
-    if (scopeLevel === "brand") return true;
-    if (scopeLevel === "model") return !!scope.model?.id;
-    return !!scope.model?.id && !!scope.year?.id;
-  }, [scope, scopeLevel]);
-
-  const hint = useMemo(() => {
-    const b = scope.brand?.label;
-    const m = scope.model?.label;
-    const y = scope.year?.label;
-    if (scopeLevel === "brand") return b || "";
-    if (scopeLevel === "model") return [b, m].filter(Boolean).join(" / ");
-    return [b, m, y].filter(Boolean).join(" / ");
-  }, [scope, scopeLevel]);
 
   function setAudienceMode(v: Audience) {
     setAudience(v);
@@ -77,19 +56,24 @@ export function CreateCampaignDialog({
       setSendEmail(false);
       setSendWhatsapp(false);
     }
-    // targeted: لا نجبر on-site
   }
 
+  const canSubmit = useMemo(() => {
+    // لازم يكون فيه مسار/رابط واحد على الأقل
+    return !!onsitePaths.trim();
+  }, [onsitePaths]);
+
   async function submit() {
-    if (!scopeReady) return;
+    if (!canSubmit) return;
     setSaving(true);
     try {
       const payload: any = {
-        title: title.trim() || hint || "حملة سيارة",
-        scope_level: scopeLevel,
-        brand_id: scope.brand?.id ?? null,
-        model_id: scope.model?.id ?? null,
-        year_id: scope.year?.id ?? null,
+        title: title.trim() || "حملة داخل المتجر",
+        // ✅ نخليها ثابتة عشان عمود DB ما ينكسر + API يسمح إذا public + onsite_paths
+        scope_level: "model",
+        brand_id: null,
+        model_id: null,
+        year_id: null,
 
         audience_mode: audience,
         campaign_type: type,
@@ -99,13 +83,12 @@ export function CreateCampaignDialog({
         send_email: isPublic ? false : !!sendEmail,
         send_whatsapp: isPublic ? false : !!sendWhatsapp,
 
-        // ✅ targets فقط للمستهدف (والعام لا يستخدمها)
+        // ✅ targets فقط للمستهدف
         only_customers: isPublic ? true : !!onlyCustomers,
         lookback_days: isPublic ? 7 : lookbackDays,
         min_signals: isPublic ? 1 : minSignals,
 
-        // ✅ فلتر صفحات العرض داخل المتجر (اختياري)
-        // سطر لكل مسار مثل: /category/VAwynW
+        // ✅ فلتر صفحات العرض داخل المتجر
         onsite_paths: onsitePaths.trim() ? onsitePaths.trim() : null,
       };
 
@@ -128,9 +111,9 @@ export function CreateCampaignDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl rounded-2xl">
         <DialogHeader>
-          <DialogTitle>إنشاء حملة سيارة</DialogTitle>
+          <DialogTitle>إنشاء حملة داخل المتجر</DialogTitle>
           <DialogDescription>
-            (ملاحظة: On-site إجباري للجمهور العام فقط)
+            (ملاحظة: On-site إجباري للجمهور العام فقط — والحملة هنا تعتمد على رابط/مسار الصفحة)
           </DialogDescription>
         </DialogHeader>
 
@@ -138,33 +121,31 @@ export function CreateCampaignDialog({
           {/* Left */}
           <div className="space-y-4">
             <div>
-              <div className="text-sm font-medium mb-2">مستوى النطاق</div>
-              <div className="flex flex-wrap gap-2">
-                {(["brand", "model", "year"] as ScopeLevel[]).map((s) => (
-                  <Button
-                    key={s}
-                    type="button"
-                    variant={scopeLevel === s ? "default" : "secondary"}
-                    onClick={() => {
-                      setScopeLevel(s);
-                      setScope((prev: any) => ({ ...prev, year: null }));
-                    }}
-                  >
-                    {s}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <VehicleScopePicker scopeLevel={scopeLevel} value={scope} onChange={setScope} />
-
-            <div>
               <div className="text-sm font-medium mb-2">عنوان الحملة</div>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder={hint || "اكتب عنوانًا واضحًا للحملة"}
+                placeholder={"اكتب عنوانًا واضحًا للحملة"}
               />
+            </div>
+
+            {/* ✅ On-site paths */}
+            <div className="rounded-2xl border p-4 space-y-2">
+              <div className="font-semibold">فلتر صفحات العرض داخل المتجر</div>
+              <div className="text-xs text-muted-foreground">
+                اكتب <span className="font-medium">مسار واحد لكل سطر</span>. لازم تحط مسار/رابط واحد على الأقل.
+              </div>
+              <textarea
+                className="w-full min-h-[140px] rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                value={onsitePaths}
+                onChange={(e) => setOnsitePaths(e.target.value)}
+                placeholder={`https://darb.com.sa/category/VAwynW?filters[category_id]=1316078958
+/category/VAwynW
+/products`}
+              />
+              <div className="text-xs text-muted-foreground">
+                تقدر تحط رابط كامل أو مسار فقط. النظام يحوّل الرابط إلى مسار تلقائيًا (مثل <span className="font-mono">/category/VAwynW</span>).
+              </div>
             </div>
           </div>
 
@@ -256,24 +237,6 @@ export function CreateCampaignDialog({
               )}
             </div>
 
-            {/* ✅ On-site paths (فلتر الصفحات) */}
-            <div className="rounded-2xl border p-4 space-y-2">
-              <div className="font-semibold">فلتر صفحات العرض داخل المتجر</div>
-              <div className="text-xs text-muted-foreground">
-                اكتب <span className="font-medium">مسار واحد لكل سطر</span>. إذا تركته فاضي، الحملة تطلع في كل الصفحات.
-              </div>
-              <textarea
-                className="w-full min-h-[96px] rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                value={onsitePaths}
-                onChange={(e) => setOnsitePaths(e.target.value)}
-                placeholder={`/category/VAwynW
-/products`}
-              />
-              <div className="text-xs text-muted-foreground">
-                مثال: لو تبغاها على قسم محدد في سلة، غالبًا المسار يكون مثل <span className="font-mono">/category/VAwynW</span>.
-              </div>
-            </div>
-
             {/* Targeting */}
             {isPublic ? (
               <div className="rounded-2xl border p-4 text-sm text-muted-foreground">
@@ -315,7 +278,7 @@ export function CreateCampaignDialog({
           <Button variant="secondary" onClick={() => onOpenChange(false)}>
             إلغاء
           </Button>
-          <Button onClick={submit} disabled={!scopeReady || saving}>
+          <Button onClick={submit} disabled={!canSubmit || saving}>
             {saving ? "جاري الإنشاء..." : "إنشاء"}
           </Button>
         </div>

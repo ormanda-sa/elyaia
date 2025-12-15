@@ -299,7 +299,7 @@ export async function POST(req: NextRequest) {
       discount_percent: body.discount_percent ?? null,
       ends_at: body.ends_at ?? null,
 
-      // ✅ جديد: فلتر صفحات العرض داخل المتجر
+      // ✅ فلتر صفحات العرض داخل المتجر
       onsite_paths: normalizeOnsitePaths(body.onsite_paths),
 
       status: "draft",
@@ -309,14 +309,21 @@ export async function POST(req: NextRequest) {
     if (!payload.scope_level) {
       return NextResponse.json({ error: "scope_level required" }, { status: 400 });
     }
-    if (payload.scope_level === "brand" && !payload.brand_id) {
-      return NextResponse.json({ error: "brand_id required" }, { status: 400 });
-    }
-    if (payload.scope_level === "model" && !payload.model_id) {
-      return NextResponse.json({ error: "model_id required" }, { status: 400 });
-    }
-    if (payload.scope_level === "year" && !payload.year_id) {
-      return NextResponse.json({ error: "year_id required" }, { status: 400 });
+
+    // ✅ الجديد: إذا public + عنده onsite_paths => ما نطلب brand/model/year
+    const hasOnsitePaths = !!String(payload.onsite_paths ?? "").trim();
+    const isPublic = payload.audience_mode === "public";
+
+    if (!(isPublic && hasOnsitePaths)) {
+      if (payload.scope_level === "brand" && !payload.brand_id) {
+        return NextResponse.json({ error: "brand_id required" }, { status: 400 });
+      }
+      if (payload.scope_level === "model" && !payload.model_id) {
+        return NextResponse.json({ error: "model_id required" }, { status: 400 });
+      }
+      if (payload.scope_level === "year" && !payload.year_id) {
+        return NextResponse.json({ error: "year_id required" }, { status: 400 });
+      }
     }
 
     // ---- Validation: targeted settings ----

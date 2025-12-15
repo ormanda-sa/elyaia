@@ -13,7 +13,6 @@ type Filters = {
   q: string;
   status: string;
   audience: string;
-  scope: string;
   type: string;
 };
 
@@ -26,7 +25,6 @@ export function VehicleCampaignsView() {
     q: "",
     status: "",
     audience: "",
-    scope: "",
     type: "",
   });
 
@@ -38,7 +36,6 @@ export function VehicleCampaignsView() {
     if (filters.q.trim()) p.set("q", filters.q.trim());
     if (filters.status) p.set("status", filters.status);
     if (filters.audience) p.set("audience_mode", filters.audience);
-    if (filters.scope) p.set("scope_level", filters.scope);
     if (filters.type) p.set("campaign_type", filters.type);
     return p.toString();
   }, [filters]);
@@ -68,16 +65,16 @@ export function VehicleCampaignsView() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-lg font-semibold">Vehicle Campaigns</div>
+          <div className="text-lg font-semibold">On-site Campaigns</div>
           <div className="text-sm text-muted-foreground">
-            أنشئ حملات على مستوى الماركة / الموديل / السنة — مع جمهور عام أو مستهدف.
+            أنشئ حملات تظهر داخل المتجر حسب صفحات/روابط محددة — مع جمهور عام أو مستهدف.
           </div>
         </div>
       </div>
 
       <CampaignsToolbar
-        filters={filters}
-        onChange={setFilters}
+        filters={filters as any}
+        onChange={setFilters as any}
         onCreate={() => setCreateOpen(true)}
         onRefresh={load}
       />

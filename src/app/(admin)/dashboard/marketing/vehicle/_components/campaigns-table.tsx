@@ -58,16 +58,18 @@ const AUDIENCE_LABELS: Record<string, string> = {
   targeted: "مستهدف",
 };
 
-const SCOPE_LABELS: Record<string, string> = {
-  brand: "ماركة",
-  model: "موديل",
-  year: "سنة",
-};
-
 const TYPE_LABELS: Record<string, string> = {
   message: "رسالة",
   discount: "خصم",
 };
+
+function firstPathLine(raw: any) {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+  const line = s.split("\n").map((x) => x.trim()).filter(Boolean)[0] || "";
+  if (!line) return "";
+  return line.length > 48 ? line.slice(0, 48) + "…" : line;
+}
 
 export function CampaignsTable({
   items,
@@ -103,7 +105,7 @@ export function CampaignsTable({
             <TableRow>
               <TableHead className="text-right">الحملة</TableHead>
               <TableHead className="text-right">الحالة</TableHead>
-              <TableHead className="text-right">النطاق</TableHead>
+              <TableHead className="text-right">الصفحات</TableHead>
               <TableHead className="text-right">الجمهور</TableHead>
               <TableHead className="text-right">النوع</TableHead>
               <TableHead className="text-right">القنوات</TableHead>
@@ -153,9 +155,21 @@ export function CampaignsTable({
                     </span>
                   </TableCell>
 
-                  {/* نطاق */}
+                  {/* ✅ صفحات العرض */}
                   <TableCell className="text-right">
-                    <Badge variant="secondary">{SCOPE_LABELS[c.scope_level] ?? c.scope_level}</Badge>
+                    {c.onsite_paths ? (
+                      <div className="space-y-1">
+                        <Badge variant="secondary">محدد</Badge>
+                        <div className="text-xs text-muted-foreground">
+                          {firstPathLine(c.onsite_paths)}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <Badge variant="outline">كل الصفحات</Badge>
+                        <div className="text-xs text-muted-foreground">—</div>
+                      </div>
+                    )}
                   </TableCell>
 
                   {/* جمهور */}

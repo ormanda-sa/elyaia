@@ -3,7 +3,33 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const STATUS_LABELS: Record<string, string> = {
+  "": "الكل",
+  draft: "مسودة",
+  active: "نشطة",
+  paused: "موقوفة",
+  finished: "منتهية",
+  cancelled: "ملغية",
+};
+
+const AUDIENCE_LABELS: Record<string, string> = {
+  "": "الكل",
+  public: "عام",
+  targeted: "مستهدف",
+};
+
+const TYPE_LABELS: Record<string, string> = {
+  "": "الكل",
+  message: "رسالة",
+  discount: "خصم",
+};
 
 export function CampaignsToolbar({
   filters,
@@ -21,7 +47,7 @@ export function CampaignsToolbar({
   return (
     <div className="rounded-2xl border bg-background p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-1 gap-2">
+        <div className="flex flex-1 flex-wrap gap-2">
           <Input
             value={filters.q}
             onChange={(e) => set("q", e.target.value)}
@@ -31,13 +57,15 @@ export function CampaignsToolbar({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="secondary">الحالة: {filters.status || "الكل"}</Button>
+              <Button variant="secondary">
+                الحالة: {STATUS_LABELS[filters.status ?? ""] ?? (filters.status || "الكل")}
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuItem onClick={() => set("status", "")}>الكل</DropdownMenuItem>
-              {["draft", "active", "paused", "finished", "cancelled"].map((s) => (
+              {(["draft", "active", "paused", "finished", "cancelled"] as const).map((s) => (
                 <DropdownMenuItem key={s} onClick={() => set("status", s)}>
-                  {s}
+                  {STATUS_LABELS[s]}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -45,35 +73,29 @@ export function CampaignsToolbar({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="secondary">الجمهور: {filters.audience || "الكل"}</Button>
+              <Button variant="secondary">
+                الجمهور: {AUDIENCE_LABELS[filters.audience ?? ""] ?? (filters.audience || "الكل")}
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuItem onClick={() => set("audience", "")}>الكل</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => set("audience", "public")}>public</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => set("audience", "targeted")}>targeted</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => set("audience", "public")}>عام</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => set("audience", "targeted")}>مستهدف</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="secondary">النطاق: {filters.scope || "الكل"}</Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => set("scope", "")}>الكل</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => set("scope", "brand")}>brand</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => set("scope", "model")}>model</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => set("scope", "year")}>year</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* ✅ حذفنا فلتر "النطاق" لأنه صار حسب الرابط فقط */}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="secondary">النوع: {filters.type || "الكل"}</Button>
+              <Button variant="secondary">
+                النوع: {TYPE_LABELS[filters.type ?? ""] ?? (filters.type || "الكل")}
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuItem onClick={() => set("type", "")}>الكل</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => set("type", "message")}>message</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => set("type", "discount")}>discount</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => set("type", "message")}>رسالة</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => set("type", "discount")}>خصم</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
