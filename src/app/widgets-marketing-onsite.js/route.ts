@@ -1,182 +1,176 @@
-// FILE: src/app/widgets-marketing-onsite.js/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "edge"; // تقدر تشيلها لو تبي Node
-
-function escapeJs(str: string) {
-  return str
-    .replace(/\\/g, "\\\\")
-    .replace(/`/g, "\\`")
-    .replace(/\$/g, "\\$");
-}
+export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-
-  // اختياري: تقدر تمررهم بالـ query:
-  // /widgets-marketing-onsite.js?store_id=...&api_base=...
-  const storeIdFromQuery = searchParams.get("store_id");
-  const apiBaseFromQuery = searchParams.get("api_base");
-
   const js = `
 (function () {
-  const STORE_ID = ${
-    storeIdFromQuery ? "`" + escapeJs(storeIdFromQuery) + "`" : "window.DARB_STORE_ID"
-  };
-  const API_BASE = ${
-    apiBaseFromQuery ? "`" + escapeJs(apiBaseFromQuery) + "`" : "window.DARB_API_BASE"
-  } || (location.origin);
-
-  if (!STORE_ID) return;
-
-  function getVisitorId() {
-    const key = "darb_visitor_id";
-    let v = localStorage.getItem(key);
-    if (!v) {
-      v = "v_" + Math.random().toString(16).slice(2) + Date.now().toString(16);
-      localStorage.setItem(key, v);
+  try {
+    function getSelfScript() {
+      try {
+        if (document.currentScript) return document.currentScript;
+        var scripts = document.getElementsByTagName("script");
+        return scripts[scripts.length - 1] || null;
+      } catch (e) {
+        return null;
+      }
     }
-    return v;
-  }
 
-  async function apiCheck() {
-    const visitor_id = getVisitorId();
-    const path = location.pathname;
-    const page_url = location.href;
+    var self = getSelfScript();
+    var STORE_ID =
+      (self && (self.getAttribute("data-store-id") || (self.dataset && self.dataset.storeId))) ||
+      (window.DARB_STORE_ID || "");
 
-    const url =
-      API_BASE +
-      "/api/widget/marketing/check?store_id=" +
-      encodeURIComponent(STORE_ID) +
-      "&visitor_id=" +
-      encodeURIComponent(visitor_id) +
-      "&path=" +
-      encodeURIComponent(path) +
-      "&page_url=" +
-      encodeURIComponent(page_url);
+    var API_BASE =
+      (self && (self.getAttribute("data-api-base") || (self.dataset && self.dataset.apiBase))) ||
+      (window.DARB_API_BASE || "https://elyaia.vercel.app");
 
-    const res = await fetch(url, { method: "GET", credentials: "omit" });
-    return res.json();
-  }
+    if (!STORE_ID) return;
 
-  function postEvent(payload) {
-    return fetch(API_BASE + "/api/widget/marketing/event", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }).catch(() => {});
-  }
+    function getVisitorId() {
+      var key = "darb_visitor_id";
+      var v = localStorage.getItem(key);
+      if (!v) {
+        v = "v_" + Math.random().toString(16).slice(2) + Date.now().toString(16);
+        localStorage.setItem(key, v);
+      }
+      return v;
+    }
 
-  function renderPopup(campaign) {
-    const wrap = document.createElement("div");
-    wrap.style.cssText =
-      "position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px;";
+    function normalizePath(p) {
+      try {
+        return (p || "/").split("?")[0].split("#")[0] || "/";
+      } catch (e) {
+        return "/";
+      }
+    }
 
-    const card = document.createElement("div");
-    card.style.cssText =
-      "width:min(420px,100%);background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:16px;direction:rtl;font-family:system-ui;";
+    async function apiCheck() {
+      var visitor_id = getVisitorId();
+      var path = normalizePath(location.pathname);
+      var page_url = location.href;
 
-    const h = document.createElement("div");
-    h.style.cssText = "font-weight:700;font-size:16px;margin-bottom:8px;";
-    h.textContent = campaign.headline || campaign.title;
+      var url =
+        API_BASE +
+        "/api/widget/marketing/check?store_id=" +
+        encodeURIComponent(STORE_ID) +
+        "&visitor_id=" +
+        encodeURIComponent(visitor_id) +
+        "&path=" +
+        encodeURIComponent(path) +
+        "&page_url=" +
+        encodeURIComponent(page_url);
 
-    const p = document.createElement("div");
-    p.style.cssText = "font-size:13px;line-height:1.6;color:#444;margin-bottom:12px;";
-    p.textContent = campaign.body || "";
+      var res = await fetch(url, { method: "GET", credentials: "omit" });
+      return res.json();
+    }
 
-    const row = document.createElement("div");
-    row.style.cssText = "display:flex;gap:8px;justify-content:flex-start;";
+    function postEvent(payload) {
+      return fetch(API_BASE + "/api/widget/marketing/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).catch(function () {});
+    }
 
-    const btn = document.createElement("button");
-    btn.textContent = campaign.cta_text || "عرض";
-    btn.style.cssText =
-      "border:none;border-radius:12px;padding:10px 12px;background:#e5202a;color:#fff;font-weight:700;cursor:pointer;";
+    function renderPopup(campaign) {
+      var wrap = document.createElement("div");
+      wrap.style.cssText =
+        "position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px;";
 
-    const close = document.createElement("button");
-    close.textContent = "إغلاق";
-    close.style.cssText =
-      "border:1px solid #ddd;border-radius:12px;padding:10px 12px;background:#fff;cursor:pointer;";
+      var card = document.createElement("div");
+      card.style.cssText =
+        "width:min(420px,100%);background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:16px;direction:rtl;font-family:system-ui;";
 
-    const visitor_id = getVisitorId();
+      var h = document.createElement("div");
+      h.style.cssText = "font-weight:700;font-size:16px;margin-bottom:8px;";
+      h.textContent = campaign.headline || campaign.title || "";
 
-    btn.onclick = () => {
-      postEvent({
-        store_id: STORE_ID,
-        campaign_id: campaign.id,
-        visitor_id,
-        event_type: "click",
-        meta: { page_url: location.href }
-      });
-      if (campaign.cta_url) window.location.href = campaign.cta_url;
-      document.body.removeChild(wrap);
-    };
+      var p = document.createElement("div");
+      p.style.cssText = "font-size:13px;line-height:1.6;color:#444;margin-bottom:12px;";
+      p.textContent = campaign.body || "";
 
-    close.onclick = () => {
-      postEvent({
-        store_id: STORE_ID,
-        campaign_id: campaign.id,
-        visitor_id,
-        event_type: "close",
-        meta: { page_url: location.href }
-      });
-      document.body.removeChild(wrap);
-    };
+      var row = document.createElement("div");
+      row.style.cssText = "display:flex;gap:8px;justify-content:flex-start;";
 
-    row.appendChild(btn);
-    row.appendChild(close);
+      var btn = document.createElement("button");
+      btn.textContent = campaign.cta_text || "عرض";
+      btn.style.cssText =
+        "border:none;border-radius:12px;padding:10px 12px;background:#e5202a;color:#fff;font-weight:700;cursor:pointer;";
 
-    card.appendChild(h);
-    card.appendChild(p);
-    card.appendChild(row);
-    wrap.appendChild(card);
-    document.body.appendChild(wrap);
-  }
+      var close = document.createElement("button");
+      close.textContent = "إغلاق";
+      close.style.cssText =
+        "border:1px solid #ddd;border-radius:12px;padding:10px 12px;background:#fff;cursor:pointer;";
 
-  function renderBar(campaign) {
-    const bar = document.createElement("div");
-    bar.style.cssText =
-      "position:fixed;left:12px;right:12px;bottom:12px;z-index:999999;background:#111;color:#fff;border-radius:14px;padding:12px;direction:rtl;font-family:system-ui;display:flex;gap:10px;align-items:center;justify-content:space-between;";
+      var visitor_id = getVisitorId();
 
-    const text = document.createElement("div");
-    text.style.cssText = "font-size:13px;line-height:1.4;";
-    text.textContent = (campaign.headline || campaign.title) + (campaign.body ? " — " + campaign.body : "");
+      btn.onclick = function () {
+        postEvent({ store_id: STORE_ID, campaign_id: campaign.id, visitor_id: visitor_id, event_type: "click", meta: { page_url: location.href } });
+        if (campaign.cta_url) location.href = campaign.cta_url;
+        if (wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      };
 
-    const btn = document.createElement("button");
-    btn.textContent = campaign.cta_text || "عرض";
-    btn.style.cssText =
-      "border:none;border-radius:12px;padding:10px 12px;background:#e5202a;color:#fff;font-weight:700;cursor:pointer;white-space:nowrap;";
+      close.onclick = function () {
+        postEvent({ store_id: STORE_ID, campaign_id: campaign.id, visitor_id: visitor_id, event_type: "close", meta: { page_url: location.href } });
+        if (wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      };
 
-    const x = document.createElement("button");
-    x.textContent = "✕";
-    x.style.cssText =
-      "border:none;background:transparent;color:#fff;font-size:16px;cursor:pointer;opacity:.8;";
+      row.appendChild(btn);
+      row.appendChild(close);
 
-    const visitor_id = getVisitorId();
+      card.appendChild(h);
+      card.appendChild(p);
+      card.appendChild(row);
 
-    btn.onclick = () => {
-      postEvent({ store_id: STORE_ID, campaign_id: campaign.id, visitor_id, event_type: "click" });
-      if (campaign.cta_url) window.location.href = campaign.cta_url;
-      bar.remove();
-    };
+      wrap.appendChild(card);
+      document.body.appendChild(wrap);
+    }
 
-    x.onclick = () => {
-      postEvent({ store_id: STORE_ID, campaign_id: campaign.id, visitor_id, event_type: "close" });
-      bar.remove();
-    };
+    function renderBar(campaign) {
+      var bar = document.createElement("div");
+      bar.style.cssText =
+        "position:fixed;left:12px;right:12px;bottom:12px;z-index:999999;background:#111;color:#fff;border-radius:14px;padding:12px;direction:rtl;font-family:system-ui;display:flex;gap:10px;align-items:center;justify-content:space-between;";
 
-    bar.appendChild(text);
-    bar.appendChild(btn);
-    bar.appendChild(x);
-    document.body.appendChild(bar);
-  }
+      var text = document.createElement("div");
+      text.style.cssText = "font-size:13px;line-height:1.4;";
+      text.textContent = (campaign.headline || campaign.title || "") + (campaign.body ? " — " + campaign.body : "");
 
-  apiCheck()
-    .then((r) => {
+      var btn = document.createElement("button");
+      btn.textContent = campaign.cta_text || "عرض";
+      btn.style.cssText =
+        "border:none;border-radius:12px;padding:10px 12px;background:#e5202a;color:#fff;font-weight:700;cursor:pointer;white-space:nowrap;";
+
+      var x = document.createElement("button");
+      x.textContent = "✕";
+      x.style.cssText =
+        "border:none;background:transparent;color:#fff;font-size:16px;cursor:pointer;opacity:.8;";
+
+      var visitor_id = getVisitorId();
+
+      btn.onclick = function () {
+        postEvent({ store_id: STORE_ID, campaign_id: campaign.id, visitor_id: visitor_id, event_type: "click" });
+        if (campaign.cta_url) location.href = campaign.cta_url;
+        bar.remove();
+      };
+
+      x.onclick = function () {
+        postEvent({ store_id: STORE_ID, campaign_id: campaign.id, visitor_id: visitor_id, event_type: "close" });
+        bar.remove();
+      };
+
+      bar.appendChild(text);
+      bar.appendChild(btn);
+      bar.appendChild(x);
+      document.body.appendChild(bar);
+    }
+
+    apiCheck().then(function (r) {
       if (!r || !r.show || !r.campaign) return;
       if (r.campaign.variant === "bar") renderBar(r.campaign);
       else renderPopup(r.campaign);
-    })
-    .catch(() => {});
+    }).catch(function(){});
+  } catch (e) {}
 })();
 `;
 
