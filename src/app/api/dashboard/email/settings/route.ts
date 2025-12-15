@@ -13,6 +13,7 @@ type StoreEmailSettings = {
   smtp_password: string | null;
   use_tls: boolean;
   updated_at: string;
+  logo_url: string | null; // 👈 أضفنا حقل الشعار هنا
 };
 
 export async function GET(_req: NextRequest) {
@@ -48,6 +49,7 @@ export async function GET(_req: NextRequest) {
         smtp_username: null,
         smtp_password: null,
         use_tls: true,
+        logo_url: null, // 👈 نرجّع الشعار كـ null افتراضياً
       },
       { status: 200 },
     );
@@ -63,6 +65,7 @@ export async function GET(_req: NextRequest) {
       smtp_username: data.smtp_username,
       smtp_password: data.smtp_password ? "********" : null,
       use_tls: data.use_tls,
+      logo_url: data.logo_url ?? null, // 👈 نرجّع قيمة الشعار من الجدول
     },
     { status: 200 },
   );
@@ -84,15 +87,13 @@ export async function POST(req: NextRequest) {
     smtp_username?: string | null;
     smtp_password?: string | null;
     use_tls?: boolean | null;
+    logo_url?: string | null; // 👈 نستقبل logo_url من الـ body
   };
 
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { error: "INVALID_JSON" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
   }
 
   const {
@@ -103,6 +104,7 @@ export async function POST(req: NextRequest) {
     smtp_username = null,
     smtp_password = null,
     use_tls = true,
+    logo_url = null,
   } = body;
 
   const upsertPayload: Partial<StoreEmailSettings> = {
@@ -113,6 +115,7 @@ export async function POST(req: NextRequest) {
     smtp_port: smtp_port ?? null,
     smtp_username,
     use_tls: use_tls ?? true,
+    logo_url: logo_url ?? null, // 👈 نخزّن الرابط في الجدول
   };
 
   if (smtp_password && smtp_password !== "********") {

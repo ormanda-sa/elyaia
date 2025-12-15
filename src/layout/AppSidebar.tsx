@@ -34,30 +34,29 @@ type NavItem = {
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
 };
 
-/** هنا التعديل في أسماء القوائم فوق */
 const navItems: NavItem[] = [
   {
-    icon: <GridIcon />,
+    icon: <HomeIcon />,
     name: "الرئيسية",
     path: "/dashboard",
   },
   {
-    icon: <ListIcon />, // أو FilterIcon لو عندك واحد
+    icon: <FilterIcon />,
     name: "إعداد الفلتر الذكي",
     path: "/dashboard/filter",
   },
   {
-    icon: <PieChartIcon />,
+    icon: <ReportIcon />,
     name: "تقرير",
     path: "/dashboard/analytics",
   },
-   {
-    icon: <PageIcon />,
+  {
+    icon: <PieChartIcon />,
     name: "تحليل",
     path: "/dashboard/widget-insights-queries",
   },
   {
-    icon: <ListIcon />, // أو FilterIcon لو عندك واحد
+    icon: <TableIcon />,
     name: "تنسيق الفلتر الذكي",
     path: "/dashboard/hero-settings",
   },
@@ -65,42 +64,48 @@ const navItems: NavItem[] = [
 
 const othersItems: NavItem[] = [
   {
-    icon: <CalenderIcon />,
+    icon: <SubscriptionsIcon />,
     name: "اشتراكات",
     path: "/dashboard/subscriptions",
   },
   {
-    icon: <BoxCubeIcon />, // تمثّل “باقات / خطط”
+    icon: <PlansIcon />,
     name: "خطط الاشتراك",
     path: "/dashboard/plans",
   },
 ];
 
-// ⭐ قسم جديد خاص بالـ SEO
 const seoItems: NavItem[] = [
-   
   {
-    icon: <PlugInIcon />,
+    icon: <CalenderIcon />,
     name: "تنبيهات نزول الأسعار",
     path: "/dashboard/price-drop",
-  } ,
+  },
+  {
+    icon: <CalenderIcon />,
+    name: "تحركات العملاء",
+    path: "/dashboard/visitors",
+  },
   {
     icon: <PlugInIcon />,
     name: "الاتصال مع سلة",
     path: "/dashboard/salla",
-  } ,
-  {
+  },{
     icon: <PlugInIcon />,
+    name: "اعلانات",
+    path: "/dashboard/marketing",
+  },
+  {
+    icon: <UserCircleIcon />,
     name: "اعدادت الايميل والوتساب",
     path: "/dashboard/settings",
-  } 
+  },
 ];
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
 
-  // ✅ إخفاء السايدبار في صفحات الدخول
   const isAuthPage =
     pathname.startsWith("/dashboard/login") ||
     pathname.startsWith("/dashboard/forgot-password") ||
@@ -138,7 +143,7 @@ const AppSidebar: React.FC = () => {
     navItems: NavItem[],
     menuType: "main" | "others",
   ) => (
-    <ul className="flex flex-col gap-4">
+    <ul className="flex flex-col gap-3">
       {navItems.map((nav, index) => (
         <li key={nav.name}>
           {nav.subItems ? (
@@ -347,17 +352,17 @@ const AppSidebar: React.FC = () => {
       </div>
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-6">
             <div>
               <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+                className={`mb-4 text-xs font-semibold uppercase flex leading-[20px] text-gray-500 dark:text-gray-400 ${
                   !isExpanded && !isHovered
                     ? "lg:justify-center"
                     : "justify-start"
                 }`}
               >
                 {isExpanded || isHovered || isMobileOpen ? (
-                  "Menu"
+                  "القائمة الرئيسية"
                 ) : (
                   <HorizontaLDots />
                 )}
@@ -365,16 +370,20 @@ const AppSidebar: React.FC = () => {
               {renderMenuItems(navItems, "main")}
             </div>
 
+            {(isExpanded || isHovered || isMobileOpen) && (
+              <div className="border-t border-gray-200 dark:border-gray-700"></div>
+            )}
+
             <div>
               <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+                className={`mb-4 text-xs font-semibold uppercase flex leading-[20px] text-gray-500 dark:text-gray-400 ${
                   !isExpanded && !isHovered
                     ? "lg:justify-center"
                     : "justify-start"
                 }`}
               >
                 {isExpanded || isHovered || isMobileOpen ? (
-                  "اشتراكات"
+                  "الاشتراكات"
                 ) : (
                   <HorizontaLDots />
                 )}
@@ -382,17 +391,20 @@ const AppSidebar: React.FC = () => {
               {renderMenuItems(othersItems, "others")}
             </div>
 
-            {/* ⭐ قسم SEO الجديد */}
+            {(isExpanded || isHovered || isMobileOpen) && (
+              <div className="border-t border-gray-200 dark:border-gray-700"></div>
+            )}
+
             <div>
               <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+                className={`mb-4 text-xs font-semibold uppercase flex leading-[20px] text-gray-500 dark:text-gray-400 ${
                   !isExpanded && !isHovered
                     ? "lg:justify-center"
                     : "justify-start"
                 }`}
               >
                 {isExpanded || isHovered || isMobileOpen ? (
-                  "تسويق"
+                  "التسويق"
                 ) : (
                   <HorizontaLDots />
                 )}

@@ -18,6 +18,7 @@ type EmailSettings = {
   smtp_username: string | null;
   smtp_password: string | null; // "********" في الرد
   use_tls: boolean;
+  logo_url: string | null; // 👈 حقل الشعار الجديد
 };
 
 export default function EmailSettingsPage() {
@@ -52,7 +53,10 @@ export default function EmailSettingsPage() {
     load();
   }, []);
 
-  function updateField<K extends keyof EmailSettings>(key: K, value: EmailSettings[K]) {
+  function updateField<K extends keyof EmailSettings>(
+    key: K,
+    value: EmailSettings[K],
+  ) {
     if (!form) return;
     setForm({ ...form, [key]: value });
   }
@@ -73,6 +77,7 @@ export default function EmailSettingsPage() {
         smtp_port: form.smtp_port ? Number(form.smtp_port) : null,
         smtp_username: form.smtp_username,
         use_tls: form.use_tls,
+        logo_url: form.logo_url, // 👈 نرسل الشعار
       };
 
       if (passwordInput.trim()) {
@@ -130,12 +135,14 @@ export default function EmailSettingsPage() {
       <div>
         <h1 className="text-lg font-semibold">إعدادات البريد الإلكتروني</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          ضبط إعدادات SMTP لإرسال حملات Price Drop عبر الإيميل لعملائك.
+          ضبط إعدادات SMTP وشعار المتجر لإرسال حملات Price Drop عبر الإيميل لعملائك.
         </p>
       </div>
 
       {loading && (
-        <div className="text-sm text-muted-foreground">جاري تحميل الإعدادات...</div>
+        <div className="text-sm text-muted-foreground">
+          جاري تحميل الإعدادات...
+        </div>
       )}
 
       {!loading && error && (
@@ -155,7 +162,9 @@ export default function EmailSettingsPage() {
                 <Input
                   id="from_name"
                   value={form.from_name ?? ""}
-                  onChange={(e) => updateField("from_name", e.target.value || null)}
+                  onChange={(e) =>
+                    updateField("from_name", e.target.value || null)
+                  }
                   placeholder="مثال: عروض درب لقطع الغيار"
                 />
               </div>
@@ -166,10 +175,27 @@ export default function EmailSettingsPage() {
                   id="from_email"
                   type="email"
                   value={form.from_email ?? ""}
-                  onChange={(e) => updateField("from_email", e.target.value || null)}
+                  onChange={(e) =>
+                    updateField("from_email", e.target.value || null)
+                  }
                   placeholder="offers@darb.com.sa"
                 />
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="logo_url">رابط الشعار (Logo URL)</Label>
+              <Input
+                id="logo_url"
+                value={form.logo_url ?? ""}
+                onChange={(e) =>
+                  updateField("logo_url", e.target.value || null)
+                }
+                placeholder="https://cdn.darb.com.sa/logo-email.png"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                هذا الشعار يظهر في أعلى جميع الإيميلات (إن وُجد).
+              </p>
             </div>
           </div>
 
@@ -182,7 +208,9 @@ export default function EmailSettingsPage() {
                 <Input
                   id="smtp_host"
                   value={form.smtp_host ?? ""}
-                  onChange={(e) => updateField("smtp_host", e.target.value || null)}
+                  onChange={(e) =>
+                    updateField("smtp_host", e.target.value || null)
+                  }
                   placeholder="smtp.resend.com"
                 />
               </div>
@@ -224,7 +252,9 @@ export default function EmailSettingsPage() {
                   type="password"
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder={form.smtp_password ? "********" : "كلمة المرور أو API Key"}
+                  placeholder={
+                    form.smtp_password ? "********" : "كلمة المرور أو API Key"
+                  }
                 />
                 {form.smtp_password && (
                   <p className="text-[10px] text-muted-foreground">
@@ -271,7 +301,9 @@ export default function EmailSettingsPage() {
             </Button>
 
             {saved && (
-              <span className="text-xs text-emerald-600">تم الحفظ بنجاح ✅</span>
+              <span className="text-xs text-emerald-600">
+                تم الحفظ بنجاح ✅
+              </span>
             )}
           </div>
         </form>

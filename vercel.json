@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/marketing/refresh-targets?secret=mkt_refresh_2025_9x7k3p",
+      "schedule": "*/30 * * * *"
+    }
+  ]
+}

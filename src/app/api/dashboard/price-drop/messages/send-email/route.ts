@@ -1,7 +1,10 @@
 // FILE: src/app/(admin)/api/dashboard/price-drop/messages/send-email/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import { getCurrentStoreId } from "@/lib/currentStore";
+
+type DiscountType = "price" | "coupon";
 
 type StoreEmailSettings = {
   store_id: string;
@@ -10,8 +13,46 @@ type StoreEmailSettings = {
   smtp_host: string | null;
   smtp_port: number | null;
   smtp_username: string | null;
-  smtp_password: string | null; // هنا نخزن API Key تبع Resend
+  smtp_password: string | null; // API Key تبع Resend
   use_tls: boolean;
+  logo_url?: string | null; // شعار المتجر لو حطيناه في الجدول
+};
+
+type EmailTemplateRecord = {
+  id: number;
+  subject_template: string;
+  text_template: string;
+  html_template: string;
+  is_default: boolean;
+};
+
+type CampaignForEmail = {
+  id: number;
+  product_title: string | null;
+  product_url: string | null;
+  product_image_url: string | null;
+  discount_type: DiscountType;
+  discount_percent: string | null;
+  original_price: string | null;
+  new_price: string | null;
+  coupon_code: string | null;
+  ends_at: string | null;
+  email_template_id?: number | null;
+};
+
+type TemplateContext = {
+  product_title: string;
+  product_url: string;
+  product_image_url: string | null;
+  discount_type: DiscountType;
+  discount_percent: string | null;
+  original_price: string | null;
+  new_price: string | null;
+  coupon_code: string | null;
+  store_name: string;
+  store_logo_url: string | null;
+  tracking_url: string;
+  ends_at_label: string | null;
 };
 
 export async function POST(_req: NextRequest) {
@@ -22,7 +63,7 @@ export async function POST(_req: NextRequest) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  // 1) إعدادات الإيميل (Resend)
+  // 1) إعدادات الإيميل (Resend + الشعار)
   const { data: settings, error: settingsError } = await supabase
     .from("store_email_settings")
     .select("*")
@@ -47,8 +88,39 @@ export async function POST(_req: NextRequest) {
   const apiKey = settings.smtp_password;
   const fromName = settings.from_name || "عروض درب لقطع الغيار";
   const fromEmail = settings.from_email;
+  const storeLogoUrl = settings.logo_url ?? null;
 
-  // 2) نجيب الرسائل pending للقناة email
+  // 2) نجيب القوالب النشطة للمخزن
+  const { data: templatesData, error: templatesError } = await supabase
+    .from("email_templates")
+    .select(
+      "id, subject_template, text_template, html_template, is_default, is_active",
+    )
+    .eq("store_id", storeId)
+    .eq("is_active", true);
+
+  if (templatesError) {
+    console.error("[send-email] templatesError", templatesError);
+    return NextResponse.json(
+      { error: "EMAIL_TEMPLATES_FETCH_ERROR" },
+      { status: 500 },
+    );
+  }
+
+  const templates = (templatesData ?? []) as (EmailTemplateRecord & {
+    is_active: boolean;
+  })[];
+
+  const templatesMap = new Map<number, EmailTemplateRecord>();
+  let defaultTemplate: EmailTemplateRecord | null = null;
+  for (const t of templates) {
+    templatesMap.set(t.id, t);
+    if (t.is_default && !defaultTemplate) {
+      defaultTemplate = t;
+    }
+  }
+
+  // 3) نجيب الرسائل pending للقناة email
   const { data: pendingMsgs, error: msgsError } = await supabase
     .from("price_drop_messages")
     .select(
@@ -76,14 +148,15 @@ export async function POST(_req: NextRequest) {
           original_price,
           new_price,
           coupon_code,
-          ends_at
+          ends_at,
+          email_template_id
         )
       )
     `,
     )
     .eq("channel", "email")
     .eq("status", "pending")
-    .limit(50); // دفعة وحدة
+    .limit(50);
 
   if (msgsError) {
     console.error("[send-email] msgsError", msgsError);
@@ -106,6 +179,15 @@ export async function POST(_req: NextRequest) {
   let failed = 0;
   let skipped = 0;
 
+  // لو مافيه ولا قالب → نرجع خطأ واضح وخلاص
+  if (!templates.length) {
+    console.warn("[send-email] NO_EMAIL_TEMPLATES_FOR_STORE", storeId);
+    return NextResponse.json(
+      { error: "NO_EMAIL_TEMPLATES_FOR_STORE" },
+      { status: 400 },
+    );
+  }
+
   for (const m of msgs) {
     const target = m.target;
     const campaignWrapper = m.campaign?.price_drop_campaigns;
@@ -116,18 +198,16 @@ export async function POST(_req: NextRequest) {
       continue;
     }
 
-    const c = campaignWrapper as {
-      id: number;
-      product_title: string | null;
-      product_url: string | null;
-      product_image_url: string | null;
-      discount_type: "price" | "coupon";
-      discount_percent: string | null;
-      original_price: string | null;
-      new_price: string | null;
-      coupon_code: string | null;
-      ends_at: string | null;
-    };
+    const c = campaignWrapper as CampaignForEmail;
+
+    // 3.1: تحديد القالب المستخدم
+    const templateForCampaign =
+      (c.email_template_id &&
+        templatesMap.get(Number(c.email_template_id))) ||
+      defaultTemplate;
+
+    // لو لا يوجد قالب مخصص ولا افتراضي → نستخدم البناء القديم كـ fallback
+    const useLegacyBuilder = !templateForCampaign;
 
     // رابط تتبع النقر من الإيميل
     const trackingUrl =
@@ -137,15 +217,54 @@ export async function POST(_req: NextRequest) {
           )}`
         : "#";
 
-    const subject = buildEmailSubject(c);
-    const { text: bodyText, html: bodyHtml } = buildEmailBodies(
-      c,
-      fromName,
-      trackingUrl,
-    );
+    // تجهيز context
+    const endsAtLabel =
+      c.ends_at != null
+        ? new Date(c.ends_at).toLocaleString("ar-SA", {
+            dateStyle: "medium",
+            timeStyle: "short",
+          })
+        : null;
+
+    const ctx: TemplateContext = {
+      product_title: c.product_title || "المنتج الذي شاهدته",
+      product_url: c.product_url || "#",
+      product_image_url: c.product_image_url || null,
+      discount_type: c.discount_type,
+      discount_percent: c.discount_percent,
+      original_price: c.original_price,
+      new_price: c.new_price,
+      coupon_code:
+        c.discount_type === "coupon" && c.coupon_code ? c.coupon_code : null,
+      store_name: fromName,
+      store_logo_url: storeLogoUrl,
+      tracking_url: trackingUrl,
+      ends_at_label: endsAtLabel,
+    };
+
+    let subject: string;
+    let bodyText: string;
+    let bodyHtml: string;
+
+    if (useLegacyBuilder) {
+      // Fallback على النظام القديم لو ما كان فيه قالب
+      subject = buildEmailSubject(c);
+      const bodies = buildEmailBodies(
+        c,
+        fromName,
+        trackingUrl,
+      );
+      bodyText = bodies.text;
+      bodyHtml = bodies.html;
+    } else {
+      const tpl = templateForCampaign!;
+      subject = applyTemplateToString(tpl.subject_template, ctx);
+      bodyText = applyTemplateToString(tpl.text_template, ctx);
+      bodyHtml = applyTemplateToString(tpl.html_template, ctx);
+    }
 
     try {
-      // 3) نرسل عبر Resend HTTP API + metadata للـ Webhooks
+      // 4) نرسل عبر Resend HTTP API + metadata للـ Webhooks
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
@@ -188,10 +307,8 @@ export async function POST(_req: NextRequest) {
         continue;
       }
 
-      // 👈 نقرأ id من Resend (email_id) ونخزّنه
       const emailProviderId = body.id as string | undefined;
 
-      // 4) نحدّث الرسالة إلى sent
       const { error: updErr } = await supabase
         .from("price_drop_messages")
         .update({
@@ -236,9 +353,42 @@ export async function POST(_req: NextRequest) {
   );
 }
 
+// ============= Helpers ============= //
+
+function applyTemplateToString(str: string, ctx: TemplateContext): string {
+  let out = str || "";
+
+  out = out.replace(/{{\s*product_title\s*}}/g, ctx.product_title);
+  out = out.replace(/{{\s*product_url\s*}}/g, ctx.product_url);
+  out = out.replace(
+    /{{\s*product_image_url\s*}}/g,
+    ctx.product_image_url ?? "",
+  );
+  out = out.replace(/{{\s*discount_type\s*}}/g, ctx.discount_type);
+  out = out.replace(
+    /{{\s*discount_percent\s*}}/g,
+    ctx.discount_percent ?? "",
+  );
+  out = out.replace(
+    /{{\s*original_price\s*}}/g,
+    ctx.original_price ?? "",
+  );
+  out = out.replace(/{{\s*new_price\s*}}/g, ctx.new_price ?? "");
+  out = out.replace(/{{\s*coupon_code\s*}}/g, ctx.coupon_code ?? "");
+  out = out.replace(/{{\s*store_name\s*}}/g, ctx.store_name);
+  out = out.replace(
+    /{{\s*store_logo_url\s*}}/g,
+    ctx.store_logo_url ?? "",
+  );
+  out = out.replace(/{{\s*tracking_url\s*}}/g, ctx.tracking_url);
+  out = out.replace(/{{\s*ends_at\s*}}/g, ctx.ends_at_label ?? "");
+
+  return out;
+}
+
 function buildEmailSubject(c: {
   product_title: string | null;
-  discount_type: "price" | "coupon";
+  discount_type: DiscountType;
   discount_percent: string | null;
 }): string {
   const title = c.product_title || "المنتج اللي شفته قبل";
@@ -252,15 +402,14 @@ function buildEmailSubject(c: {
 }
 
 /**
- * يبني نص بسيط + HTML على شكل بطاقة منتج
- * حالياً لمنتج واحد، وبعدين تقدر توسعها لعدة منتجات في نفس الإيميل.
+ * البناء القديم fallback فقط لو ما فيه قالب
  */
 function buildEmailBodies(
   c: {
     product_title: string | null;
     product_url: string | null;
     product_image_url: string | null;
-    discount_type: "price" | "coupon";
+    discount_type: DiscountType;
     discount_percent: string | null;
     original_price: string | null;
     new_price: string | null;
@@ -273,7 +422,6 @@ function buildEmailBodies(
   const title = c.product_title || "المنتج اللي شفته قبل";
   const url = trackingUrl || c.product_url || "#";
 
-  // تنسيق التاريخ
   const endsAtLabel =
     c.ends_at != null
       ? new Date(c.ends_at).toLocaleString("ar-SA", {
@@ -282,7 +430,6 @@ function buildEmailBodies(
         })
       : null;
 
-  // ===== نص عادي (text) =====
   let text = `مرحبًا 👋\n\n`;
   text += `لاحظنا إنك مهتم بالمنتج: ${title}\n\n`;
 
@@ -311,7 +458,6 @@ function buildEmailBodies(
   text += `تقدر تشوف تفاصيل العرض من هنا:\n${url}\n\n`;
   text += `تحياتنا,\n${storeName}\n`;
 
-  // ===== HTML كبطاقة منتج =====
   const safeOriginal =
     c.original_price != null ? `${c.original_price} ريال` : "";
   const safeNew = c.new_price != null ? `${c.new_price} ريال` : "";
@@ -321,7 +467,6 @@ function buildEmailBodies(
     !!c.new_price &&
     c.original_price !== c.new_price;
 
-  // لو فيه رابط صورة نستخدمه، غير كذا ما نعرض صورة
   const hasImage = !!(c.product_image_url && c.product_image_url.trim());
   const imageCell = hasImage
     ? `
@@ -402,7 +547,6 @@ function buildEmailBodies(
 
             <tr>
               <td style="padding:0 16px 16px 16px;">
-                <!-- بطاقة المنتج -->
                 <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:10px;border:1px solid #e5e7eb;background-color:#f9fafb;">
                   <tr>
                     ${hasImage ? imageCell + detailsCell : detailsCell}
@@ -410,7 +554,6 @@ function buildEmailBodies(
 
                   <tr>
                     <td colspan="2" style="padding:0 14px 12px 14px;">
-                      <!-- زر عرض المنتج -->
                       <a href="${url}"
                          style="
                            display:inline-block;

@@ -89,14 +89,13 @@ async function fetchCurrentPriceFromSalla(opts: {
 async function syncProductPriceToSalla(opts: {
   accessToken: string;
   productId: string;
-  basePrice: number;    // السعر الأساسي من سِلّة
-  salePrice: number;    // سعر الخصم
+  basePrice: number; // السعر الأساسي من سِلّة
+  salePrice: number; // سعر الخصم
   saleEndIso: string | null;
 }) {
   const { accessToken, productId, basePrice, salePrice, saleEndIso } = opts;
 
-  const url =
-    "https://api.salla.dev/admin/v2/products/prices/bulkPrice";
+  const url = "https://api.salla.dev/admin/v2/products/prices/bulkPrice";
 
   const body = {
     products: [
@@ -137,6 +136,18 @@ function generateCouponCode(baseCode: string | undefined, percent: number) {
   return `PD${percent}-${rand}`;
 }
 
+// تاريخ اليوم بصيغة YYYY-MM-DD حسب توقيت الرياض
+function getTodayRiyadhDateOnly(): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Riyadh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  return formatter.format(new Date()); // مثال: 2025-12-12
+}
+
 // Error خاص للكوبون المكرر
 class CouponCodeExistsError extends Error {
   public coupon: string;
@@ -160,9 +171,11 @@ async function createCouponInSalla(opts: {
 
   const url = "https://api.salla.dev/admin/v2/coupons";
 
-  const today = new Date();
-  const startDate = formatDate(today.toISOString());
-  const expiryDate = formatDate(endsAt);
+  // start_date لازم يكون اليوم أو أحدث بتوقيت الرياض
+  const startDate = getTodayRiyadhDateOnly();
+
+  // expiry_date من endsAt (ISO) لكن نرسل YYYY-MM-DD فقط
+  const expiryDate = endsAt ? endsAt.slice(0, 10) : null;
 
   const finalCode = generateCouponCode(codeFromUser, amountPercent);
 
@@ -350,9 +363,7 @@ export async function POST(req: NextRequest) {
 
     const discountPercentPrice =
       discount_type === "price"
-        ? Math.round(
-            ((original_price - new_price) / original_price) * 100,
-          )
+        ? Math.round(((original_price - new_price) / original_price) * 100)
         : 0;
 
     const discountPercentCoupon =
