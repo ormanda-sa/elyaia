@@ -17,7 +17,7 @@ import {
   TableIcon,
   UserCircleIcon,
 } from "../icons/index";
-import {
+import { 
   HomeIcon,
   FilterIcon,
   ReportIcon,
