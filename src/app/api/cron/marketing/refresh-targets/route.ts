@@ -6,7 +6,8 @@ import { createClient } from "@supabase/supabase-js";
 /**
  * Cron endpoint (multi-tenant):
  * - يجلب كل الحملات المستهدفة النشطة لكل المتاجر
- * - يعمل refresh-targets لكل حملة باستخدام Service Role
+ * - يبني targets من visitor_vehicle_signals
+ * - (الجديد) يعمل queue تلقائي لرسائل email/whatsapp مع scheduled_at (delay)
  *
  * Vercel Cron ينادي GET، ونحميه بـ secret في query:
  * /api/cron/marketing/refresh-targets?secret=XXXX
@@ -18,6 +19,11 @@ function getServiceSupabase() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
+function addMinutes(iso: string, minutes: number) {
+  const d = new Date(iso);
+  return new Date(d.getTime() + minutes * 60 * 1000).toISOString();
+}
+
 async function refreshTargetsForCampaign(opts: {
   supabase: ReturnType<typeof getServiceSupabase>;
   storeId: string;
@@ -25,11 +31,15 @@ async function refreshTargetsForCampaign(opts: {
 }) {
   const { supabase, storeId, campaignId } = opts;
 
-  // 1) load campaign
+  // 1) load campaign (✅ نضيف send_email/send_whatsapp/send_delay_minutes)
   const { data: c, error: e1 } = await supabase
     .from("marketing_campaigns_vehicle")
     .select(
-      "id, store_id, audience_mode, scope_level, brand_id, model_id, year_id, lookback_days, min_signals, only_customers"
+      `
+      id, store_id, audience_mode, scope_level, brand_id, model_id, year_id,
+      lookback_days, min_signals, only_customers,
+      send_email, send_whatsapp, send_delay_minutes
+      `
     )
     .eq("store_id", storeId)
     .eq("id", campaignId)
@@ -38,8 +48,13 @@ async function refreshTargetsForCampaign(opts: {
   if (e1) throw e1;
   if (!c) throw new Error("Campaign not found");
   if (c.audience_mode !== "targeted") {
-    return { ok: true, skipped: true, reason: "public" };
+    return { ok: true, skipped: true, reason: "public", targets_upserted: 0, messages_created: 0 };
   }
+
+  const wantEmail = !!c.send_email;
+  const wantWhats = !!c.send_whatsapp;
+  const forceCustomers = wantEmail || wantWhats;
+  const onlyCustomers = forceCustomers ? true : !!c.only_customers;
 
   const since = new Date(Date.now() - Number(c.lookback_days) * 86400000).toISOString();
 
@@ -93,9 +108,9 @@ async function refreshTargetsForCampaign(opts: {
 
   const entries = [...byVisitor.entries()].filter(([, v]) => v.count >= Number(c.min_signals));
 
-  // 5) join customers if only_customers
+  // 5) join customers if only_customers (✅ يجبرها لو ايميل/واتساب شغال)
   const customersByVisitor = new Map<string, any>();
-  if (c.only_customers) {
+  if (onlyCustomers) {
     const ids = entries.map(([vid]) => vid);
     const chunk = (arr: string[], size: number) =>
       Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
@@ -114,11 +129,11 @@ async function refreshTargetsForCampaign(opts: {
     }
   }
 
-  // 6) build rows
+  // 6) build target rows
   const rows: any[] = [];
   for (const [visitorId, v] of entries) {
     const link = customersByVisitor.get(visitorId);
-    if (c.only_customers && !link) continue;
+    if (onlyCustomers && !link) continue;
 
     rows.push({
       store_id: storeId,
@@ -161,44 +176,111 @@ async function refreshTargetsForCampaign(opts: {
     if (delErr) throw delErr;
   }
 
-  // 7) upsert
-  let upserted = 0;
+  // 7) upsert targets
+  const { data: up, error: u1 } = await supabase
+    .from("marketing_campaigns_targets")
+    .upsert(rows, { onConflict: "campaign_id,visitor_id" })
+    .select("id");
 
-  const visitorRows = rows.filter((r) => r.visitor_id);
-  if (visitorRows.length) {
-    const { data: d1, error: u1 } = await supabase
-      .from("marketing_campaigns_targets")
-      .upsert(visitorRows, { onConflict: "campaign_id,visitor_id" })
-      .select("id");
-    if (u1) throw u1;
-    upserted += (d1 ?? []).length;
-  }
+  if (u1) throw u1;
+  const targetsUpserted = (up ?? []).length;
 
-  const customerRows = rows.filter((r) => r.salla_customer_id);
-  if (customerRows.length) {
-    const { data: d2, error: u2 } = await supabase
-      .from("marketing_campaigns_targets")
-      .upsert(customerRows, { onConflict: "campaign_id,salla_customer_id" })
-      .select("id");
-    if (u2) throw u2;
-    upserted += (d2 ?? []).length;
-  }
-
-  // 8) update meta
+  // 8) update meta (+ only_customers يتصحح تلقائيًا لو القنوات تحتاج)
   const nowIso = new Date().toISOString();
   const { error: eu } = await supabase
     .from("marketing_campaigns_vehicle")
     .update({
       targets_last_refreshed_at: nowIso,
-      targets_last_refreshed_count: upserted,
+      targets_last_refreshed_count: targetsUpserted,
       updated_at: nowIso,
+      only_customers: onlyCustomers,
     })
     .eq("store_id", storeId)
     .eq("id", campaignId);
 
   if (eu) throw eu;
 
-  return { ok: true, eligible: rows.length, upserted };
+  // 9) ✅ Queue messages تلقائيًا (بدون تكرار)
+  let messagesCreated = 0;
+
+  if (wantEmail || wantWhats) {
+    const delayMin = Number(c.send_delay_minutes ?? 60);
+
+    // نجيب targets pending
+    const { data: pendingTargets, error: et } = await supabase
+      .from("marketing_campaigns_targets")
+      .select("id, customer_email, customer_phone, last_signal_at, status")
+      .eq("store_id", storeId)
+      .eq("campaign_id", campaignId)
+      .in("status", ["pending"])
+      .limit(2000);
+
+    if (et) throw et;
+
+    const targetIds = (pendingTargets ?? []).map((t) => t.id);
+    const existingKey = new Set<string>();
+
+    if (targetIds.length) {
+      const { data: ex, error: exErr } = await supabase
+        .from("marketing_campaigns_messages")
+        .select("target_id, channel, status")
+        .eq("store_id", storeId)
+        .eq("campaign_id", campaignId)
+        .in("target_id", targetIds)
+        .limit(5000);
+
+      if (exErr) throw exErr;
+
+      // أي رسالة موجودة لنفس target+channel (pending/sent) تمنع التكرار
+      for (const m of ex ?? []) existingKey.add(`${m.target_id}:${m.channel}`);
+    }
+
+    const msgRows: any[] = [];
+    for (const t of pendingTargets ?? []) {
+      const last = t.last_signal_at ? String(t.last_signal_at) : nowIso;
+      const sched = addMinutes(last, delayMin);
+
+      if (wantEmail && t.customer_email && !existingKey.has(`${t.id}:email`)) {
+        msgRows.push({
+          store_id: storeId,
+          campaign_id: campaignId,
+          target_id: t.id,
+          channel: "email",
+          status: "pending",
+          scheduled_at: sched,
+        });
+      }
+
+      if (wantWhats && t.customer_phone && !existingKey.has(`${t.id}:whatsapp`)) {
+        msgRows.push({
+          store_id: storeId,
+          campaign_id: campaignId,
+          target_id: t.id,
+          channel: "whatsapp",
+          status: "pending",
+          scheduled_at: sched,
+        });
+      }
+    }
+
+    if (msgRows.length) {
+      const { data: ins, error: insErr } = await supabase
+        .from("marketing_campaigns_messages")
+        .insert(msgRows)
+        .select("id");
+
+      if (insErr) throw insErr;
+      messagesCreated = (ins ?? []).length;
+    }
+  }
+
+  return {
+    ok: true,
+    eligible: rows.length,
+    targets_upserted: targetsUpserted,
+    messages_created: messagesCreated,
+    forced_only_customers: forceCustomers,
+  };
 }
 
 export async function GET(req: NextRequest) {
@@ -224,15 +306,20 @@ export async function GET(req: NextRequest) {
 
     let ok = 0;
     let failed = 0;
+    let messages_created = 0;
+    let targets_upserted = 0;
 
     for (const c of campaigns ?? []) {
       try {
-        await refreshTargetsForCampaign({
+        const r: any = await refreshTargetsForCampaign({
           supabase,
           storeId: c.store_id,
           campaignId: c.id,
         });
+
         ok++;
+        messages_created += Number(r?.messages_created ?? 0);
+        targets_upserted += Number(r?.targets_upserted ?? 0);
       } catch {
         failed++;
       }
@@ -242,6 +329,8 @@ export async function GET(req: NextRequest) {
       ok,
       failed,
       total: (campaigns ?? []).length,
+      targets_upserted,
+      messages_created,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "failed" }, { status: 500 });
