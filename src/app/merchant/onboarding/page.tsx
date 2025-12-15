@@ -17,7 +17,11 @@ function MerchantOnboardingForm() {
   const [sallaStoreId, setSallaStoreId] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> 65799b0bb3b71bb68add31f0b8fce103009f09d3
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);

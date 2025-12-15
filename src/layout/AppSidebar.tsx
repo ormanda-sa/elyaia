@@ -17,16 +17,26 @@ import {
   TableIcon,
   UserCircleIcon,
 } from "../icons/index";
+<<<<<<< HEAD
 import {
+=======
+import { 
+>>>>>>> 65799b0bb3b71bb68add31f0b8fce103009f09d3
   HomeIcon,
   FilterIcon,
   ReportIcon,
   SubscriptionsIcon,
   PlansIcon,
 } from "@/components/icons/DashboardIcons";
+<<<<<<< HEAD
 
 import SidebarWidget from "./SidebarWidget";
 
+=======
+ 
+import SidebarWidget from "./SidebarWidget";
+ 
+>>>>>>> 65799b0bb3b71bb68add31f0b8fce103009f09d3
 type NavItem = {
   name: string;
   icon: React.ReactNode;
@@ -95,9 +105,15 @@ const seoItems: NavItem[] = [
     name: "اعلانات",
     path: "/dashboard/marketing",
   },
+<<<<<<< HEAD
   {
     icon: <UserCircleIcon />,
     name: "اعدادت الايميل والوتساب",
+=======
+  {  
+    icon: <UserCircleIcon />,
+    name: " اعدادت الايميل والوتساب",
+>>>>>>> 65799b0bb3b71bb68add31f0b8fce103009f09d3
     path: "/dashboard/settings",
   },
 ];
