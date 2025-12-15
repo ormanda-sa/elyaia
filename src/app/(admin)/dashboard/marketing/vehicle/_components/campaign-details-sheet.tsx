@@ -72,6 +72,9 @@ export function CampaignDetailsSheet({
   const [busyRefresh, setBusyRefresh] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ Auto refresh UI (polling)
+  const [autoRefresh, setAutoRefresh] = useState(true);
+
   // form state
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<string>("draft");
@@ -83,7 +86,7 @@ export function CampaignDetailsSheet({
   const [lookbackDays, setLookbackDays] = useState(7);
   const [minSignals, setMinSignals] = useState(1);
 
-  // ✅ جديد: فلتر صفحات العرض داخل المتجر
+  // فلتر صفحات العرض داخل المتجر
   const [onsitePaths, setOnsitePaths] = useState<string>("");
 
   const targeted = useMemo(() => item?.audience_mode === "targeted", [item]);
@@ -123,7 +126,6 @@ export function CampaignDetailsSheet({
       setLookbackDays(Number(json.item.lookback_days ?? 7));
       setMinSignals(Number(json.item.min_signals ?? 1));
 
-      // ✅ جديد
       setOnsitePaths(String(json.item.onsite_paths ?? "").trim());
     } catch (e: any) {
       setError(e?.message || "حدث خطأ");
@@ -137,6 +139,32 @@ export function CampaignDetailsSheet({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, campaignId]);
+
+  // ✅ Auto refresh كل 15 ثانية للحملات النشطة المستهدفة
+  useEffect(() => {
+    if (!open || !campaignId) return;
+    if (!autoRefresh) return;
+    if (!item) return;
+
+    const should = item.audience_mode === "targeted" && item.status === "active";
+    if (!should) return;
+
+    const t = setInterval(() => {
+      if (saving || busyRefresh) return;
+      load();
+    }, 15000);
+
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    open,
+    campaignId,
+    autoRefresh,
+    item?.audience_mode,
+    item?.status,
+    saving,
+    busyRefresh,
+  ]);
 
   async function refreshTargets() {
     if (!campaignId) return;
@@ -182,13 +210,11 @@ export function CampaignDetailsSheet({
         send_onsite: sendOnsite,
         send_email: sendEmail,
         send_whatsapp: sendWhatsapp,
-
-        // ✅ جديد: فلتر صفحات العرض داخل المتجر
         onsite_paths: onsitePaths.trim() ? onsitePaths.trim() : null,
       };
 
       if (targeted) {
-        payload.only_customers = needsCustomerOnly ? true : !!onlyCustomers; // ✅ القفل
+        payload.only_customers = needsCustomerOnly ? true : !!onlyCustomers;
         payload.lookback_days = lookbackDays;
         payload.min_signals = minSignals;
       }
@@ -212,7 +238,6 @@ export function CampaignDetailsSheet({
           prev.lookback_days !== lookbackDays ||
           prev.min_signals !== minSignals;
 
-        // ✅ إذا تغيّر الاستهداف نحدّث targets
         if (targetingChanged) {
           await refreshTargets();
         }
@@ -261,6 +286,7 @@ export function CampaignDetailsSheet({
                 <Badge variant={item.campaign_type === "discount" ? "default" : "outline"}>
                   {TYPE_LABELS[item.campaign_type] ?? item.campaign_type}
                 </Badge>
+
                 <span
                   className={[
                     "inline-flex items-center rounded-full px-3 py-1 text-xs border",
@@ -269,6 +295,12 @@ export function CampaignDetailsSheet({
                 >
                   {STATUS_LABELS[item.status] ?? item.status}
                 </span>
+
+                {/* ✅ Auto refresh toggle */}
+                <div className="ms-auto flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">تحديث تلقائي</span>
+                  <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
+                </div>
               </div>
 
               {/* Title */}
@@ -345,7 +377,7 @@ export function CampaignDetailsSheet({
                 )}
               </div>
 
-              {/* ✅ On-site Paths */}
+              {/* On-site Paths */}
               <div className="rounded-2xl border p-4 space-y-2">
                 <div className="font-semibold">فلتر صفحات العرض داخل المتجر</div>
                 <div className="text-xs text-muted-foreground">
@@ -370,7 +402,7 @@ export function CampaignDetailsSheet({
                     <Switch
                       checked={needsCustomerOnly ? true : onlyCustomers}
                       onCheckedChange={(v) => setOnlyCustomers(v)}
-                      disabled={needsCustomerOnly} // ✅ قفل
+                      disabled={needsCustomerOnly}
                     />
                   </div>
 
