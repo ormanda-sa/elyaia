@@ -10,29 +10,32 @@ function supabaseService() {
 function addHours(date: Date, hours: number) {
   return new Date(date.getTime() + hours * 60 * 60 * 1000);
 }
- 
+
+function safeUrl(page_url: string | null) {
+  if (!page_url) return null;
+  try {
+    return new URL(page_url);
+  } catch {
+    return null;
+  }
+}
+
+// يطلع 1316078958 من filters[category_id]=1316078958
+function extractSallaCategoryId(page_url: string | null): string | null {
+  const u = safeUrl(page_url);
+  if (!u) return null;
+
+  // الشكل اللي عندك: filters[category_id]
+  const v =
+    u.searchParams.get("filters[category_id]") ||
+    u.searchParams.get("category_id");
+
+  return v && v.trim() ? v.trim() : null;
+}
+
 function normalizePath(p: string) {
   if (!p) return "/";
-  try {
-    // لو جت URL كامل
-    if (p.startsWith("http")) return new URL(p).pathname || "/";
-  } catch {}
   return p.startsWith("/") ? p : "/" + p;
-}
-
-function parseAllowedPaths(raw: string | null | undefined): string[] {
-  if (!raw) return [];
-  return raw
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map(normalizePath);
-}
-
-function pathAllowed(currentPath: string, allowed: string[]) {
-  if (!allowed.length) return true; // ما فيه قيود = كل الصفحات
-  const p = normalizePath(currentPath);
-  return allowed.some((prefix) => p.startsWith(prefix));
 }
 
 export async function GET(req: NextRequest) {
@@ -41,7 +44,7 @@ export async function GET(req: NextRequest) {
 
   const store_id = searchParams.get("store_id") || "";
   const visitor_id = searchParams.get("visitor_id") || "";
-  const path = searchParams.get("path") || "/";
+  const path = normalizePath(searchParams.get("path") || "/");
   const page_url = searchParams.get("page_url") || null;
 
   if (!store_id || !visitor_id) {
@@ -52,19 +55,21 @@ export async function GET(req: NextRequest) {
   }
 
   const now = new Date();
+  const currentCategoryId = extractSallaCategoryId(page_url);
 
-  // 1) جيب الحملات النشطة + داخل المتجر
+  // 1) نجيب الحملات النشطة (مع سحب salla_category_id من model)
   const { data: campaigns, error: campErr } = await sp
     .from("marketing_campaigns_vehicle")
     .select(
       `
       id, store_id, title, status,
       scope_level, brand_id, model_id, year_id,
-      audience_mode, only_customers, lookback_days, min_signals,
+      audience_mode,
       send_onsite, onsite_enabled, onsite_variant, onsite_headline, onsite_body, onsite_cta_text, onsite_cta_url,
-      starts_at, ends_at,
-      onsite_paths,
-      updated_at
+      starts_at, ends_at, updated_at,
+      model:filter_models ( salla_category_id ),
+      year:filter_years ( salla_category_year_id, salla_year_id ),
+      brand:filter_brands ( salla_company_id )
     `
     )
     .eq("store_id", store_id)
@@ -75,35 +80,44 @@ export async function GET(req: NextRequest) {
   if (campErr) {
     return NextResponse.json({ show: false, error: campErr.message }, { status: 500 });
   }
-
   if (!campaigns?.length) return NextResponse.json({ show: false });
 
-  // 2) فلترة وقت + فلترة صفحة
-  const eligible = campaigns.filter((c: any) => {
+  // 2) فلترة وقت + فلترة “القسم” حسب category_id (إذا الرابط فيه category_id)
+  const eligible: any[] = [];
+  for (const c of campaigns as any[]) {
     const starts = c.starts_at ? new Date(c.starts_at) : null;
     const ends = c.ends_at ? new Date(c.ends_at) : null;
-    if (starts && now < starts) return false;
-    if (ends && now > ends) return false;
+    if (starts && now < starts) continue;
+    if (ends && now > ends) continue;
 
-    // onsite_enabled إذا موجودة في DB، لو ما عندك عمودها تجاهلها
-    if (typeof c.onsite_enabled === "boolean" && c.onsite_enabled === false) return false;
+    if (typeof c.onsite_enabled === "boolean" && c.onsite_enabled === false) continue;
 
-    const allowed = parseAllowedPaths(c.onsite_paths);
-    return pathAllowed(path, allowed);
-  });
+    // أهم جزء: ربط Scope بالموقع الحقيقي
+    // - لو scope_level = model: لازم category_id الموجود بالرابط يساوي filter_models.salla_category_id
+    if (c.scope_level === "model") {
+      const campaignCat = c.model?.salla_category_id || null;
+
+      // إذا ما فيه category_id في الرابط: ما نعرض حملة “قسم” (لأنك قلت تبغاه على قسم محدد)
+      if (!currentCategoryId) continue;
+
+      // إذا الحملة ما عندها salla_category_id مضبوط: ما نعرض
+      if (!campaignCat) continue;
+
+      if (String(campaignCat) !== String(currentCategoryId)) continue;
+    }
+
+    // (اختياري لاحقًا) scope_level = brand/year نربطه على year_id/brand_id بطريقة مشابهة
+    eligible.push(c);
+  }
 
   if (!eligible.length) return NextResponse.json({ show: false });
 
   // 3) ترتيب: targeted أولاً ثم public
-  eligible.sort((a: any, b: any) => {
-    const aw = a.audience_mode === "targeted" ? 0 : 1;
-    const bw = b.audience_mode === "targeted" ? 0 : 1;
-    return aw - bw;
-  });
+  eligible.sort((a, b) => (a.audience_mode === "targeted" ? -1 : 1));
 
-  // 4) اختر أول حملة تنفع + Dedup 24 ساعة
-  for (const c of eligible as any[]) {
-    // Dedup
+  // 4) Dedup + شروط targeted
+  for (const c of eligible) {
+    // Dedup 24h
     const { data: impr } = await sp
       .from("marketing_campaigns_impressions")
       .select("id, expires_at")
@@ -112,12 +126,10 @@ export async function GET(req: NextRequest) {
       .eq("visitor_id", visitor_id)
       .maybeSingle();
 
-    if (impr?.expires_at && new Date(impr.expires_at) > now) {
-      continue; // شافها قبل أقل من 24 ساعة
-    }
+    if (impr?.expires_at && new Date(impr.expires_at) > now) continue;
 
-    // targeted لازم targets
     let targetRow: any = null;
+
     if (c.audience_mode === "targeted") {
       const { data: t } = await sp
         .from("marketing_campaigns_targets")
@@ -133,7 +145,6 @@ export async function GET(req: NextRequest) {
       targetRow = t;
     }
 
-    // سجّل impression
     const expires_at = addHours(now, 24).toISOString();
 
     if (impr?.id) {
@@ -172,7 +183,7 @@ export async function GET(req: NextRequest) {
       campaign_id: c.id,
       target_id: targetRow?.id ?? null,
       event_type: "impression",
-      meta: { path, page_url },
+      meta: { path, page_url, category_id: currentCategoryId },
     });
 
     return NextResponse.json({
