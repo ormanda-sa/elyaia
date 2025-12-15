@@ -1,4 +1,6 @@
-import { MarketingTabs } from "./_components/marketing-tabs";
+// FILE: src/app/dashboard/marketing/page.tsx
+
+import { MarketingTabs } from "@/app/(admin)/dashboard/marketing/_components/marketing-tabs";
 
 export default function MarketingPage() {
   return (
@@ -7,4 +9,3 @@ export default function MarketingPage() {
     </div>
   );
 }
-  
