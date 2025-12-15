@@ -95,7 +95,7 @@ const seoItems: NavItem[] = [
     name: "اعلانات",
     path: "/dashboard/marketing",
   },
-  {
+  { 
     icon: <UserCircleIcon />,
     name: "اعدادت الايميل والوتساب",
     path: "/dashboard/settings",
