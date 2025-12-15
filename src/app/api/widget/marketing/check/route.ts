@@ -10,7 +10,7 @@ function supabaseService() {
 function addHours(date: Date, hours: number) {
   return new Date(date.getTime() + hours * 60 * 60 * 1000);
 }
-
+ 
 function normalizePath(p: string) {
   if (!p) return "/";
   try {
