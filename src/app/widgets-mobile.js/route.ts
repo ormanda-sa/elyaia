@@ -109,42 +109,64 @@ export async function GET(_req: NextRequest) {
     }
 
     async function loadKeywords(
-      storeId,
-      brandId,
-      modelId,
-      yearId,
-      sectionId
-    ) {
-      var snap = await ensureSnapshot(storeId);
-      var allKeywords = snap.keywords || [];
+  storeId,
+  brandId,
+  modelId,
+  yearId,
+  sectionId
+) {
+  // 1) جرّب Live من DB (الأفضل) — يحل مشكلة نقص snapshot
+  try {
+    var url =
+      API_BASE +
+      "/keywords?store_id=" +
+      encodeURIComponent(storeId) +
+      "&section_id=" +
+      encodeURIComponent(String(sectionId || "")) +
+      "&model_id=" +
+      encodeURIComponent(String(modelId || ""));
 
-      console.log("[widgets-mobile] allKeywords length:", allKeywords.length);
+    var data = await fetchJson(url);
+    var live = (data && data.keywords) || [];
 
-      var mId = Number(modelId);
-      var sId = Number(sectionId);
+    console.log("[widgets-mobile] live keywords length:", Array.isArray(live) ? live.length : 0);
 
-      var result = allKeywords.filter(function (k) {
-        // نفلتر فقط على الموديل + القسم (نفس منطق widgets.js)
-        if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
-        if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
-        return true;
-      });
+    if (Array.isArray(live)) return live;
+  } catch (e) {
+    console.warn("[widgets-mobile] live keywords failed, fallback to snapshot", e);
+  }
 
-      console.log(
-        "[widgets-mobile] filtered keywords length:",
-        result.length,
-        "for model_id=",
-        modelId,
-        "section_id=",
-        sectionId
-      );
+  // 2) Fallback: snapshot (نفس منطقك القديم)
+  var snap = await ensureSnapshot(storeId);
+  var allKeywords = (snap && snap.keywords) || [];
 
-      if (result.length > 0) {
-        console.log("[widgets-mobile] sample keyword:", result[0]);
-      }
+  console.log("[widgets-mobile] allKeywords length:", allKeywords.length);
 
-      return result;
-    }
+  var mId = Number(modelId);
+  var sId = Number(sectionId);
+
+  var result = allKeywords.filter(function (k) {
+    if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
+    if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
+    return true;
+  });
+
+  console.log(
+    "[widgets-mobile] filtered keywords length:",
+    result.length,
+    "for model_id=",
+    modelId,
+    "section_id=",
+    sectionId
+  );
+
+  if (result.length > 0) {
+    console.log("[widgets-mobile] sample keyword:", result[0]);
+  }
+
+  return result;
+}
+
 
     function getFilterSessionKey() {
       var KEY = "darb_filter_sid";
