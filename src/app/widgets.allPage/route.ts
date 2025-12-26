@@ -141,27 +141,46 @@ export async function GET(_req: NextRequest) {
       return snap.sections || [];
     }
 
-    async function loadKeywords(
-      storeId,
-      brandId,
-      modelId,
-      yearId,
-      sectionId
-    ) {
-      var snap = await ensureSnapshot(storeId);
-      var allKeywords = snap.keywords || [];
+async function loadKeywords(
+  storeId,
+  brandId,
+  modelId,
+  yearId,
+  sectionId
+) {
+  // 1) Live من DB عبر API (يحُل نقص snapshot)
+  try {
+    var url =
+      API_BASE +
+      "/keywords?store_id=" +
+      encodeURIComponent(storeId) +
+      "&section_id=" +
+      encodeURIComponent(String(sectionId || "")) +
+      "&model_id=" +
+      encodeURIComponent(String(modelId || ""));
 
-      var mId = Number(modelId);
-      var sId = Number(sectionId);
+    var data = await fetchJson(url);
+    var live = (data && data.keywords) || [];
 
-      var result = allKeywords.filter(function (k) {
-        if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
-        if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
-        return true;
-      });
+    if (Array.isArray(live)) return live;
+  } catch (e) {
+    // نسكت ونروح fallback
+  }
 
-      return result;
-    }
+  // 2) Fallback: snapshot (سلوكك القديم)
+  var snap = await ensureSnapshot(storeId);
+  var allKeywords = (snap && snap.keywords) || [];
+
+  var mId = Number(modelId);
+  var sId = Number(sectionId);
+
+  return allKeywords.filter(function (k) {
+    if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
+    if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
+    return true;
+  });
+}
+
 
     function getFilterSessionKey() {
       var KEY = "darb_filter_sid";
