@@ -12,10 +12,14 @@ import GuestsTable, { GuestRow } from "./guests-table";
 import GuestJourneySheet from "./guest-journey-sheet";
 
 import DateRangeBar from "./date-range-bar";
+<<<<<<< HEAD
  
  import VisitorsSummary from "./visitors-summary";
 
 
+=======
+import VisitorsSummary from "./visitors-summary";
+>>>>>>> b8e0e03 (init)
 
 type Cursor = { cursor_last_seen: string; cursor_customer_id: string } | null;
 type GuestCursor = { cursor_last_seen: string; cursor_visitor_id: string } | null;
@@ -69,7 +73,13 @@ export default function VisitorsPage() {
         params.set("cursor_customer_id", cursor.cursor_customer_id);
       }
 
+<<<<<<< HEAD
       const res = await fetch(`/api/dashboard/visitors?${params.toString()}`, { cache: "no-store" });
+=======
+      const res = await fetch(`/api/dashboard/visitors?${params.toString()}`, {
+        cache: "no-store",
+      });
+>>>>>>> b8e0e03 (init)
       const data = await res.json();
 
       setCustomers(data.items || []);
@@ -112,7 +122,13 @@ export default function VisitorsPage() {
         params.set("cursor_visitor_id", cursor.cursor_visitor_id);
       }
 
+<<<<<<< HEAD
       const res = await fetch(`/api/dashboard/visitors/guests?${params.toString()}`, { cache: "no-store" });
+=======
+      const res = await fetch(`/api/dashboard/visitors/guests?${params.toString()}`, {
+        cache: "no-store",
+      });
+>>>>>>> b8e0e03 (init)
       const data = await res.json();
 
       setGuests(data.items || []);
@@ -154,7 +170,11 @@ export default function VisitorsPage() {
     setDateTo(next.to);
     resetCustomersPaging();
     resetGuestsPaging();
+<<<<<<< HEAD
     // reload current tab after state update
+=======
+
+>>>>>>> b8e0e03 (init)
     setTimeout(() => {
       if (tab === "customers") loadCustomers(null);
       else loadGuests(null);
@@ -182,6 +202,7 @@ export default function VisitorsPage() {
         </Button>
       </div>
 
+<<<<<<< HEAD
       {/* Date Range Bar */}
       <DateRangeBar
         from={dateFrom}
@@ -192,6 +213,12 @@ export default function VisitorsPage() {
 <VisitorsSummary from={dateFrom} to={dateTo} />
 
       {/* Tabs */}
+=======
+      <DateRangeBar from={dateFrom} to={dateTo} onChange={applyDate} />
+
+      <VisitorsSummary from={dateFrom} to={dateTo} />
+
+>>>>>>> b8e0e03 (init)
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <TabsList>
           <TabsTrigger value="customers">العملاء</TabsTrigger>
@@ -199,7 +226,10 @@ export default function VisitorsPage() {
         </TabsList>
       </Tabs>
 
+<<<<<<< HEAD
       {/* Customers */}
+=======
+>>>>>>> b8e0e03 (init)
       {tab === "customers" ? (
         <>
           <div className="flex items-center gap-2">
@@ -283,7 +313,18 @@ export default function VisitorsPage() {
             </div>
           </div>
 
+<<<<<<< HEAD
           <JourneyDialog open={openCustomer} onOpenChange={setOpenCustomer} customer={selectedCustomer} />
+=======
+          {/* ✅ مهم: مرر from/to لأن JourneyDialog صرنا نخليه يحترم فلترة الصفحة */}
+          <JourneyDialog
+            open={openCustomer}
+            onOpenChange={setOpenCustomer}
+            customer={selectedCustomer}
+            from={dateFrom}
+            to={dateTo}
+          />
+>>>>>>> b8e0e03 (init)
         </>
       ) : (
         <>
@@ -344,7 +385,18 @@ export default function VisitorsPage() {
             </div>
           </div>
 
+<<<<<<< HEAD
           <GuestJourneySheet open={openGuest} onOpenChange={setOpenGuest} guest={selectedGuest} />
+=======
+          {/* ✅ مهم: مرر from/to للشيت */}
+          <GuestJourneySheet
+            open={openGuest}
+            onOpenChange={setOpenGuest}
+            guest={selectedGuest}
+            from={dateFrom}
+            to={dateTo}
+          />
+>>>>>>> b8e0e03 (init)
         </>
       )}
     </div>

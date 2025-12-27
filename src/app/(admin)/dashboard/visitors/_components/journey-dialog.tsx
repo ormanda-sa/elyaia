@@ -48,9 +48,20 @@ type VehicleProfile = {
   year_text: string | null;
   signals_7d: number;
   last_signal_at: string | null;
+<<<<<<< HEAD
 } | null;
 
 function fmt(dt: string) {
+=======
+
+  confidence?: "high" | "medium" | "low";
+  score?: number;
+  reasons?: string[];
+} | null;
+
+function fmt(dt?: string | null) {
+  if (!dt) return "—";
+>>>>>>> b8e0e03 (init)
   try {
     return new Date(dt).toLocaleString("ar-SA-u-ca-gregory-nu-latn", {
       year: "numeric",
@@ -61,18 +72,42 @@ function fmt(dt: string) {
       second: "2-digit",
     });
   } catch {
+<<<<<<< HEAD
     return dt;
   }
 }
 
+=======
+    return String(dt);
+  }
+}
+
+function confidenceBadge(c?: "high" | "medium" | "low") {
+  if (c === "high") return <Badge variant="secondary">ثقة عالية</Badge>;
+  if (c === "medium") return <Badge variant="outline">ثقة متوسطة</Badge>;
+  if (c === "low") return <Badge variant="outline">ثقة منخفضة</Badge>;
+  return null;
+}
+
+>>>>>>> b8e0e03 (init)
 export default function JourneyDialog({
   open,
   onOpenChange,
   customer,
+<<<<<<< HEAD
+=======
+  from,
+  to,
+>>>>>>> b8e0e03 (init)
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   customer: VisitorRow | null;
+<<<<<<< HEAD
+=======
+  from: string; // YYYY-MM-DD
+  to: string;   // YYYY-MM-DD
+>>>>>>> b8e0e03 (init)
 }) {
   const [tab, setTab] = useState<"journey" | "products">("journey");
   const [journey, setJourney] = useState<JourneyRow[]>([]);
@@ -87,6 +122,7 @@ export default function JourneyDialog({
     return `${customer.customer_name || "عميل"} — ${customer.salla_customer_id}`;
   }, [customer]);
 
+<<<<<<< HEAD
   async function load(tabName: "journey" | "products", customerId: string) {
     setLoading(true);
     try {
@@ -115,6 +151,60 @@ export default function JourneyDialog({
     try {
       const res = await fetch(
         `/api/dashboard/visitors/${customerId}/vehicle-profile`,
+=======
+  const customerId = customer?.salla_customer_id || null;
+
+  async function load(tabName: "journey" | "products", cid: string) {
+  setLoading(true);
+  try {
+    const qs = new URLSearchParams();
+    qs.set("limit", "400");
+    qs.set("ts", String(Date.now()));
+
+    // ✅ from/to فقط للرحلة
+    if (tabName === "journey") {
+      qs.set("from", from);
+      qs.set("to", to);
+
+      const res = await fetch(`/api/dashboard/visitors/${cid}/journey?${qs.toString()}`, {
+        cache: "no-store",
+      });
+      const data = await res.json();
+      setJourney(data.items || []);
+      return;
+    }
+
+    // ✅ products بدون from/to (يرجع مثل قبل)
+    const res = await fetch(`/api/dashboard/visitors/${cid}/products?${qs.toString()}`, {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    setProducts(data.items || []);
+  } finally {
+    setLoading(false);
+  }
+}
+
+
+  // ✅ المهم: سيارة العميل المسجل تُجلب بالـ visitor_id من endpoint الضيوف (اللي شغال)
+  async function loadVehicleProfile() {
+    const visitorId = String(customer?.visitor_id || "").trim();
+    if (!visitorId) {
+      setVehicle(null);
+      return;
+    }
+
+    setVehicleLoading(true);
+    try {
+      const qs = new URLSearchParams();
+      qs.set("from", from);
+      qs.set("to", to);
+      qs.set("limit", "2000");
+      qs.set("ts", String(Date.now()));
+
+      const res = await fetch(
+        `/api/dashboard/visitors/guests/${encodeURIComponent(visitorId)}/vehicle-profile?${qs.toString()}`,
+>>>>>>> b8e0e03 (init)
         { cache: "no-store" },
       );
       const data = await res.json();
@@ -125,15 +215,28 @@ export default function JourneyDialog({
   }
 
   useEffect(() => {
+<<<<<<< HEAD
     if (!open || !customer) return;
+=======
+    if (!open || !customerId) return;
+
+>>>>>>> b8e0e03 (init)
     setTab("journey");
     setJourney([]);
     setProducts([]);
     setVehicle(null);
+<<<<<<< HEAD
     load("journey", customer.salla_customer_id);
     loadVehicleProfile(customer.salla_customer_id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, customer?.salla_customer_id]);
+=======
+
+    load("journey", customerId);
+    loadVehicleProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, customerId, from, to]);
+>>>>>>> b8e0e03 (init)
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -174,7 +277,11 @@ export default function JourneyDialog({
                     variant="outline"
                     size="sm"
                     disabled={!customer || vehicleLoading}
+<<<<<<< HEAD
                     onClick={() => customer && loadVehicleProfile(customer.salla_customer_id)}
+=======
+                    onClick={() => loadVehicleProfile()}
+>>>>>>> b8e0e03 (init)
                   >
                     {vehicleLoading ? "..." : "تحديث"}
                   </Button>
@@ -196,6 +303,7 @@ export default function JourneyDialog({
                   )}
 
                   {!vehicleLoading && vehicle && (
+<<<<<<< HEAD
   <>
     {vehicle.brand_name ? <Badge variant="secondary">{vehicle.brand_name}</Badge> : null}
 
@@ -220,6 +328,52 @@ export default function JourneyDialog({
 )}
 
                 </div>
+=======
+                    <>
+                      {vehicle.brand_name ? (
+                        <Badge variant="secondary">{vehicle.brand_name}</Badge>
+                      ) : null}
+
+                      {vehicle.model_name ? (
+                        <Badge variant="secondary">{vehicle.model_name}</Badge>
+                      ) : (
+                        <Badge variant="destructive">بدون موديل</Badge>
+                      )}
+
+                      {vehicle.year_text ? (
+                        <Badge variant="secondary">{vehicle.year_text}</Badge>
+                      ) : (
+                        <Badge variant="outline">بدون سنة</Badge>
+                      )}
+
+                      {confidenceBadge(vehicle.confidence)}
+
+                      <Badge variant="outline">إشارات: {vehicle.signals_7d}</Badge>
+
+                      {typeof vehicle.score === "number" ? (
+                        <Badge variant="outline">Score: {vehicle.score}</Badge>
+                      ) : null}
+
+                      {vehicle.last_signal_at ? (
+                        <span className="text-xs text-muted-foreground">
+                          آخر إشارة: {fmt(vehicle.last_signal_at)}
+                        </span>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+
+                {!vehicleLoading && vehicle && Array.isArray(vehicle.reasons) && vehicle.reasons.length > 0 && (
+                  <div className="mt-3 rounded-xl border bg-white px-3 py-2">
+                    <div className="text-xs font-semibold mb-1">ليش اخترناها؟</div>
+                    <ul className="text-xs text-muted-foreground list-disc pr-5 space-y-1">
+                      {vehicle.reasons.slice(0, 2).map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+>>>>>>> b8e0e03 (init)
               </div>
             </div>
 
@@ -233,6 +387,7 @@ export default function JourneyDialog({
           <div className="mt-4 flex items-center justify-between gap-2">
             <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
               <TabsList>
+<<<<<<< HEAD
                 <TabsTrigger
                   value="journey"
                   onClick={() => customer && load("journey", customer.salla_customer_id)}
@@ -243,6 +398,12 @@ export default function JourneyDialog({
                   value="products"
                   onClick={() => customer && load("products", customer.salla_customer_id)}
                 >
+=======
+                <TabsTrigger value="journey" onClick={() => customerId && load("journey", customerId)}>
+                  المسارات
+                </TabsTrigger>
+                <TabsTrigger value="products" onClick={() => customerId && load("products", customerId)}>
+>>>>>>> b8e0e03 (init)
                   المنتجات التي شاهدها
                 </TabsTrigger>
               </TabsList>
@@ -251,11 +412,16 @@ export default function JourneyDialog({
             <Button
               variant="secondary"
               size="sm"
+<<<<<<< HEAD
               disabled={!customer || loading}
               onClick={() => {
                 if (!customer) return;
                 load(tab, customer.salla_customer_id);
               }}
+=======
+              disabled={!customerId || loading}
+              onClick={() => customerId && load(tab, customerId)}
+>>>>>>> b8e0e03 (init)
             >
               <RefreshCw className="h-4 w-4 ml-2" />
               تحديث
