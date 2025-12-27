@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabaseServer";
 import { getCurrentStoreId } from "@/lib/currentStore";
 
-<<<<<<< HEAD
-=======
 function extractCategorySlug(path?: string | null) {
   if (!path) return null;
   const m = path.match(/\/category\/([^/?#]+)/i);
@@ -55,7 +53,6 @@ type CustomerRow = Record<string, any> & {
   vehicle_signals_7d?: number | null;
 };
 
->>>>>>> b8e0e03 (init)
 export async function GET(req: NextRequest) {
   try {
     const supabase = getSupabaseServerClient();
@@ -63,18 +60,13 @@ export async function GET(req: NextRequest) {
     if (!storeId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
     const url = new URL(req.url);
-<<<<<<< HEAD
-=======
 
->>>>>>> b8e0e03 (init)
     const q = (url.searchParams.get("q") || "").trim();
     const limit = Math.min(Number(url.searchParams.get("limit") || 50) || 50, 200);
 
     const cursorLastSeen = url.searchParams.get("cursor_last_seen");
     const cursorCustomerId = url.searchParams.get("cursor_customer_id");
 
-<<<<<<< HEAD
-=======
     // ✅ نفس فلترة الصفحة (from/to)
     const from = url.searchParams.get("from"); // YYYY-MM-DD
     const to = url.searchParams.get("to"); // YYYY-MM-DD
@@ -83,21 +75,12 @@ export async function GET(req: NextRequest) {
 
     const rawLimit = Math.min(limit * 3 + 1, 800);
 
->>>>>>> b8e0e03 (init)
     let query = supabase
       .from("customer_journey_summary")
       .select("*")
       .eq("store_id", storeId)
       .order("last_seen_at", { ascending: false })
       .order("salla_customer_id", { ascending: false })
-<<<<<<< HEAD
-      .limit(limit + 1); // عشان نعرف فيه صفحة بعدها
-
-    if (q) {
-      if (/^\d+$/.test(q)) {
-        query = query.eq("salla_customer_id", q);
-      } else {
-=======
       .limit(rawLimit);
 
     if (fromTs) query = query.gte("last_seen_at", fromTs);
@@ -106,20 +89,13 @@ export async function GET(req: NextRequest) {
     if (q) {
       if (/^\d+$/.test(q)) query = query.eq("salla_customer_id", q);
       else {
->>>>>>> b8e0e03 (init)
         query = query.or(
           `customer_name.ilike.%${q}%,customer_email.ilike.%${q}%,customer_phone.ilike.%${q}%`,
         );
       }
     }
 
-<<<<<<< HEAD
-    // cursor pagination (keyset)
     if (cursorLastSeen && cursorCustomerId) {
-      // (last_seen_at, salla_customer_id) < (cursorLastSeen, cursorCustomerId)
-=======
-    if (cursorLastSeen && cursorCustomerId) {
->>>>>>> b8e0e03 (init)
       query = query.or(
         `and(last_seen_at.lt.${cursorLastSeen}),and(last_seen_at.eq.${cursorLastSeen},salla_customer_id.lt.${cursorCustomerId})`,
       );
@@ -128,21 +104,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-<<<<<<< HEAD
-    const rows = data || [];
-    const hasMore = rows.length > limit;
-    const items = hasMore ? rows.slice(0, limit) : rows;
-
-    const nextCursor =
-      hasMore && items.length
-        ? {
-            cursor_last_seen: items[items.length - 1].last_seen_at,
-            cursor_customer_id: items[items.length - 1].salla_customer_id,
-          }
-        : null;
-
-    return NextResponse.json({ ok: true, items, nextCursor });
-=======
     const rows = (data || []) as CustomerRow[];
 
     // ✅ Dedup: عميل واحد = صف واحد
@@ -447,7 +408,6 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, items: finalItems, nextCursor });
->>>>>>> b8e0e03 (init)
   } catch (e: any) {
     return NextResponse.json({ error: "SERVER_ERROR", details: String(e?.message || e) }, { status: 500 });
   }

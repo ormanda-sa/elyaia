@@ -23,12 +23,8 @@ export type GuestRow = {
   vehicle_signals_7d?: number | null;
 };
 
-<<<<<<< HEAD
-function fmt(dt: string) {
-=======
 function fmt(dt?: string | null) {
   if (!dt) return "—";
->>>>>>> b8e0e03 (init)
   try {
     return new Date(dt).toLocaleString("ar-SA-u-ca-gregory-nu-latn", {
       year: "numeric",
@@ -81,12 +77,9 @@ export default function GuestsTable({
               const year = r.vehicle_year_text || null;
               const hasAny = Boolean(brand || model || year);
 
-<<<<<<< HEAD
-=======
               const signals =
                 typeof r.vehicle_signals_7d === "number" ? r.vehicle_signals_7d : 0;
 
->>>>>>> b8e0e03 (init)
               return (
                 <TableRow key={r.visitor_id}>
                   <TableCell className="font-mono text-xs break-all">
@@ -103,23 +96,14 @@ export default function GuestsTable({
                         <Badge variant="outline">لا توجد بيانات</Badge>
                       ) : null}
 
-<<<<<<< HEAD
-                      {typeof r.vehicle_signals_7d === "number" && r.vehicle_signals_7d > 0 ? (
-                        <Badge variant="outline">إشارات: {r.vehicle_signals_7d}</Badge>
-=======
                       {signals > 0 ? (
                         <Badge variant="outline">إشارات: {signals}</Badge>
->>>>>>> b8e0e03 (init)
                       ) : null}
                     </div>
                   </TableCell>
 
                   <TableCell>{fmt(r.last_seen_at)}</TableCell>
-<<<<<<< HEAD
-                  <TableCell>{r.page_views_count}</TableCell>
-=======
                   <TableCell>{Number(r.page_views_count || 0)}</TableCell>
->>>>>>> b8e0e03 (init)
 
                   <TableCell className="text-left">
                     <Button variant="outline" onClick={() => onOpenJourney(r)}>
@@ -132,14 +116,10 @@ export default function GuestsTable({
 
           {!loading && items.length === 0 && (
             <TableRow>
-<<<<<<< HEAD
-              <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-=======
               <TableCell
                 colSpan={5}
                 className="py-10 text-center text-muted-foreground"
               >
->>>>>>> b8e0e03 (init)
                 لا يوجد زوار بدون تسجيل دخول
               </TableCell>
             </TableRow>

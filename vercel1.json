@@ -7,13 +7,10 @@
     {
       "path": "/api/cron/marketing/send-messages?secret=YOUR_SECRET",
       "schedule": "*/10 * * * *"
-<<<<<<< HEAD
-=======
     },
     {
       "path": "/api/dashboard/visitors/vehicle-signals/rebuild?secret=YOUR_SECRET&store_id=103ccdde-7358-4e56-b5a2-82638712d1b2",
       "schedule": "*/10 * * * *"
->>>>>>> b8e0e03 (init)
     }
   ]
 }
