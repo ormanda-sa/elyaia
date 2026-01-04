@@ -643,7 +643,7 @@ export async function GET(_req: NextRequest) {
               encodeURIComponent(carSlug) +
               "?filters[company]=" +
               encodeURIComponent(sallaCompanyId) +
-              "&filters[category]=" +
+              "&filters[category_cat]=" +
               encodeURIComponent(sallaCategoryId) +
               "&filters[category_id]=" +
               encodeURIComponent(sallaYearId) +
