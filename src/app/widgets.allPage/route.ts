@@ -265,7 +265,7 @@ async function loadKeywords(
         }
         var sp = url.searchParams;
         result.sCompany = sp.get("filters[company]");
-        result.sCategory = sp.get("filters[category]");
+        result.sCategory = sp.get("filters[category1]");
         result.sYear = sp.get("filters[category_id]");
         result.sSection = sp.get("filters[brand_id]");
         var keyword = sp.get("keyword");
