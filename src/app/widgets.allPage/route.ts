@@ -842,19 +842,19 @@ async function loadKeywords(
 
           var url =
             domain +
-            "/category/" +
-            encodeURIComponent(carSlug) +
-            "?filters[company]=" +
-            encodeURIComponent(sallaCompanyId) +
-            "&filters[category_cat]=" +
-            encodeURIComponent(sallaCategoryId) +
-            "&filters[category_id]=" +
-            encodeURIComponent(sallaYearId) +
-            "&filters[brand_id]=" +
+            "/category/"+
+            encodeURIComponent(carSlug)+
+            "?filters[company]="+
+            encodeURIComponent(sallaCompanyId)+
+            "&filters[category_cat]="+
+            encodeURIComponent(sallaCategoryId)+
+            "&filters[category_id]="+
+            encodeURIComponent(sallaYearId)+
+            "&filters[brand_id]="+
             encodeURIComponent(sallaSectionId);
 
           if (keywordParam) {
-            url += "&keyword=" + keywordParam;
+            url +="&keyword="+keywordParam;
           }
 
           var brandNumeric = Number(brandId);
