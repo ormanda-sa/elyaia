@@ -1,9 +1,9 @@
-// src/app/widgets.js/route.ts
+// src/app/widgetsT2.js/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets.js — Darb Filter Hero (snapshot + events + full config)
+// widgets.js — Darb Filter Hero (snapshot + events + full config) — NO BRAND FILTER
 (function () {
   try {
     var script =
@@ -80,11 +80,7 @@ export async function GET(_req: NextRequest) {
     async function ensureSnapshot(storeId) {
       if (SNAPSHOT) return SNAPSHOT;
 
-      var url =
-        SNAPSHOT_BASE +
-        "/" +
-        encodeURIComponent(storeId) +
-        ".json";
+      var url = SNAPSHOT_BASE + "/" + encodeURIComponent(storeId) + ".json";
 
       try {
         var data = await fetchJson(url);
@@ -93,7 +89,6 @@ export async function GET(_req: NextRequest) {
         console.error("[DarbFilter] failed to load snapshot", e);
         SNAPSHOT = {
           store_id: storeId,
-          brands: [],
           models: [],
           years: [],
           sections: [],
@@ -104,19 +99,10 @@ export async function GET(_req: NextRequest) {
       return SNAPSHOT;
     }
 
-    async function loadBrands(storeId) {
+    // ✅ no brands anymore
+    async function loadModels(storeId) {
       var snap = await ensureSnapshot(storeId);
-      return snap.brands || [];
-    }
-
-    async function loadModels(storeId, brandId) {
-      var snap = await ensureSnapshot(storeId);
-      var allModels = snap.models || [];
-      var idNum = Number(brandId);
-      if (Number.isNaN(idNum)) return allModels;
-      return allModels.filter(function (m) {
-        return Number(m.brand_id) === idNum;
-      });
+      return snap.models || [];
     }
 
     async function loadYears(storeId, modelId) {
@@ -134,46 +120,39 @@ export async function GET(_req: NextRequest) {
       return snap.sections || [];
     }
 
-   async function loadKeywords(
-  storeId,
-  brandId,
-  modelId,
-  yearId,
-  sectionId
-) {
-  // 1) Live من DB عبر API (يحُل مشكلة نقص snapshot)
-  try {
-    var url =
-      API_BASE +
-      "/keywords?store_id=" +
-      encodeURIComponent(storeId) +
-      "&section_id=" +
-      encodeURIComponent(String(sectionId || "")) +
-      "&model_id=" +
-      encodeURIComponent(String(modelId || ""));
+    async function loadKeywords(storeId, modelId, yearId, sectionId) {
+      // 1) Live من DB عبر API (يحُل مشكلة نقص snapshot)
+      try {
+        var url =
+          API_BASE +
+          "/keywords?store_id=" +
+          encodeURIComponent(storeId) +
+          "&section_id=" +
+          encodeURIComponent(String(sectionId || "")) +
+          "&model_id=" +
+          encodeURIComponent(String(modelId || ""));
 
-    var data = await fetchJson(url);
-    var live = (data && data.keywords) || [];
+        var data = await fetchJson(url);
+        var live = (data && data.keywords) || [];
 
-    if (Array.isArray(live)) return live;
-  } catch (e) {
-    // نسكت ونروح fallback
-  }
+        if (Array.isArray(live)) return live;
+      } catch (e) {
+        // نسكت ونروح fallback
+      }
 
-  // 2) Fallback: snapshot (نفس منطقك القديم)
-  var snap = await ensureSnapshot(storeId);
-  var allKeywords = (snap && snap.keywords) || [];
+      // 2) Fallback: snapshot
+      var snap = await ensureSnapshot(storeId);
+      var allKeywords = (snap && snap.keywords) || [];
 
-  var mId = Number(modelId);
-  var sId = Number(sectionId);
+      var mId = Number(modelId);
+      var sId = Number(sectionId);
 
-  return allKeywords.filter(function (k) {
-    if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
-    if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
-    return true;
-  });
-}
-
+      return allKeywords.filter(function (k) {
+        if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
+        if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
+        return true;
+      });
+    }
 
     function getFilterSessionKey() {
       var KEY = "darb_filter_sid";
@@ -249,9 +228,7 @@ export async function GET(_req: NextRequest) {
         var snap = await ensureSnapshot(storeId);
         var cfg = (snap && snap.config) || {};
 
-        var heroTitle =
-          cfg.title_text || "ابحث عن قطع غيار سيارتك";
-
+        var heroTitle = cfg.title_text || "ابحث عن قطع غيار سيارتك";
         var counterTarget = cfg.counter_target || 181825;
 
         var heroBgMode = cfg.hero_bg_mode || "image";
@@ -266,26 +243,21 @@ export async function GET(_req: NextRequest) {
         var shippingColor = cfg.shipping_color || "#2563eb";
         var stepBadgeBg = cfg.step_badge_bg || "#d50026";
 
-        // نصوص القالب
         var prefixTemplate =
           cfg.hero_description_prefix ||
           "ابحث بين {counter} قطعة غيار لجميع سيارات تويوتا الأصلية واليابانية والتجارية";
         var shippingLine =
-          cfg.hero_shipping_line ||
-          "شحن سريع خلال 4-6 أيام وسعر منافس جداً";
+          cfg.hero_shipping_line || "شحن سريع خلال 4-6 أيام وسعر منافس جداً";
 
-        // نبني HTML من القوالب إذا ما فيه subtitle_text مخصص
         var heroDescHtml =
           cfg.subtitle_text ||
-          (
-            prefixTemplate.replace(
-              "{counter}",
-              '<span id="countUp" class="darb-counter">0</span>'
-            ) +
+          (prefixTemplate.replace(
+            "{counter}",
+            '<span id="countUp" class="darb-counter">0</span>'
+          ) +
             '<br><span class="darb-shipping">' +
             String(shippingLine) +
-            '</span> <span class="emoji-bounce">🚚</span><span class="emoji-bounce">🔥</span>'
-          );
+            '</span> <span class="emoji-bounce">🚚</span><span class="emoji-bounce">🔥</span>');
 
         var heroBgStyle =
           heroBgMode === "gradient" && heroBgGradient
@@ -295,8 +267,7 @@ export async function GET(_req: NextRequest) {
         var heroButtonBg =
           cfg.hero_button_bg ||
           "linear-gradient(90deg, #e5202a 0%, #f97316 100%)";
-        var heroButtonText =
-          cfg.hero_button_text_color || "#ffffff";
+        var heroButtonText = cfg.hero_button_text_color || "#ffffff";
 
         var capsuleBg =
           cfg.hero_capsule_bg ||
@@ -308,7 +279,9 @@ export async function GET(_req: NextRequest) {
         var wrap = document.createElement("div");
         wrap.className = "widgets-filter-hero-wrap";
 
-        var html = '\\
+        // ✅ removed brand/company field completely; steps become 01..04
+        var html =
+          '\\
     <div class="hero-section widgets-filter-hero">\\
       <div class="hero-bg-img" style="background:' +
           heroBgStyle.replace(/"/g, '\\"') +
@@ -330,8 +303,7 @@ export async function GET(_req: NextRequest) {
         <div class="X1">\\
           <div class="hero-filters-wrapper">\\
             <form id="filters-form" onsubmit="return false;" dir="rtl" class="hero-filters-form">\\
-              <select id="company"></select>\\
-              <select id="category" disabled></select>\\
+              <select id="category"></select>\\
               <select id="model" disabled></select>\\
               <select id="section" disabled></select>\\
               <select id="parts" multiple disabled></select>\\
@@ -364,13 +336,31 @@ export async function GET(_req: NextRequest) {
           styleEl.textContent =
             ".widgets-filter-hero-wrap select.df-field-error{border-color:#ef4444 !important;outline:0;}" +
             ".widgets-filter-hero-wrap .hero-search-btn[disabled]{opacity:.6;cursor:not-allowed;}" +
-            ".widgets-filter-hero-wrap .hero-filter-head{color:" + heroTitleColor + " !important;}" +
-            ".widgets-filter-hero-wrap .hero-filter-desc{color:" + heroDescColor + " !important;}" +
-            ".widgets-filter-hero-wrap .hero-filters-form{background:" + capsuleBg + " !important;box-shadow:" + capsuleShadow + " !important;}" +
-            ".widgets-filter-hero-wrap .hero-search-btn{background:" + heroButtonBg + " !important;color:" + heroButtonText + " !important;}" +
-            ".widgets-filter-hero-wrap .step-label{background:" + stepBadgeBg + " !important;}" +
-            ".widgets-filter-hero-wrap .darb-counter{color:" + counterColor + " !important;font-weight:700;}" +
-            ".widgets-filter-hero-wrap .darb-shipping{color:" + shippingColor + " !important;font-weight:600;}";
+            ".widgets-filter-hero-wrap .hero-filter-head{color:" +
+            heroTitleColor +
+            " !important;}" +
+            ".widgets-filter-hero-wrap .hero-filter-desc{color:" +
+            heroDescColor +
+            " !important;}" +
+            ".widgets-filter-hero-wrap .hero-filters-form{background:" +
+            capsuleBg +
+            " !important;box-shadow:" +
+            capsuleShadow +
+            " !important;}" +
+            ".widgets-filter-hero-wrap .hero-search-btn{background:" +
+            heroButtonBg +
+            " !important;color:" +
+            heroButtonText +
+            " !important;}" +
+            ".widgets-filter-hero-wrap .step-label{background:" +
+            stepBadgeBg +
+            " !important;}" +
+            ".widgets-filter-hero-wrap .darb-counter{color:" +
+            counterColor +
+            " !important;font-weight:700;}" +
+            ".widgets-filter-hero-wrap .darb-shipping{color:" +
+            shippingColor +
+            " !important;font-weight:600;}";
           document.head.appendChild(styleEl);
         }
 
@@ -379,24 +369,24 @@ export async function GET(_req: NextRequest) {
           link.style.display = showBranding ? "inline-block" : "none";
         }
 
-        var steps = ["01", "02", "03", "04", "05"];
-        wrap.querySelectorAll(".hero-filters-form select").forEach(function (
-          el,
-          idx
-        ) {
-          if (steps[idx]) {
-            var holder = document.createElement("div");
-            holder.className = "select-with-step";
-            var label = document.createElement("span");
-            label.className = "step-label";
-            label.textContent = steps[idx];
-            holder.appendChild(label);
-            el.parentNode.insertBefore(holder, el);
-            holder.appendChild(el);
-          }
-        });
+        // ✅ steps now 01..04 (category, year, section, parts)
+        var steps = ["01", "02", "03", "04"];
+        wrap
+          .querySelectorAll(".hero-filters-form select")
+          .forEach(function (el, idx) {
+            if (steps[idx]) {
+              var holder = document.createElement("div");
+              holder.className = "select-with-step";
+              var label = document.createElement("span");
+              label.className = "step-label";
+              label.textContent = steps[idx];
+              holder.appendChild(label);
+              el.parentNode.insertBefore(holder, el);
+              holder.appendChild(el);
+            }
+          });
 
-        var company = wrap.querySelector("#company");
+        // ✅ company removed
         var category = wrap.querySelector("#category");
         var model = wrap.querySelector("#model");
         var section = wrap.querySelector("#section");
@@ -412,32 +402,24 @@ export async function GET(_req: NextRequest) {
 
         function setFieldError(selectEl, hasError) {
           if (!selectEl) return;
-          if (hasError) {
-            selectEl.classList.add("df-field-error");
-          } else {
-            selectEl.classList.remove("df-field-error");
-          }
+          if (hasError) selectEl.classList.add("df-field-error");
+          else selectEl.classList.remove("df-field-error");
         }
 
         function updateFilterButtonState() {
-          var brandId   = companyChoices && companyChoices.getValue(true);
-          var modelId   = categoryChoices && categoryChoices.getValue(true);
-          var yearId    = modelChoices && modelChoices.getValue(true);
+          var modelId = categoryChoices && categoryChoices.getValue(true);
+          var yearId = modelChoices && modelChoices.getValue(true);
           var sectionId = sectionChoices && sectionChoices.getValue(true);
 
-          var ready = !!(brandId && modelId && yearId && sectionId);
-          if (filterBtn) {
-            filterBtn.disabled = !ready;
-          }
+          var ready = !!(modelId && yearId && sectionId);
+          if (filterBtn) filterBtn.disabled = !ready;
         }
 
         function markMissingRequiredFields() {
-          var brandId   = companyChoices.getValue(true);
-          var modelId   = categoryChoices.getValue(true);
-          var yearId    = modelChoices.getValue(true);
+          var modelId = categoryChoices.getValue(true);
+          var yearId = modelChoices.getValue(true);
           var sectionId = sectionChoices.getValue(true);
 
-          setFieldError(company, !brandId);
           setFieldError(category, !modelId);
           setFieldError(model, !yearId);
           setFieldError(section, !sectionId);
@@ -453,9 +435,7 @@ export async function GET(_req: NextRequest) {
             filterBtn.innerHTML = "جاري التحميل...";
           } else {
             var original = filterBtn.dataset.originalText;
-            if (original) {
-              filterBtn.innerHTML = original;
-            }
+            if (original) filterBtn.innerHTML = original;
             updateFilterButtonState();
           }
         }
@@ -471,7 +451,7 @@ export async function GET(_req: NextRequest) {
           });
         }
 
-        var companyChoices = initChoices(company, "اختر الماركة");
+        // ✅ placeholders updated (no brand)
         var categoryChoices = initChoices(category, "اختر الموديل");
         var modelChoices = initChoices(model, "اختر السنة");
         var sectionChoices = initChoices(section, "اختر القسم");
@@ -487,14 +467,12 @@ export async function GET(_req: NextRequest) {
           itemSelectText: "اختر",
         });
 
-        company.disabled = true;
         category.disabled = true;
         model.disabled = true;
         section.disabled = true;
         parts.disabled = true;
         filterBtn.disabled = true;
 
-        var brands = [];
         var models = [];
         var years = [];
         var sections = [];
@@ -502,11 +480,7 @@ export async function GET(_req: NextRequest) {
 
         function setChoicesData(choicesInstance, list, placeholder, labelKey) {
           var items = [
-            {
-              value: "",
-              label: placeholder,
-              selected: true,
-            },
+            { value: "", label: placeholder, selected: true },
           ].concat(
             (list || []).map(function (item) {
               var label =
@@ -528,106 +502,33 @@ export async function GET(_req: NextRequest) {
           choicesInstance.setChoices(items, "value", "label", true);
         }
 
-        setChoicesData(companyChoices, [], "جاري التحميل...");
-        company.disabled = true;
-        companyChoices.disable();
+        // ✅ initial load models (top-level)
+        setChoicesData(categoryChoices, [], "جاري التحميل...");
+        category.disabled = true;
+        categoryChoices.disable();
 
         try {
-          brands = await loadBrands(storeId);
+          models = await loadModels(storeId);
 
-          if (brands.length > 0) {
-            setChoicesData(companyChoices, brands, "اختر الماركة", "name_ar");
-            company.disabled = false;
-            companyChoices.enable();
+          if (models.length > 0) {
+            setChoicesData(categoryChoices, models, "اختر الموديل", "name_ar");
+            category.disabled = false;
+            categoryChoices.enable();
           } else {
-            setChoicesData(companyChoices, [], "لا توجد خيارات");
-            company.disabled = true;
-            companyChoices.disable();
-          }
-        } catch (e) {
-          setChoicesData(companyChoices, [], "خطأ في تحميل الماركات");
-          company.disabled = true;
-          companyChoices.disable();
-        }
-
-        company.addEventListener("change", async function () {
-          var brandId = companyChoices.getValue(true);
-
-          if (brandId) {
-            setFieldError(company, false);
-          }
-
-          setChoicesData(categoryChoices, [], "اختر الموديل");
-          setChoicesData(modelChoices, [], "اختر السنة");
-          setChoicesData(sectionChoices, [], "اختر القسم");
-          partsChoices.clearStore();
-
-          category.disabled = true;
-          model.disabled = true;
-          section.disabled = true;
-          parts.disabled = true;
-          filterBtn.disabled = true;
-
-          currentCategory = null;
-          currentModel = null;
-
-          if (!brandId) {
-            categoryChoices.disable();
-            modelChoices.disable();
-            sectionChoices.disable();
-            partsChoices.disable();
-            updateFilterButtonState();
-            return;
-          }
-
-          var brandNumeric = Number(brandId);
-          if (!Number.isNaN(brandNumeric)) {
-            logFilterEvent({
-              event_type: "brand_select",
-              brand_id: brandNumeric,
-            });
-          }
-
-          setChoicesData(categoryChoices, [], "جاري التحميل...");
-          category.disabled = true;
-          categoryChoices.disable();
-
-          try {
-            models = await loadModels(storeId, brandId);
-
-            if (models.length > 0) {
-              setChoicesData(
-                categoryChoices,
-                models,
-                "اختر الموديل",
-                "name_ar"
-              );
-              category.disabled = false;
-              categoryChoices.enable();
-            } else {
-              setChoicesData(categoryChoices, [], "لا توجد خيارات");
-              category.disabled = true;
-              categoryChoices.disable();
-            }
-          } catch (e) {
-            setChoicesData(
-              categoryChoices,
-              [],
-              "خطأ في تحميل الموديلات"
-            );
+            setChoicesData(categoryChoices, [], "لا توجد خيارات");
             category.disabled = true;
             categoryChoices.disable();
           }
-
-          updateFilterButtonState();
-        });
+        } catch (e) {
+          setChoicesData(categoryChoices, [], "خطأ في تحميل الموديلات");
+          category.disabled = true;
+          categoryChoices.disable();
+        }
 
         category.addEventListener("change", async function () {
           var categoryId = categoryChoices.getValue(true);
 
-          if (categoryId) {
-            setFieldError(category, false);
-          }
+          if (categoryId) setFieldError(category, false);
 
           setChoicesData(modelChoices, [], "اختر السنة");
           setChoicesData(sectionChoices, [], "اختر القسم");
@@ -687,9 +588,7 @@ export async function GET(_req: NextRequest) {
         model.addEventListener("change", async function () {
           var modelId = modelChoices.getValue(true);
 
-          if (modelId) {
-            setFieldError(model, false);
-          }
+          if (modelId) setFieldError(model, false);
 
           setChoicesData(sectionChoices, [], "اختر القسم");
           partsChoices.clearStore();
@@ -725,12 +624,7 @@ export async function GET(_req: NextRequest) {
           try {
             sections = await loadSections(storeId);
             if (sections.length > 0) {
-              setChoicesData(
-                sectionChoices,
-                sections,
-                "اختر القسم",
-                "name_ar"
-              );
+              setChoicesData(sectionChoices, sections, "اختر القسم", "name_ar");
               section.disabled = false;
               sectionChoices.enable();
             } else {
@@ -739,11 +633,7 @@ export async function GET(_req: NextRequest) {
               sectionChoices.disable();
             }
           } catch (e) {
-            setChoicesData(
-              sectionChoices,
-              [],
-              "خطأ في تحميل الأقسام"
-            );
+            setChoicesData(sectionChoices, [], "خطأ في تحميل الأقسام");
             section.disabled = true;
             sectionChoices.disable();
           }
@@ -754,9 +644,7 @@ export async function GET(_req: NextRequest) {
         section.addEventListener("change", async function () {
           var sectionId = sectionChoices.getValue(true);
 
-          if (sectionId) {
-            setFieldError(section, false);
-          }
+          if (sectionId) setFieldError(section, false);
 
           partsChoices.clearStore();
           parts.disabled = true;
@@ -776,18 +664,11 @@ export async function GET(_req: NextRequest) {
             });
           }
 
-          var brandId = companyChoices.getValue(true);
           var modelId = categoryChoices.getValue(true);
           var yearId = modelChoices.getValue(true);
 
           partsChoices.setChoices(
-            [
-              {
-                value: "",
-                label: "جاري التحميل...",
-                selected: true,
-              },
-            ],
+            [{ value: "", label: "جاري التحميل...", selected: true }],
             "value",
             "label",
             true
@@ -796,13 +677,7 @@ export async function GET(_req: NextRequest) {
           partsChoices.disable();
 
           try {
-            keywords = await loadKeywords(
-              storeId,
-              brandId,
-              modelId,
-              yearId,
-              sectionId
-            );
+            keywords = await loadKeywords(storeId, modelId, yearId, sectionId);
 
             partsChoices.clearStore();
 
@@ -811,11 +686,7 @@ export async function GET(_req: NextRequest) {
               partsChoices.setChoices(
                 (keywords || []).map(function (k) {
                   var label = k.name_ar || k.slug || ("#" + k.id);
-                  return {
-                    value: String(k.id),
-                    label: label,
-                    selected: false,
-                  };
+                  return { value: String(k.id), label: label, selected: false };
                 }),
                 "value",
                 "label",
@@ -825,13 +696,7 @@ export async function GET(_req: NextRequest) {
             } else {
               parts.disabled = true;
               partsChoices.setChoices(
-                [
-                  {
-                    value: "",
-                    label: "لا توجد خيارات",
-                    selected: true,
-                  },
-                ],
+                [{ value: "", label: "لا توجد خيارات", selected: true }],
                 "value",
                 "label",
                 true
@@ -843,13 +708,7 @@ export async function GET(_req: NextRequest) {
           } catch (e) {
             partsChoices.clearStore();
             partsChoices.setChoices(
-              [
-                {
-                  value: "",
-                  label: "خطأ في تحميل الكلمات",
-                  selected: true,
-                },
-              ],
+              [{ value: "", label: "خطأ في تحميل الكلمات", selected: true }],
               "value",
               "label",
               true
@@ -861,12 +720,11 @@ export async function GET(_req: NextRequest) {
         });
 
         filterBtn.addEventListener("click", async function () {
-          var brandId   = companyChoices.getValue(true);
-          var modelId   = categoryChoices.getValue(true);
-          var yearId    = modelChoices.getValue(true);
+          var modelId = categoryChoices.getValue(true);
+          var yearId = modelChoices.getValue(true);
           var sectionId = sectionChoices.getValue(true);
 
-          if (!brandId || !modelId || !yearId || !sectionId) {
+          if (!modelId || !yearId || !sectionId) {
             markMissingRequiredFields();
             return;
           }
@@ -874,20 +732,12 @@ export async function GET(_req: NextRequest) {
           setButtonLoading(true);
 
           try {
-            var brandObj =
-              brands.find(function (b) {
-                return String(b.id) === String(brandId);
-              }) || null;
-
             var modelRow =
               models.find(function (m) {
                 return String(m.id) === String(modelId);
               }) || null;
 
-            var carSlug =
-              (modelRow && modelRow.slug) ||
-              (brandObj && brandObj.slug) ||
-              "قطع-غيار";
+            var carSlug = (modelRow && modelRow.slug) || "قطع-غيار";
 
             var yearRow =
               years.find(function (y) {
@@ -899,15 +749,12 @@ export async function GET(_req: NextRequest) {
                 return String(s.id) === String(sectionId);
               }) || null;
 
-            var sallaCompanyId  = (brandObj && brandObj.salla_company_id) || brandId;
             var sallaCategoryId = (modelRow && modelRow.salla_category_id) || modelId;
-            var sallaYearId     = (yearRow && yearRow.salla_year_id) || yearId;
-            var sallaSectionId  = (sectionRow && sectionRow.salla_section_id) || sectionId;
+            var sallaYearId = (yearRow && yearRow.salla_year_id) || yearId;
+            var sallaSectionId = (sectionRow && sectionRow.salla_section_id) || sectionId;
 
             var selectedKeywordIds = partsChoices.getValue(true) || [];
-            if (!Array.isArray(selectedKeywordIds)) {
-              selectedKeywordIds = [selectedKeywordIds];
-            }
+            if (!Array.isArray(selectedKeywordIds)) selectedKeywordIds = [selectedKeywordIds];
 
             var keywordIdsNumeric = selectedKeywordIds
               .map(function (v) { return Number(v); })
@@ -918,9 +765,7 @@ export async function GET(_req: NextRequest) {
               var k = (keywords || []).find(function (kw) {
                 return Number(kw.id) === id;
               });
-              if (k) {
-                keywordLabels.push(k.name_ar || k.slug || ("#" + k.id));
-              }
+              if (k) keywordLabels.push(k.name_ar || k.slug || ("#" + k.id));
             });
 
             var keywordParam = "";
@@ -930,31 +775,32 @@ export async function GET(_req: NextRequest) {
 
             var domain = await resolveStoreDomain(storeId);
 
+            // ✅ removed filters[company] and filters[brand_id]
             var url =
               domain +
-              "/category/"+
-              encodeURIComponent(carSlug)+
-              "?filters[company]="+
-              encodeURIComponent(sallaCompanyId)+
-              "&filters[category_cat]="+
-              encodeURIComponent(sallaCategoryId)+
-              "&filters[category_id]="+
-              encodeURIComponent(sallaYearId)+
-              "&filters[brand_id]="+
+              "/category/" +
+              encodeURIComponent(carSlug) +
+              "?filters[category_cat]=" +
+              encodeURIComponent(sallaCategoryId) +
+              "&filters[category_id]=" +
+              encodeURIComponent(sallaYearId);
+
+            // ✅ keep section as its own param without brand_id naming
+            // (If your store expects section in filters, keep it here)
+            url +=
+              "&filters[section_id]=" +
               encodeURIComponent(sallaSectionId);
 
             if (keywordParam) {
-              url +="&keyword="+keywordParam;
+              url += "&keyword=" + keywordParam;
             }
 
-            var brandNumeric   = Number(brandId);
-            var modelNumeric   = Number(modelId);
-            var yearNumeric    = Number(yearId);
+            var modelNumeric = Number(modelId);
+            var yearNumeric = Number(yearId);
             var sectionNumeric = Number(sectionId);
 
             await logFilterEvent({
               event_type: "search_submit",
-              brand_id: !Number.isNaN(brandNumeric) ? brandNumeric : null,
               model_id: !Number.isNaN(modelNumeric) ? modelNumeric : null,
               year_id: !Number.isNaN(yearNumeric) ? yearNumeric : null,
               section_id: !Number.isNaN(sectionNumeric) ? sectionNumeric : null,
@@ -1006,7 +852,9 @@ export async function GET(_req: NextRequest) {
 
       fetch(statusUrl)
         .then(function (res) {
-          return res.json().catch(function () { return {}; });
+          return res.json().catch(function () {
+            return {};
+          });
         })
         .then(function (data) {
           if (data && data.ok && data.suspended) {
@@ -1031,7 +879,7 @@ export async function GET(_req: NextRequest) {
   }
 })();
 `;
- 
+
   return new NextResponse(js, {
     status: 200,
     headers: {

@@ -181,7 +181,6 @@ async function loadKeywords(
   });
 }
 
-
     function getFilterSessionKey() {
       var KEY = "darb_filter_sid";
       try {
@@ -266,7 +265,7 @@ async function loadKeywords(
         }
         var sp = url.searchParams;
         result.sCompany = sp.get("filters[company]");
-        result.sCategory = sp.get("filters[category]");
+        result.sCategory = sp.get("filters[category_cat]");
         result.sYear = sp.get("filters[category_id]");
         result.sSection = sp.get("filters[brand_id]");
         var keyword = sp.get("keyword");
@@ -323,19 +322,15 @@ async function loadKeywords(
           var styleEl = document.createElement("style");
           styleEl.id = styleId;
           styleEl.textContent =
-            // wrappers
             ".widgets-filter-hero-wrap{margin:12px auto 16px auto;max-width:1200px;background:transparent;padding:0 16px;}" +
             ".widgets-filter-hero-wrap .hero-filters-wrapper{width:100%;display:flex;justify-content:center;}" +
-            // Choices.js (اخرى)
             ".choices{position:relative;overflow:hidden;margin-bottom:6px;font-size:16px;}" +
-            // form (الكبسولة): أبيض, عرض كامل, بدون ظل
             ".hero-filters-form{" +
               "position:relative;z-index:10;width:100%;max-width:100%;margin:4px auto 4px 0;padding:20px 3%;border-radius:9px;" +
               "display:flex;align-items:center;gap:8px;flex-wrap:nowrap;" +
               "background:#fbfbfb;border:1px solid #e5e7eb;box-shadow:none;" +
               "-webkit-backdrop-filter:blur(0);" +
             "}" +
-            // كل حقل
             ".select-with-step{display:flex;flex-direction:column;align-items:flex-start;position:relative;margin-bottom:0;flex:1 1 0;min-width:150px;}" +
             ".select-with-step .step-label{" +
               "background:#d50026;color:#ffffff;text-align:center;font-size:9px;border:1.5px solid #eef0f8;" +
@@ -347,7 +342,6 @@ async function loadKeywords(
               "min-width:0;width:100%;height:49px;border-radius:6px;border:1.5px solid #e5e7eb;font-size:14px;font-weight:500;" +
               "background:#ffffff;box-shadow:none;padding:0 12px;appearance:none;-webkit-appearance:none;-moz-appearance:none;" +
             "}" +
-            // زر البحث (نفس الهيرو)
             ".hero-search-btn{" +
               "background:#e5202a;color:#fff;font-size:18px;min-width:140px;padding:0 34px;height:54px;border-radius:12px;border:none;" +
               "font-weight:bold;letter-spacing:0.5px;box-shadow:0 3px 12px #e5202a22;display:flex;align-items:center;justify-content:center;gap:4px;" +
@@ -358,7 +352,6 @@ async function loadKeywords(
             "}" +
             ".hero-search-btn[disabled]{opacity:0.6;cursor:not-allowed;}" +
             ".hero-filters-form select.df-field-error{border-color:#ef4444 !important;}" +
-            // موبايل
             "@media(max-width:900px){" +
               ".widgets-filter-hero-wrap{padding:0 8px;}" +
               ".hero-filters-form{display:block;width:100%;max-width:100%;padding:14px 10px;}" +
@@ -479,7 +472,6 @@ async function loadKeywords(
           choicesInstance.setChoices(items, "value", "label", true);
         }
 
-        // ===== 1) تحميل الماركات من snapshot =====
         setChoicesData(companyChoices, [], "جاري تحميل الماركات...", "name_ar");
 
         try {
@@ -504,7 +496,6 @@ async function loadKeywords(
           companyChoices.disable();
         }
 
-        // 2) on change brand
         company.addEventListener("change", async function () {
           var brandId = companyChoices.getValue(true);
 
@@ -564,7 +555,6 @@ async function loadKeywords(
           updateFilterButtonState();
         });
 
-        // 3) on change model
         category.addEventListener("change", async function () {
           var categoryId = categoryChoices.getValue(true);
 
@@ -616,7 +606,6 @@ async function loadKeywords(
           updateFilterButtonState();
         });
 
-        // 4) on change year
         model.addEventListener("change", async function () {
           var modelId = modelChoices.getValue(true);
 
@@ -671,7 +660,6 @@ async function loadKeywords(
           updateFilterButtonState();
         });
 
-        // 5) on change section
         section.addEventListener("change", async function () {
           var sectionId = sectionChoices.getValue(true);
 
@@ -777,7 +765,6 @@ async function loadKeywords(
           }
         });
 
-        // ===== زر البحث =====
         filterBtn.addEventListener("click", async function () {
           var brandId = companyChoices.getValue(true);
           var modelId = categoryChoices.getValue(true);
@@ -855,19 +842,19 @@ async function loadKeywords(
 
           var url =
             domain +
-            "/category/" +
-            encodeURIComponent(carSlug) +
-            "?filters[company]=" +
-            encodeURIComponent(sallaCompanyId) +
-            "&filters[category]=" +
-            encodeURIComponent(sallaCategoryId) +
-            "&filters[category_id]=" +
-            encodeURIComponent(sallaYearId) +
-            "&filters[brand_id]=" +
+            "/category/"+
+            encodeURIComponent(carSlug)+
+            "?filters[company]="+
+            encodeURIComponent(sallaCompanyId)+
+            "&filters[category_cat]="+
+            encodeURIComponent(sallaCategoryId)+
+            "&filters[category_id]="+
+            encodeURIComponent(sallaYearId)+
+            "&filters[brand_id]="+
             encodeURIComponent(sallaSectionId);
 
           if (keywordParam) {
-            url += "&keyword=" + keywordParam;
+            url +="&keyword="+keywordParam;
           }
 
           var brandNumeric = Number(brandId);
@@ -1093,9 +1080,47 @@ async function loadKeywords(
       try {
         var path = window.location && window.location.pathname;
         if (!path) return;
-        if (path === "/" || path === "/index.html") {
+
+        // =========================
+        // BLOCK PAGES (المطلوب فقط)
+        // =========================
+        // normalize: remove trailing slash (except root)
+        var p = String(path);
+        if (p.length > 1) p = p.replace(/\\/+$/, "");
+        var pl = p.toLowerCase();
+
+        // صفحات ممنوعة (ثابتة)
+        var blockedExact = {
+          "/": true,
+          "/index.html": true,
+          "/cart": true,
+          "/pending_orders": true,
+          "/notifications": true,
+          "/orders": true,
+          "/wishlist": true,
+          "/settings": true
+        };
+
+        // صفحات /p/ (تعريفية) ممنوعة
+        var isInfoPage = pl === "/p" || pl.indexOf("/p/") === 0;
+
+        // صفحات المنتج (أحياناً تكون سلاج قصير على الجذر مثل /OyEGwPp)
+        // نمنع أي مسار "جذر" بدون سلاش إضافي، بشرط ما يكون /category/... ولا /p/...
+        var isRootSlug =
+          pl.charAt(0) === "/" &&
+          pl.indexOf("/", 1) === -1 &&
+          pl !== "/" &&
+          pl !== "/index.html";
+
+        var isCategory = pl.indexOf("/category/") === 0;
+
+        var isProductPage = isRootSlug && !isCategory && !isInfoPage && !blockedExact[pl];
+
+        if (blockedExact[pl] || isInfoPage || isProductPage) {
           return;
         }
+        // =========================
+
       } catch (e) {}
 
       var statusUrl =
