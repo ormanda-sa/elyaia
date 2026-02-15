@@ -450,9 +450,9 @@ export async function GET(_req: NextRequest) {
           });
         }
 
-        var companyChoices = initChoices(company, "اختر الماركة");
-        var categoryChoices = initChoices(category, "اختر الموديل");
-        var modelChoices = initChoices(model, "اختر السنة");
+        var companyChoices = initChoices(company, "اختر الموديل");
+        var categoryChoices = initChoices(category, "اختر السنة");
+        var modelChoices = initChoices(model, "اختر القسم");
         var partsChoices = new Choices(parts, {
           removeItemButton: true,
           maxItemCount: 5,
@@ -504,7 +504,7 @@ export async function GET(_req: NextRequest) {
           brands = await loadBrands(storeId);
 
           if (brands.length > 0) {
-            setChoicesData(companyChoices, brands, "اختر الماركة", "name_ar");
+            setChoicesData(companyChoices, brands, "اختر الموديل", "name_ar");
             company.disabled = false;
             companyChoices.enable();
           } else {
@@ -513,7 +513,7 @@ export async function GET(_req: NextRequest) {
             companyChoices.disable();
           }
         } catch (e) {
-          setChoicesData(companyChoices, [], "خطأ في تحميل الماركات");
+          setChoicesData(companyChoices, [], "خطأ في تحميل الموديلات");
           company.disabled = true;
           companyChoices.disable();
         }
@@ -523,8 +523,8 @@ export async function GET(_req: NextRequest) {
 
           if (brandId) setFieldError(company, false);
 
-          setChoicesData(categoryChoices, [], "اختر الموديل");
-          setChoicesData(modelChoices, [], "اختر السنة");
+          setChoicesData(categoryChoices, [], "اختر السنة");
+          setChoicesData(modelChoices, [], "اختر القسم");
           partsChoices.clearStore();
 
           category.disabled = true;
@@ -556,7 +556,7 @@ export async function GET(_req: NextRequest) {
             models = await loadModels(storeId, brandId);
 
             if (models.length > 0) {
-              setChoicesData(categoryChoices, models, "اختر الموديل", "name_ar");
+              setChoicesData(categoryChoices, models, "اختر السنة", "name_ar");
               category.disabled = false;
               categoryChoices.enable();
             } else {
@@ -565,7 +565,7 @@ export async function GET(_req: NextRequest) {
               categoryChoices.disable();
             }
           } catch (e) {
-            setChoicesData(categoryChoices, [], "خطأ في تحميل الموديلات");
+            setChoicesData(categoryChoices, [], "خطأ في تحميل السنوات");
             category.disabled = true;
             categoryChoices.disable();
           }
@@ -610,7 +610,7 @@ export async function GET(_req: NextRequest) {
             years = await loadYears(storeId, categoryId);
 
             if (years.length > 0) {
-              setChoicesData(modelChoices, years, "اختر السنة", "year");
+              setChoicesData(modelChoices, years, "اختر القسم", "year");
               model.disabled = false;
               modelChoices.enable();
             } else {
@@ -619,7 +619,7 @@ export async function GET(_req: NextRequest) {
               modelChoices.disable();
             }
           } catch (e) {
-            setChoicesData(modelChoices, [], "خطأ في تحميل السنوات");
+            setChoicesData(modelChoices, [], "خطأ في تحميل الاقسام");
             model.disabled = true;
             modelChoices.disable();
           }
