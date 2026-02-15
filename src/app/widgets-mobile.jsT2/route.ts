@@ -3,8 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
+
 (function () {
   try {
+
     var script =
       document.currentScript ||
       (function () {
@@ -16,6 +18,8 @@ export async function GET(_req: NextRequest) {
 
     var storeId = script.getAttribute("data-store-id");
     if (!storeId) return;
+
+    var WIDGET_SECRET = script.getAttribute("data-event-secret") || "";
 
     var PANEL_ORIGIN = "";
     try {
@@ -41,6 +45,7 @@ export async function GET(_req: NextRequest) {
 
     async function ensureSnapshot(storeId) {
       if (SNAPSHOT) return SNAPSHOT;
+
       var url =
         SNAPSHOT_BASE +
         "/" +
@@ -49,16 +54,17 @@ export async function GET(_req: NextRequest) {
 
       try {
         var res = await fetch(url, { credentials: "omit" });
-        if (!res.ok) throw new Error("Snapshot failed");
+        if (!res.ok) throw new Error();
         SNAPSHOT = await res.json();
       } catch (e) {
         SNAPSHOT = {
           brands: [],
           models: [],
           years: [],
-          keywords: [],
+          keywords: []
         };
       }
+
       return SNAPSHOT;
     }
 
@@ -69,19 +75,17 @@ export async function GET(_req: NextRequest) {
 
     async function loadModels(storeId, brandId) {
       var snap = await ensureSnapshot(storeId);
-      var allModels = snap.models || [];
-      var idNum = Number(brandId);
-      return allModels.filter(function (m) {
-        return Number(m.brand_id) === idNum;
+      var all = snap.models || [];
+      return all.filter(function (m) {
+        return Number(m.brand_id) === Number(brandId);
       });
     }
 
     async function loadYears(storeId, modelId) {
       var snap = await ensureSnapshot(storeId);
-      var allYears = snap.years || [];
-      var idNum = Number(modelId);
-      return allYears.filter(function (y) {
-        return Number(y.model_id) === idNum;
+      var all = snap.years || [];
+      return all.filter(function (y) {
+        return Number(y.model_id) === Number(modelId);
       });
     }
 
@@ -99,10 +103,10 @@ export async function GET(_req: NextRequest) {
       } catch (e) {}
 
       var snap = await ensureSnapshot(storeId);
-      var allKeywords = snap.keywords || [];
-      var mId = Number(modelId);
-      return allKeywords.filter(function (k) {
-        return Number(k.model_id) === mId;
+      var all = snap.keywords || [];
+
+      return all.filter(function (k) {
+        return Number(k.model_id) === Number(modelId);
       });
     }
 
@@ -111,7 +115,8 @@ export async function GET(_req: NextRequest) {
         var data = await fetchJson(
           API_BASE + "/store-domain?store_id=" + encodeURIComponent(storeId)
         );
-        var domain = (data && data.domain) || window.location.origin;
+
+        var domain = data.domain || window.location.origin;
         if (!/^https?:\\/\\//i.test(domain)) {
           domain = "https://" + domain;
         }
@@ -121,100 +126,173 @@ export async function GET(_req: NextRequest) {
       }
     }
 
-    function buildMobileFilter() {
+    function getFilterSessionKey() {
+      try {
+        var v = localStorage.getItem("darb_filter_sid");
+        if (!v) {
+          v = Date.now() + "-" + Math.random();
+          localStorage.setItem("darb_filter_sid", v);
+        }
+        return v;
+      } catch (e) {
+        return "no-storage";
+      }
+    }
+
+    async function logFilterEvent(payload) {
+      try {
+        if (!WIDGET_SECRET) return;
+        await fetch(API_BASE + "/event", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-widget-secret": WIDGET_SECRET,
+          },
+          body: JSON.stringify({
+            store_id: storeId,
+            session_key: getFilterSessionKey(),
+            ...payload,
+          }),
+        });
+      } catch (e) {}
+    }
+
+    // ================= POPUP =================
+
+    function buildAdvancedSearchButton() {
+
       var state = {
         brand: null,
+        type: null,
         model: null,
-        year: null,
-        keywords: [],
+        options: []
       };
 
-      var container = document.createElement("div");
-      container.className = "mobile-filter";
+      var step = 0;
 
-      container.innerHTML =
-        '<select id="brand"></select>' +
-        '<select id="model" disabled></select>' +
-        '<select id="year" disabled></select>' +
-        '<select id="parts" multiple disabled></select>' +
-        '<button id="searchBtn" disabled>بحث</button>';
+      var brands = [];
+      var models = [];
+      var years = [];
+      var keywords = [];
 
-      document.body.prepend(container);
+      var openBtn = document.createElement("button");
+      openBtn.textContent = "اختيار السيارة";
+      document.body.appendChild(openBtn);
 
-      var brandSel = container.querySelector("#brand");
-      var modelSel = container.querySelector("#model");
-      var yearSel = container.querySelector("#year");
-      var partsSel = container.querySelector("#parts");
-      var searchBtn = container.querySelector("#searchBtn");
+      var popup = document.createElement("div");
+      popup.style.display = "none";
+      document.body.appendChild(popup);
 
-      loadBrands(storeId).then(function (brands) {
-        brandSel.innerHTML =
-          '<option value="">اختر الماركة</option>' +
-          brands.map(function (b) {
-            return '<option value="'+b.id+'">'+(b.name_ar || b.name)+'</option>';
-          }).join("");
-      });
+      function renderStep(s) {
+        step = s;
+        popup.innerHTML = "";
 
-      brandSel.onchange = function () {
-        state.brand = this.value;
-        modelSel.disabled = false;
-        loadModels(storeId, state.brand).then(function (models) {
-          modelSel.innerHTML =
-            '<option value="">اختر الموديل</option>' +
-            models.map(function (m) {
-              return '<option value="'+m.id+'">'+(m.name_ar || m.name)+'</option>';
-            }).join("");
-        });
+        if (step === 0) {
+          brands.forEach(function (b) {
+            var btn = document.createElement("button");
+            btn.textContent = b.name_ar || b.name;
+            btn.onclick = async function () {
+              state.brand = b;
+              models = await loadModels(storeId, b.id);
+              renderStep(1);
+            };
+            popup.appendChild(btn);
+          });
+        }
+
+        else if (step === 1) {
+          models.forEach(function (m) {
+            var btn = document.createElement("button");
+            btn.textContent = m.name_ar || m.name;
+            btn.onclick = async function () {
+              state.type = m;
+              years = await loadYears(storeId, m.id);
+              renderStep(2);
+            };
+            popup.appendChild(btn);
+          });
+        }
+
+        else if (step === 2) {
+          years.forEach(function (y) {
+            var btn = document.createElement("button");
+            btn.textContent = y.year;
+            btn.onclick = async function () {
+              state.model = y;
+              keywords = await loadKeywords(storeId, state.brand.id, state.type.id, y.id);
+              renderStep(3);
+            };
+            popup.appendChild(btn);
+          });
+        }
+
+        else if (step === 3) {
+          keywords.forEach(function (k) {
+            var label = k.name_ar || k.slug;
+            var btn = document.createElement("button");
+            btn.textContent = label;
+            btn.onclick = function () {
+              if (state.options.indexOf(label) === -1)
+                state.options.push(label);
+              else
+                state.options = state.options.filter(function (x) { return x !== label; });
+            };
+            popup.appendChild(btn);
+          });
+
+          var confirm = document.createElement("button");
+          confirm.textContent = "تأكيد";
+          confirm.onclick = async function () {
+
+            var carSlug =
+              state.type.slug ||
+              state.brand.slug ||
+              "قطع-غيار";
+
+            var domain = await resolveStoreDomain(storeId);
+
+            var url =
+              domain +
+              "/category/" +
+              encodeURIComponent(carSlug) +
+              "?filters[company]=" +
+              encodeURIComponent(state.brand.id) +
+              "&filters[category_cat]=" +
+              encodeURIComponent(state.type.id) +
+              "&filters[category_id]=" +
+              encodeURIComponent(state.model.id);
+
+            if (state.options.length) {
+              url += "&keyword=" + encodeURIComponent(state.options.join("||"));
+            }
+
+            await logFilterEvent({
+              event_type: "search_submit",
+              brand_id: Number(state.brand.id),
+              model_id: Number(state.type.id),
+              year_id: Number(state.model.id),
+              keyword_labels: state.options
+            });
+
+            window.location.href = url;
+          };
+
+          popup.appendChild(confirm);
+        }
+      }
+
+      openBtn.onclick = async function () {
+        popup.style.display = "block";
+        brands = await loadBrands(storeId);
+        renderStep(0);
       };
 
-      modelSel.onchange = function () {
-        state.model = this.value;
-        yearSel.disabled = false;
-        loadYears(storeId, state.model).then(function (years) {
-          yearSel.innerHTML =
-            '<option value="">اختر السنة</option>' +
-            years.map(function (y) {
-              return '<option value="'+y.id+'">'+y.year+'</option>';
-            }).join("");
-        });
-      };
-
-      yearSel.onchange = function () {
-        state.year = this.value;
-        partsSel.disabled = false;
-        loadKeywords(storeId, state.brand, state.model, state.year).then(function (keys) {
-          partsSel.innerHTML =
-            keys.map(function (k) {
-              return '<option value="'+k.name_ar+'">'+k.name_ar+'</option>';
-            }).join("");
-        });
-        searchBtn.disabled = false;
-      };
-
-      searchBtn.onclick = async function () {
-        if (!state.brand || !state.model || !state.year) return;
-
-        var domain = await resolveStoreDomain(storeId);
-
-        var url =
-          domain +
-          "/category/قطع-غيار" +
-          "?filters[company]=" + encodeURIComponent(state.brand) +
-          "&filters[category_cat]=" + encodeURIComponent(state.model) +
-          "&filters[category_id]=" + encodeURIComponent(state.year);
-
-        window.location.href = url;
-      };
     }
 
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", buildMobileFilter);
-    } else {
-      buildMobileFilter();
-    }
+    buildAdvancedSearchButton();
 
   } catch (err) {
-    console.error("[widgets-mobileT2] error:", err);
+    console.error("widgets-mobile error:", err);
   }
 })();
 `;
