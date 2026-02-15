@@ -1,9 +1,10 @@
 // src/app/widgetsT2.js/route.ts
+// src/app/widgets.js/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
   const js = `
-// widgets.js — Darb Filter Hero (snapshot + events + full config) — NO BRAND FILTER
+// widgets.js — Darb Filter Hero (snapshot + events + full config)
 (function () {
   try {
     var script =
@@ -89,6 +90,7 @@ export async function GET(_req: NextRequest) {
         console.error("[DarbFilter] failed to load snapshot", e);
         SNAPSHOT = {
           store_id: storeId,
+          brands: [],
           models: [],
           years: [],
           sections: [],
@@ -99,10 +101,19 @@ export async function GET(_req: NextRequest) {
       return SNAPSHOT;
     }
 
-    // ✅ no brands anymore
-    async function loadModels(storeId) {
+    async function loadBrands(storeId) {
       var snap = await ensureSnapshot(storeId);
-      return snap.models || [];
+      return snap.brands || [];
+    }
+
+    async function loadModels(storeId, brandId) {
+      var snap = await ensureSnapshot(storeId);
+      var allModels = snap.models || [];
+      var idNum = Number(brandId);
+      if (Number.isNaN(idNum)) return allModels;
+      return allModels.filter(function (m) {
+        return Number(m.brand_id) === idNum;
+      });
     }
 
     async function loadYears(storeId, modelId) {
@@ -115,41 +126,32 @@ export async function GET(_req: NextRequest) {
       });
     }
 
-    async function loadSections(storeId) {
-      var snap = await ensureSnapshot(storeId);
-      return snap.sections || [];
-    }
-
-    async function loadKeywords(storeId, modelId, yearId, sectionId) {
-      // 1) Live من DB عبر API (يحُل مشكلة نقص snapshot)
+    // ✅ تم حذف "القسم" بالكامل — لذلك الكلمات تعتمد على (model_id + اختياري year_id لو احتجته لاحقاً)
+    async function loadKeywords(storeId, brandId, modelId, yearId) {
+      // 1) Live من DB عبر API
       try {
         var url =
           API_BASE +
           "/keywords?store_id=" +
           encodeURIComponent(storeId) +
-          "&section_id=" +
-          encodeURIComponent(String(sectionId || "")) +
           "&model_id=" +
           encodeURIComponent(String(modelId || ""));
 
+        // لو احتجت السنة عند الـ API مستقبلاً، فك التعليق:
+        // url += "&year_id=" + encodeURIComponent(String(yearId || ""));
+
         var data = await fetchJson(url);
         var live = (data && data.keywords) || [];
-
         if (Array.isArray(live)) return live;
-      } catch (e) {
-        // نسكت ونروح fallback
-      }
+      } catch (e) {}
 
       // 2) Fallback: snapshot
       var snap = await ensureSnapshot(storeId);
       var allKeywords = (snap && snap.keywords) || [];
 
       var mId = Number(modelId);
-      var sId = Number(sectionId);
-
       return allKeywords.filter(function (k) {
         if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
-        if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
         return true;
       });
     }
@@ -279,9 +281,8 @@ export async function GET(_req: NextRequest) {
         var wrap = document.createElement("div");
         wrap.className = "widgets-filter-hero-wrap";
 
-        // ✅ removed brand/company field completely; steps become 01..04
-        var html =
-          '\\
+        // ✅ حذفنا select القسم بالكامل
+        var html = '\\
     <div class="hero-section widgets-filter-hero">\\
       <div class="hero-bg-img" style="background:' +
           heroBgStyle.replace(/"/g, '\\"') +
@@ -303,9 +304,9 @@ export async function GET(_req: NextRequest) {
         <div class="X1">\\
           <div class="hero-filters-wrapper">\\
             <form id="filters-form" onsubmit="return false;" dir="rtl" class="hero-filters-form">\\
-              <select id="category"></select>\\
+              <select id="company"></select>\\
+              <select id="category" disabled></select>\\
               <select id="model" disabled></select>\\
-              <select id="section" disabled></select>\\
               <select id="parts" multiple disabled></select>\\
               <button id="filter-btn" type="button" class="hero-search-btn">\\
                 بحث <span style="font-size:18px;vertical-align:middle;">&#8594;</span>\\
@@ -369,33 +370,31 @@ export async function GET(_req: NextRequest) {
           link.style.display = showBranding ? "inline-block" : "none";
         }
 
-        // ✅ steps now 01..04 (category, year, section, parts)
+        // ✅ صاروا 4 خطوات بدل 5
         var steps = ["01", "02", "03", "04"];
-        wrap
-          .querySelectorAll(".hero-filters-form select")
-          .forEach(function (el, idx) {
-            if (steps[idx]) {
-              var holder = document.createElement("div");
-              holder.className = "select-with-step";
-              var label = document.createElement("span");
-              label.className = "step-label";
-              label.textContent = steps[idx];
-              holder.appendChild(label);
-              el.parentNode.insertBefore(holder, el);
-              holder.appendChild(el);
-            }
-          });
+        wrap.querySelectorAll(".hero-filters-form select").forEach(function (
+          el,
+          idx
+        ) {
+          if (steps[idx]) {
+            var holder = document.createElement("div");
+            holder.className = "select-with-step";
+            var label = document.createElement("span");
+            label.className = "step-label";
+            label.textContent = steps[idx];
+            holder.appendChild(label);
+            el.parentNode.insertBefore(holder, el);
+            holder.appendChild(el);
+          }
+        });
 
-        // ✅ company removed
+        var company = wrap.querySelector("#company");
         var category = wrap.querySelector("#category");
         var model = wrap.querySelector("#model");
-        var section = wrap.querySelector("#section");
         var parts = wrap.querySelector("#parts");
         var filterBtn = wrap.querySelector("#filter-btn");
 
-        if (filterBtn) {
-          filterBtn.style.cursor = "pointer";
-        }
+        if (filterBtn) filterBtn.style.cursor = "pointer";
 
         var currentCategory = null;
         var currentModel = null;
@@ -407,22 +406,22 @@ export async function GET(_req: NextRequest) {
         }
 
         function updateFilterButtonState() {
+          var brandId = companyChoices && companyChoices.getValue(true);
           var modelId = categoryChoices && categoryChoices.getValue(true);
           var yearId = modelChoices && modelChoices.getValue(true);
-          var sectionId = sectionChoices && sectionChoices.getValue(true);
 
-          var ready = !!(modelId && yearId && sectionId);
+          var ready = !!(brandId && modelId && yearId);
           if (filterBtn) filterBtn.disabled = !ready;
         }
 
         function markMissingRequiredFields() {
+          var brandId = companyChoices.getValue(true);
           var modelId = categoryChoices.getValue(true);
           var yearId = modelChoices.getValue(true);
-          var sectionId = sectionChoices.getValue(true);
 
+          setFieldError(company, !brandId);
           setFieldError(category, !modelId);
           setFieldError(model, !yearId);
-          setFieldError(section, !sectionId);
         }
 
         function setButtonLoading(isLoading) {
@@ -451,10 +450,9 @@ export async function GET(_req: NextRequest) {
           });
         }
 
-        // ✅ placeholders updated (no brand)
+        var companyChoices = initChoices(company, "اختر الماركة");
         var categoryChoices = initChoices(category, "اختر الموديل");
         var modelChoices = initChoices(model, "اختر السنة");
-        var sectionChoices = initChoices(section, "اختر القسم");
         var partsChoices = new Choices(parts, {
           removeItemButton: true,
           maxItemCount: 5,
@@ -467,15 +465,15 @@ export async function GET(_req: NextRequest) {
           itemSelectText: "اختر",
         });
 
+        company.disabled = true;
         category.disabled = true;
         model.disabled = true;
-        section.disabled = true;
         parts.disabled = true;
         filterBtn.disabled = true;
 
+        var brands = [];
         var models = [];
         var years = [];
-        var sections = [];
         var keywords = [];
 
         function setChoicesData(choicesInstance, list, placeholder, labelKey) {
@@ -490,11 +488,7 @@ export async function GET(_req: NextRequest) {
                 item.name ||
                 ("#" + item.id);
 
-              return {
-                value: String(item.id),
-                label: label,
-                selected: false,
-              };
+              return { value: String(item.id), label: label, selected: false };
             })
           );
 
@@ -502,28 +496,82 @@ export async function GET(_req: NextRequest) {
           choicesInstance.setChoices(items, "value", "label", true);
         }
 
-        // ✅ initial load models (top-level)
-        setChoicesData(categoryChoices, [], "جاري التحميل...");
-        category.disabled = true;
-        categoryChoices.disable();
+        setChoicesData(companyChoices, [], "جاري التحميل...");
+        company.disabled = true;
+        companyChoices.disable();
 
         try {
-          models = await loadModels(storeId);
+          brands = await loadBrands(storeId);
 
-          if (models.length > 0) {
-            setChoicesData(categoryChoices, models, "اختر الموديل", "name_ar");
-            category.disabled = false;
-            categoryChoices.enable();
+          if (brands.length > 0) {
+            setChoicesData(companyChoices, brands, "اختر الماركة", "name_ar");
+            company.disabled = false;
+            companyChoices.enable();
           } else {
-            setChoicesData(categoryChoices, [], "لا توجد خيارات");
+            setChoicesData(companyChoices, [], "لا توجد خيارات");
+            company.disabled = true;
+            companyChoices.disable();
+          }
+        } catch (e) {
+          setChoicesData(companyChoices, [], "خطأ في تحميل الماركات");
+          company.disabled = true;
+          companyChoices.disable();
+        }
+
+        company.addEventListener("change", async function () {
+          var brandId = companyChoices.getValue(true);
+
+          if (brandId) setFieldError(company, false);
+
+          setChoicesData(categoryChoices, [], "اختر الموديل");
+          setChoicesData(modelChoices, [], "اختر السنة");
+          partsChoices.clearStore();
+
+          category.disabled = true;
+          model.disabled = true;
+          parts.disabled = true;
+          filterBtn.disabled = true;
+
+          currentCategory = null;
+          currentModel = null;
+
+          if (!brandId) {
+            categoryChoices.disable();
+            modelChoices.disable();
+            partsChoices.disable();
+            updateFilterButtonState();
+            return;
+          }
+
+          var brandNumeric = Number(brandId);
+          if (!Number.isNaN(brandNumeric)) {
+            logFilterEvent({ event_type: "brand_select", brand_id: brandNumeric });
+          }
+
+          setChoicesData(categoryChoices, [], "جاري التحميل...");
+          category.disabled = true;
+          categoryChoices.disable();
+
+          try {
+            models = await loadModels(storeId, brandId);
+
+            if (models.length > 0) {
+              setChoicesData(categoryChoices, models, "اختر الموديل", "name_ar");
+              category.disabled = false;
+              categoryChoices.enable();
+            } else {
+              setChoicesData(categoryChoices, [], "لا توجد خيارات");
+              category.disabled = true;
+              categoryChoices.disable();
+            }
+          } catch (e) {
+            setChoicesData(categoryChoices, [], "خطأ في تحميل الموديلات");
             category.disabled = true;
             categoryChoices.disable();
           }
-        } catch (e) {
-          setChoicesData(categoryChoices, [], "خطأ في تحميل الموديلات");
-          category.disabled = true;
-          categoryChoices.disable();
-        }
+
+          updateFilterButtonState();
+        });
 
         category.addEventListener("change", async function () {
           var categoryId = categoryChoices.getValue(true);
@@ -531,11 +579,9 @@ export async function GET(_req: NextRequest) {
           if (categoryId) setFieldError(category, false);
 
           setChoicesData(modelChoices, [], "اختر السنة");
-          setChoicesData(sectionChoices, [], "اختر القسم");
           partsChoices.clearStore();
 
           model.disabled = true;
-          section.disabled = true;
           parts.disabled = true;
           filterBtn.disabled = true;
 
@@ -546,7 +592,6 @@ export async function GET(_req: NextRequest) {
 
           if (!categoryId) {
             modelChoices.disable();
-            sectionChoices.disable();
             partsChoices.disable();
             updateFilterButtonState();
             return;
@@ -554,10 +599,7 @@ export async function GET(_req: NextRequest) {
 
           var modelNumeric = Number(categoryId);
           if (!Number.isNaN(modelNumeric)) {
-            logFilterEvent({
-              event_type: "model_select",
-              model_id: modelNumeric,
-            });
+            logFilterEvent({ event_type: "model_select", model_id: modelNumeric });
           }
 
           setChoicesData(modelChoices, [], "جاري التحميل...");
@@ -585,87 +627,34 @@ export async function GET(_req: NextRequest) {
           updateFilterButtonState();
         });
 
+        // ✅ بعد اختيار السنة نحمل القطع مباشرة (بدون قسم)
         model.addEventListener("change", async function () {
-          var modelId = modelChoices.getValue(true);
+          var yearId = modelChoices.getValue(true);
 
-          if (modelId) setFieldError(model, false);
+          if (yearId) setFieldError(model, false);
 
-          setChoicesData(sectionChoices, [], "اختر القسم");
           partsChoices.clearStore();
-
-          section.disabled = true;
           parts.disabled = true;
           filterBtn.disabled = true;
 
           currentModel =
             years.find(function (y) {
-              return String(y.id) === String(modelId);
+              return String(y.id) === String(yearId);
             }) || null;
 
-          if (!modelId) {
-            sectionChoices.disable();
+          if (!yearId) {
             partsChoices.disable();
             updateFilterButtonState();
             return;
           }
 
-          var yearNumeric = Number(modelId);
+          var yearNumeric = Number(yearId);
           if (!Number.isNaN(yearNumeric)) {
-            logFilterEvent({
-              event_type: "year_select",
-              year_id: yearNumeric,
-            });
+            logFilterEvent({ event_type: "year_select", year_id: yearNumeric });
           }
 
-          setChoicesData(sectionChoices, [], "جاري التحميل...");
-          section.disabled = true;
-          sectionChoices.disable();
-
-          try {
-            sections = await loadSections(storeId);
-            if (sections.length > 0) {
-              setChoicesData(sectionChoices, sections, "اختر القسم", "name_ar");
-              section.disabled = false;
-              sectionChoices.enable();
-            } else {
-              setChoicesData(sectionChoices, [], "لا توجد خيارات");
-              section.disabled = true;
-              sectionChoices.disable();
-            }
-          } catch (e) {
-            setChoicesData(sectionChoices, [], "خطأ في تحميل الأقسام");
-            section.disabled = true;
-            sectionChoices.disable();
-          }
-
-          updateFilterButtonState();
-        });
-
-        section.addEventListener("change", async function () {
-          var sectionId = sectionChoices.getValue(true);
-
-          if (sectionId) setFieldError(section, false);
-
-          partsChoices.clearStore();
-          parts.disabled = true;
-          filterBtn.disabled = true;
-
-          if (!sectionId) {
-            partsChoices.disable();
-            updateFilterButtonState();
-            return;
-          }
-
-          var sectionNumeric = Number(sectionId);
-          if (!Number.isNaN(sectionNumeric)) {
-            logFilterEvent({
-              event_type: "section_select",
-              section_id: sectionNumeric,
-            });
-          }
-
+          var brandId = companyChoices.getValue(true);
           var modelId = categoryChoices.getValue(true);
-          var yearId = modelChoices.getValue(true);
 
           partsChoices.setChoices(
             [{ value: "", label: "جاري التحميل...", selected: true }],
@@ -677,7 +666,7 @@ export async function GET(_req: NextRequest) {
           partsChoices.disable();
 
           try {
-            keywords = await loadKeywords(storeId, modelId, yearId, sectionId);
+            keywords = await loadKeywords(storeId, brandId, modelId, yearId);
 
             partsChoices.clearStore();
 
@@ -720,11 +709,11 @@ export async function GET(_req: NextRequest) {
         });
 
         filterBtn.addEventListener("click", async function () {
+          var brandId = companyChoices.getValue(true);
           var modelId = categoryChoices.getValue(true);
           var yearId = modelChoices.getValue(true);
-          var sectionId = sectionChoices.getValue(true);
 
-          if (!modelId || !yearId || !sectionId) {
+          if (!brandId || !modelId || !yearId) {
             markMissingRequiredFields();
             return;
           }
@@ -732,26 +721,29 @@ export async function GET(_req: NextRequest) {
           setButtonLoading(true);
 
           try {
+            var brandObj =
+              brands.find(function (b) {
+                return String(b.id) === String(brandId);
+              }) || null;
+
             var modelRow =
               models.find(function (m) {
                 return String(m.id) === String(modelId);
               }) || null;
 
-            var carSlug = (modelRow && modelRow.slug) || "قطع-غيار";
+            var carSlug =
+              (modelRow && modelRow.slug) ||
+              (brandObj && brandObj.slug) ||
+              "قطع-غيار";
 
             var yearRow =
               years.find(function (y) {
                 return String(y.id) === String(yearId);
               }) || null;
 
-            var sectionRow =
-              sections.find(function (s) {
-                return String(s.id) === String(sectionId);
-              }) || null;
-
+            var sallaCompanyId = (brandObj && brandObj.salla_company_id) || brandId;
             var sallaCategoryId = (modelRow && modelRow.salla_category_id) || modelId;
             var sallaYearId = (yearRow && yearRow.salla_year_id) || yearId;
-            var sallaSectionId = (sectionRow && sectionRow.salla_section_id) || sectionId;
 
             var selectedKeywordIds = partsChoices.getValue(true) || [];
             if (!Array.isArray(selectedKeywordIds)) selectedKeywordIds = [selectedKeywordIds];
@@ -769,41 +761,35 @@ export async function GET(_req: NextRequest) {
             });
 
             var keywordParam = "";
-            if (keywordLabels.length) {
-              keywordParam = encodeURIComponent(keywordLabels.join("||"));
-            }
+            if (keywordLabels.length) keywordParam = encodeURIComponent(keywordLabels.join("||"));
 
             var domain = await resolveStoreDomain(storeId);
 
-            // ✅ removed filters[company] and filters[brand_id]
+            // ✅ حذفنا filters[brand_id] لأنه كان مربوط بالقسم
             var url =
               domain +
               "/category/" +
               encodeURIComponent(carSlug) +
-              "?filters[category_cat]=" +
+              "?filters[company]=" +
+              encodeURIComponent(sallaCompanyId) +
+              "&filters[category_cat]=" +
               encodeURIComponent(sallaCategoryId) +
               "&filters[category_id]=" +
               encodeURIComponent(sallaYearId);
-
-            // ✅ keep section as its own param without brand_id naming
-            // (If your store expects section in filters, keep it here)
-            url +=
-              "&filters[section_id]=" +
-              encodeURIComponent(sallaSectionId);
 
             if (keywordParam) {
               url += "&keyword=" + keywordParam;
             }
 
+            var brandNumeric = Number(brandId);
             var modelNumeric = Number(modelId);
             var yearNumeric = Number(yearId);
-            var sectionNumeric = Number(sectionId);
 
             await logFilterEvent({
               event_type: "search_submit",
+              brand_id: !Number.isNaN(brandNumeric) ? brandNumeric : null,
               model_id: !Number.isNaN(modelNumeric) ? modelNumeric : null,
               year_id: !Number.isNaN(yearNumeric) ? yearNumeric : null,
-              section_id: !Number.isNaN(sectionNumeric) ? sectionNumeric : null,
               keyword_ids: keywordIdsNumeric,
               meta: {
                 page_url: window.location.href,
@@ -852,9 +838,7 @@ export async function GET(_req: NextRequest) {
 
       fetch(statusUrl)
         .then(function (res) {
-          return res.json().catch(function () {
-            return {};
-          });
+          return res.json().catch(function () { return {}; });
         })
         .then(function (data) {
           if (data && data.ok && data.suspended) {
