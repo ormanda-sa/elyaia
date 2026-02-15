@@ -1,5 +1,5 @@
 // src/app/widgetsT2.js/route.ts
-// src/app/widgets.js/route.ts
+ 
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
