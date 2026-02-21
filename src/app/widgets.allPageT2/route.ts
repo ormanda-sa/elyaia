@@ -30,7 +30,7 @@ export async function GET(_req: NextRequest) {
     }
 
     var API_BASE = (PANEL_ORIGIN || "") + "/api/widget";
-    var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data";
+   var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data-v2";
 
     // ========== Helpers ==========
 

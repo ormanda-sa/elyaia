@@ -1,4 +1,3 @@
-// src/app/(admin)/dashboard/filter/page.tsx
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
@@ -6,8 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ModelsBulkImportDialog } from "./_components/ModelsBulkImportDialog";
 import { YearsBulkImportDialog } from "./_components/YearsBulkImportDialog";
 import { KeywordsBulkImportDialog } from "./_components/KeywordsBulkImportDialog";
- import { SnapshotButton } from "./_components/SnapshotButton";
-
+import { SnapshotButton } from "./_components/SnapshotButton";
+import { SnapshotExportButton } from "./_components/SnapshotExportButton";
+ 
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,12 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import {
   Card,
@@ -51,7 +46,19 @@ import {
   KeywordFormState,
 } from "./_components/KeywordsTab";
 
-type TabKey = "brands" | "models" | "years" | "sections" | "keywords";
+import {
+  YearKeywordsTab,
+  YearKeyword,
+  YearKeywordFormState,
+} from "./_components/YearKeywordsTab";
+
+type TabKey =
+  | "brands"
+  | "models"
+  | "years"
+  | "sections"
+  | "keywords"
+  | "year_keywords";
 
 function BrandDeleteButton({
   brand,
@@ -94,9 +101,8 @@ function BrandDeleteButton({
             حذف الشركة {brand.name_ar}؟
           </AlertDialogTitle>
           <AlertDialogDescription className="text-right text-[11px]">
-            سيتم حذف الشركة وجميع الموديلات والسنوات والكلمات المرتبطة بها.
-            لا يمكن التراجع عن هذه العملية. للمتابعة اكتب اسم الشركة بالضبط كما
-            هو:
+            سيتم حذف الشركة وجميع الموديلات والسنوات والكلمات المرتبطة بها. لا
+            يمكن التراجع عن هذه العملية. للمتابعة اكتب اسم الشركة بالضبط كما هو:
             <span className="ml-1 font-semibold text-slate-900">
               {brand.name_ar}
             </span>
@@ -133,7 +139,7 @@ function BrandDeleteButton({
   );
 }
 
-/** الكومبوننت الداخلي: فيه كل useSearchParams/useRouter/useEffect/... */
+/** الكومبوننت الداخلي */
 function FilterSettingsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -141,7 +147,7 @@ function FilterSettingsInner() {
   const brandFromUrl = searchParams.get("brand");
   const tabFromUrl = searchParams.get("tab") as TabKey | null;
 
-  // نخلي التبويب الافتراضي "الموديلات"
+  // التبويب الافتراضي
   const [activeTab, setActiveTab] = useState<TabKey>("models");
 
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -150,11 +156,17 @@ function FilterSettingsInner() {
   const [sections, setSections] = useState<Section[]>([]);
   const [keywords, setKeywords] = useState<Keyword[]>([]);
 
+  // ✅ جديد: كلمات السنة
+  const [yearKeywords, setYearKeywords] = useState<YearKeyword[]>([]);
+
   const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
   const [selectedSectionId, setSelectedSectionId] = useState<number | null>(
     null,
   );
+
+  // ✅ جديد: السنة المختارة لكلمات السنة
+  const [selectedYearId, setSelectedYearId] = useState<number | null>(null);
 
   const [brandForm, setBrandForm] = useState<BrandFormState>({ mode: "add" });
   const [modelForm, setModelForm] = useState<ModelFormState>({ mode: "add" });
@@ -166,12 +178,17 @@ function FilterSettingsInner() {
     mode: "add",
   });
 
+  // ✅ جديد: فورم كلمات السنة
+  const [yearKeywordForm, setYearKeywordForm] =
+    useState<YearKeywordFormState>({ mode: "add" });
+
   const [loading, setLoading] = useState<Record<TabKey, boolean>>({
     brands: false,
     models: false,
     years: false,
     sections: false,
     keywords: false,
+    year_keywords: false,
   });
 
   const [errors, setErrors] = useState<Record<TabKey, string | null>>({
@@ -180,6 +197,7 @@ function FilterSettingsInner() {
     years: null,
     sections: null,
     keywords: null,
+    year_keywords: null,
   });
 
   const [globalLoading, setGlobalLoading] = useState(false);
@@ -188,6 +206,9 @@ function FilterSettingsInner() {
   const selectedModel = models.find((m) => m.id === selectedModelId) || null;
   const selectedSection =
     sections.find((s) => s.id === selectedSectionId) || null;
+
+  // ✅ السنة المختارة من قائمة years
+  const selectedYear = years.find((y) => y.id === selectedYearId) || null;
 
   const setTabLoading = (tab: TabKey, v: boolean) =>
     setLoading((prev) => ({ ...prev, [tab]: v }));
@@ -320,6 +341,16 @@ function FilterSettingsInner() {
       const data = await res.json();
       const list: YearRow[] = data.years || data.items || [];
       setYears(list);
+
+      // ✅ جديد (آمن): لو ما في سنة مختارة أو اختفت من القائمة اختر أول سنة
+      if (list.length) {
+        const exists = selectedYearId
+          ? list.some((y) => y.id === selectedYearId)
+          : false;
+        if (!exists) setSelectedYearId(list[0].id);
+      } else {
+        setSelectedYearId(null);
+      }
     } catch (e: any) {
       setTabError(tab, e.message || "خطأ غير متوقع");
     } finally {
@@ -360,9 +391,7 @@ function FilterSettingsInner() {
         model_id: String(selectedModelId),
         section_id: String(selectedSectionId),
       });
-      const res = await fetch(
-        `/api/dashboard/keywords?${params.toString()}`,
-      );
+      const res = await fetch(`/api/dashboard/keywords?${params.toString()}`);
       if (!res.ok) throw new Error("فشل جلب الكلمات");
       const data = await res.json();
       const list: Keyword[] = data.keywords || [];
@@ -374,10 +403,41 @@ function FilterSettingsInner() {
     }
   };
 
+  // ✅ جديد: loader لكلمات السنة
+  const loadYearKeywords = async () => {
+    const tab: TabKey = "year_keywords";
+    setTabLoading(tab, true);
+    setTabError(tab, null);
+    try {
+      if (!selectedYearId) {
+        setYearKeywords([]);
+        return;
+      }
+      const params = new URLSearchParams({
+        year_id: String(selectedYearId),
+      });
+      const res = await fetch(`/api/dashboard/year-keywords?${params.toString()}`);
+      if (!res.ok) throw new Error("فشل جلب كلمات السنة");
+      const data = await res.json();
+      const list: YearKeyword[] = data.year_keywords || data.items || [];
+      setYearKeywords(list);
+    } catch (e: any) {
+      setTabError(tab, e.message || "خطأ غير متوقع");
+    } finally {
+      setTabLoading(tab, false);
+    }
+  };
+
   // ============ EFFECTS ============
 
   useEffect(() => {
-    const allowed: TabKey[] = ["models", "years", "sections", "keywords"];
+    const allowed: TabKey[] = [
+      "models",
+      "years",
+      "sections",
+      "keywords",
+      "year_keywords",
+    ];
     if (tabFromUrl && allowed.includes(tabFromUrl)) {
       setActiveTab(tabFromUrl);
     } else {
@@ -428,6 +488,8 @@ function FilterSettingsInner() {
       await loadModels();
       setSelectedModelId(null);
       setYears([]);
+      setSelectedYearId(null);
+      setYearKeywords([]);
       setKeywords([]);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -448,6 +510,14 @@ function FilterSettingsInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSectionId]);
 
+  // ✅ جديد: إذا تغيرت السنة المختارة حمّل كلمات السنة
+  useEffect(() => {
+    (async () => {
+      await loadYearKeywords();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYearId]);
+
   const reloadAll = async () => {
     setGlobalLoading(true);
     await loadBrands();
@@ -455,10 +525,11 @@ function FilterSettingsInner() {
     await loadModels();
     await loadYears();
     await loadKeywords();
+    await loadYearKeywords();
     setGlobalLoading(false);
   };
 
-  // ============ CRUD (كلها نفسها) ============
+  // ============ CRUD (نفس الموجود + جديد لكلمات السنة) ============
 
   const submitBrand = async () => {
     const payload = {
@@ -509,6 +580,8 @@ function FilterSettingsInner() {
       setSelectedBrandId(null);
       setSelectedModelId(null);
       setYears([]);
+      setSelectedYearId(null);
+      setYearKeywords([]);
       setKeywords([]);
     }
 
@@ -553,6 +626,7 @@ function FilterSettingsInner() {
     await loadModels();
     await loadYears();
     await loadKeywords();
+    await loadYearKeywords();
   };
 
   const editModel = (m: Model) => {
@@ -574,6 +648,8 @@ function FilterSettingsInner() {
     if (selectedModelId === m.id) {
       setSelectedModelId(null);
       setYears([]);
+      setSelectedYearId(null);
+      setYearKeywords([]);
       setKeywords([]);
     }
     await loadModels();
@@ -738,6 +814,57 @@ function FilterSettingsInner() {
     await loadKeywords();
   };
 
+  // ✅ جديد: CRUD لكلمات السنة
+  const submitYearKeyword = async () => {
+    if (!selectedYearId) {
+      alert("اختر سنة أولاً");
+      return;
+    }
+
+    const payload = {
+      year_id: selectedYearId,
+      name_ar: yearKeywordForm.name_ar?.trim(),
+      sort_order:
+        yearKeywordForm.sort_order !== undefined &&
+        yearKeywordForm.sort_order !== null
+          ? Number(yearKeywordForm.sort_order)
+          : null,
+    };
+
+    if (!payload.name_ar) {
+      alert("نص الكلمة مطلوب");
+      return;
+    }
+
+    if (yearKeywordForm.mode === "add") {
+      await postJSON("/api/dashboard/year-keywords", payload, "year_keywords");
+    } else if (yearKeywordForm.mode === "edit" && yearKeywordForm.id) {
+      await putJSON(
+        "/api/dashboard/year-keywords",
+        { id: yearKeywordForm.id, ...payload },
+        "year_keywords",
+      );
+    }
+
+    setYearKeywordForm({ mode: "add" });
+    await loadYearKeywords();
+  };
+
+  const editYearKeyword = (k: YearKeyword) => {
+    setYearKeywordForm({
+      mode: "edit",
+      id: k.id,
+      name_ar: k.name_ar,
+      sort_order: k.sort_order ?? undefined,
+    });
+    setActiveTab("year_keywords");
+  };
+
+  const deleteYearKeyword = async (k: YearKeyword) => {
+    await deleteJSON("/api/dashboard/year-keywords", { id: k.id }, "year_keywords");
+    await loadYearKeywords();
+  };
+
   // ============ UI ============
 
   return (
@@ -796,47 +923,58 @@ function FilterSettingsInner() {
           )}
         </CardHeader>
 
-<CardContent className="px-0 pt-0">
-  <div className="mb-3 flex items_center justify-between gap-2">
-    <div className="text-[11px] text-slate-500">
-      {selectedModel && (
-        <>
-          الموديل الحالي:{" "}
-          <span className="font-semibold text-slate-900">
-            {selectedModel.name_ar}
-          </span>
-        </>
-      )}
-    </div>
-    <Button
-      type="button"
-      size="sm"
-      className="rounded-full"
-      onClick={reloadAll}
-      disabled={globalLoading}
-    >
-      {globalLoading ? "جارٍ التحديث..." : "إعادة تحميل البيانات"}
-    </Button>
-  </div>
+        <CardContent className="px-0 pt-0">
+          <div className="mb-3 flex items_center justify-between gap-2">
+            <div className="text-[11px] text-slate-500">
+              {selectedModel && (
+                <>
+                  الموديل الحالي:{" "}
+                  <span className="font-semibold text-slate-900">
+                    {selectedModel.name_ar}
+                  </span>
+                </>
+              )}
+              {selectedYear && (
+                <>
+                  {" "}
+                  — السنة الحالية:{" "}
+                  <span className="font-semibold text-slate-900">
+                    {selectedYear.year}
+                  </span>
+                </>
+              )}
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              className="rounded-full"
+              onClick={reloadAll}
+              disabled={globalLoading}
+            >
+              {globalLoading ? "جارٍ التحديث..." : "إعادة تحميل البيانات"}
+            </Button>
+          </div>
 
-  {/* بلوك إدارة بيانات الودجت + زر التوليد */}
-  <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
-    <h2 className="text-sm font-semibold text-slate-900">
-      بيانات الودجت (ملف JSON)
-    </h2>
-    <p className="text-xs text-slate-600">
-      بعد ما تعدّل الشركات أو الموديلات أو السنوات أو الأقسام أو الكلمات،
-      اضغط الزر عشان نحدّث ملف JSON اللي تستخدمه سكربتات الودجت في متجرك.
-    </p>
-    <SnapshotButton />
-  </div>
+          {/* بلوك إدارة بيانات الودجت + زر التوليد */}
+          <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+            <h2 className="text-sm font-semibold text-slate-900">
+              بيانات الودجت (ملف JSON)
+            </h2>
+            <p className="text-xs text-slate-600">
+              بعد ما تعدّل الشركات أو الموديلات أو السنوات أو الأقسام أو الكلمات،
+              اضغط الزر عشان نحدّث ملف JSON اللي تستخدمه سكربتات الودجت في متجرك.
+            </p>
+            <SnapshotButton />
+            <SnapshotExportButton />
+          </div>
 
           <Tabs
             dir="rtl"
             value={activeTab}
             onValueChange={(v) => setActiveTab(v as TabKey)}
           >
-            <TabsList className="mb-4 grid w-full grid-cols-4">
+            {/* ✅ عدلناها 5 تبويبات */}
+            <TabsList className="mb-4 grid w-full grid-cols-5">
               <TabsTrigger value="models" className="text-xs">
                 الموديلات
               </TabsTrigger>
@@ -848,6 +986,9 @@ function FilterSettingsInner() {
               </TabsTrigger>
               <TabsTrigger value="keywords" className="text-xs">
                 الكلمات
+              </TabsTrigger>
+              <TabsTrigger value="year_keywords" className="text-xs">
+                كلمات السنة
               </TabsTrigger>
             </TabsList>
 
@@ -865,6 +1006,7 @@ function FilterSettingsInner() {
                     await loadModels();
                     await loadYears();
                     await loadKeywords();
+                    await loadYearKeywords();
                   }}
                 />
               </div>
@@ -958,6 +1100,29 @@ function FilterSettingsInner() {
                 onDelete={deleteKeyword}
               />
             </TabsContent>
+
+            {/* ✅ جديد: Year Keywords */}
+            <TabsContent value="year_keywords" className="mt-0">
+              <YearKeywordsTab
+                brands={brands}
+                models={models}
+                years={years}
+                selectedBrandId={selectedBrandId}
+                setSelectedBrandId={setSelectedBrandId}
+                selectedModelId={selectedModelId}
+                setSelectedModelId={setSelectedModelId}
+                selectedYearId={selectedYearId}
+                setSelectedYearId={setSelectedYearId}
+                yearKeywords={yearKeywords}
+                form={yearKeywordForm}
+                setForm={setYearKeywordForm}
+                loading={loading.year_keywords}
+                error={errors.year_keywords}
+                onSubmit={submitYearKeyword}
+                onEdit={editYearKeyword}
+                onDelete={deleteYearKeyword}
+              />
+            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
@@ -965,7 +1130,7 @@ function FilterSettingsInner() {
   );
 }
 
-/** الـ default export: يلف الـ inner داخل Suspense عشان useSearchParams يرضي Next 16 */
+/** default export */
 export default function FilterSettingsPage() {
   return (
     <Suspense fallback={null}>
