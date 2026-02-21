@@ -135,7 +135,7 @@ export async function GET(_req: NextRequest) {
 
 // ✅ كلمات حسب السنة (year_id) من snapshot (widget-data-v2)
 async function loadKeywords(storeId, brandId, modelId, yearId) {
-  // 1) Live API (إذا موجود)
+  // 1) Live API
   try {
     var url =
       API_BASE +
@@ -147,9 +147,7 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
     var data = await fetchJson(url);
     var live = (data && data.keywords) || [];
     if (Array.isArray(live)) return live;
-  } catch (e) {
-    // fallback
-  }
+  } catch (e) {}
 
   // 2) Snapshot fallback
   var snap = await ensureSnapshot(storeId);
