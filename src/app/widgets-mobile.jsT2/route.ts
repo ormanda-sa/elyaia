@@ -95,35 +95,32 @@ var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data-v2";
     }
 
     // ✅ بدون قسم: نجيب الكلمات حسب model_id فقط (ولو API يدعم section_id نخليه فاضي)
-    async function loadKeywords(storeId, brandId, modelId, yearId) {
-      // 1) Live API
-      try {
-        var url =
-          API_BASE +
-          "/keywords?store_id=" +
-          encodeURIComponent(storeId) +
-          "&section_id=" +
-          encodeURIComponent("") +
-          "&model_id=" +
-          encodeURIComponent(String(modelId || ""));
+// ✅ كلمات حسب السنة (year_id)
+async function loadKeywords(storeId, brandId, modelId, yearId) {
+  // 1) Live API (اختياري) — إذا عندك endpoint يدعم year_id
+  try {
+    var url =
+      API_BASE +
+      "/year-keywords?store_id=" + encodeURIComponent(storeId) +
+      "&year_id=" + encodeURIComponent(String(yearId || ""));
 
-        var data = await fetchJson(url);
-        var live = (data && data.keywords) || [];
-        if (Array.isArray(live)) return live;
-      } catch (e) {
-        // fallback
-      }
+    var data = await fetchJson(url);
+    var live = (data && data.keywords) || [];
+    if (Array.isArray(live)) return live;
+  } catch (e) {
+    // fallback
+  }
+ 
+  // 2) Snapshot fallback
+  var snap = await ensureSnapshot(storeId);
+  var allKeywords = (snap && snap.keywords) || [];
 
-      // 2) Snapshot fallback
-      var snap = await ensureSnapshot(storeId);
-      var allKeywords = (snap && snap.keywords) || [];
-
-      var mId = Number(modelId);
-      return allKeywords.filter(function (k) {
-        if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
-        return true;
-      });
-    }
+  var yId = Number(yearId);
+  return allKeywords.filter(function (k) {
+    if (!Number.isNaN(yId) && Number(k.year_id) !== yId) return false;
+    return true;
+  });
+}
 
     function getFilterSessionKey() {
       var KEY = "darb_filter_sid";
