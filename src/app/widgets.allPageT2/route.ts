@@ -135,17 +135,29 @@ export async function GET(_req: NextRequest) {
 
 // ✅ كلمات حسب السنة (year_id) من snapshot (widget-data-v2)
 async function loadKeywords(storeId, brandId, modelId, yearId) {
-  // نجيب snapshot
-  var snap = await ensureSnapshot(storeId);
+  // 1) Live API (إذا موجود)
+  try {
+    var url =
+      API_BASE +
+      "/year-keywords?store_id=" +
+      encodeURIComponent(storeId) +
+      "&year_id=" +
+      encodeURIComponent(String(yearId || ""));
 
-  // كل الكلمات
+    var data = await fetchJson(url);
+    var live = (data && data.keywords) || [];
+    if (Array.isArray(live)) return live;
+  } catch (e) {
+    // fallback
+  }
+
+  // 2) Snapshot fallback
+  var snap = await ensureSnapshot(storeId);
   var allKeywords = (snap && snap.keywords) || [];
 
-  // لازم يكون فيه yearId
   var yId = Number(yearId);
   if (Number.isNaN(yId)) return [];
 
-  // فلترة حسب السنة المختارة
   return allKeywords.filter(function (k) {
     return Number(k.year_id) === yId;
   });
