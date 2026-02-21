@@ -133,36 +133,23 @@ export async function GET(_req: NextRequest) {
 
     // ✅ حذفنا loadSections لأن "القسم" انحذف
 
-    async function loadKeywords(storeId, brandId, modelId, yearId) {
-      // 1) Live من DB عبر API (يحُل نقص snapshot)
-      try {
-        var url =
-          API_BASE +
-          "/keywords?store_id=" +
-          encodeURIComponent(storeId) +
-          "&model_id=" +
-          encodeURIComponent(String(modelId || ""));
+// ✅ كلمات حسب السنة (year_id) من snapshot (widget-data-v2)
+async function loadKeywords(storeId, brandId, modelId, yearId) {
+  // نجيب snapshot
+  var snap = await ensureSnapshot(storeId);
 
-        // إذا عندك year_id بالـ API لاحقاً:
-        // url += "&year_id=" + encodeURIComponent(String(yearId || ""));
+  // كل الكلمات
+  var allKeywords = (snap && snap.keywords) || [];
 
-        var data = await fetchJson(url);
-        var live = (data && data.keywords) || [];
-        if (Array.isArray(live)) return live;
-      } catch (e) {
-        // fallback
-      }
+  // لازم يكون فيه yearId
+  var yId = Number(yearId);
+  if (Number.isNaN(yId)) return [];
 
-      // 2) Fallback: snapshot
-      var snap = await ensureSnapshot(storeId);
-      var allKeywords = (snap && snap.keywords) || [];
-
-      var mId = Number(modelId);
-      return allKeywords.filter(function (k) {
-        if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
-        return true;
-      });
-    }
+  // فلترة حسب السنة المختارة
+  return allKeywords.filter(function (k) {
+    return Number(k.year_id) === yId;
+  });
+}
 
     function getFilterSessionKey() {
       var KEY = "darb_filter_sid";
