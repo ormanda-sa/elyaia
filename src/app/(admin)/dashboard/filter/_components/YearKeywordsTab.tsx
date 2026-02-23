@@ -1,11 +1,11 @@
 "use client";
 
-import { Dispatch, SetStateAction, useMemo, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useMemo, useState } from "react";
 import type { Brand } from "./BrandsTab";
 import type { Model } from "./ModelsTab";
 import { DeleteConfirmButton } from "./DeleteConfirmButton";
 import { YearKeywordsBulkImportDialog } from "./YearKeywordsBulkImportDialog";
-
+import { YearKeywordsBulkImportDialogTo } from "./YearKeywordsBulkImportDialogTo";
 // shadcn + icons
 import { Button } from "@/components/ui/button";
 import {
@@ -70,7 +70,6 @@ type Props = {
   onEdit: (k: YearKeyword) => void;
   onDelete: (k: YearKeyword) => Promise<void> | void;
 
-  // ✅ مهم: لازم الأب يمررها (page.tsx) عشان بعد الاستيراد نسوي reload للكلمات
   onImported?: () => Promise<void> | void;
 };
 
@@ -115,9 +114,10 @@ export function YearKeywordsTab({
   const hasContext = !!(selectedBrand && selectedModel && selectedYear);
   const isEdit = form.mode === "edit";
 
-  // ✅ props المطلوبة للدايلوق
   const yearId = selectedYear?.id ?? null;
-  const yearLabel = selectedYear ? `${selectedBrand?.name_ar ?? ""} / ${selectedModel?.name_ar ?? ""} / ${selectedYear.year}` : null;
+  const yearLabel = selectedYear
+    ? `${selectedBrand?.name_ar ?? ""} / ${selectedModel?.name_ar ?? ""} / ${selectedYear.year}`
+    : null;
 
   const handleSelectBrand = (value: string) => {
     if (!value) {
@@ -158,6 +158,179 @@ export function YearKeywordsTab({
     setSelectedYearId(Number.isNaN(idNum) ? null : idNum);
   };
 
+  // ===============================
+  // ✅ تحديد متعدد + حذف جماعي (كما هو)
+  // ===============================
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setBulkDeleteError(null);
+    setBulkDeleting(false);
+  }, [selectedBrandId, selectedModelId, selectedYearId]);
+
+  const selectedCount = selectedIds.size;
+
+  const selectedPreview = useMemo(() => {
+    if (!selectedCount) return [];
+    const mapById = new Map(yearKeywords.map((k) => [k.id, k]));
+    return Array.from(selectedIds)
+      .map((id) => mapById.get(id))
+      .filter(Boolean)
+      .slice(0, 8) as YearKeyword[];
+  }, [selectedIds, selectedCount, yearKeywords]);
+
+  async function handleBulkDelete() {
+    if (!hasContext || selectedIds.size === 0) return;
+
+    setBulkDeleteError(null);
+    setBulkDeleting(true);
+
+    try {
+      const ids = Array.from(selectedIds);
+
+      const res = await fetch("/api/dashboard/year-keywords/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+
+      const data = await res.json().catch(() => ({} as any));
+
+      if (!res.ok) {
+        throw new Error(data?.error || "فشل حذف المحدد");
+      }
+
+      setSelectedIds(new Set());
+      if (onImported) await onImported();
+    } catch (e: any) {
+      setBulkDeleteError(e?.message || "حدث خطأ أثناء حذف المحدد");
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+  const toggleOne = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // ===============================
+  // ✅ ترتيب بالسحب (Drag & Drop)
+  // ===============================
+
+  // نرتب القائمة بدايةً حسب sort_order ثم الاسم (عشان تكون ثابتة)
+  const initialSorted = useMemo(() => {
+    const arr = [...yearKeywords];
+    arr.sort((a, b) => {
+      const ao = a.sort_order ?? 999999;
+      const bo = b.sort_order ?? 999999;
+      if (ao !== bo) return ao - bo;
+      return String(a.name_ar || "").localeCompare(String(b.name_ar || ""), "ar");
+    });
+    return arr;
+  }, [yearKeywords]);
+
+  // قائمة العرض/السحب المحلية
+  const [localKeywords, setLocalKeywords] = useState<YearKeyword[]>(initialSorted);
+
+  // إذا تغيّرت البيانات من الأب (إضافة/استيراد/تغيير سنة) نرجّع ترتيبنا من جديد
+  useEffect(() => {
+    setLocalKeywords(initialSorted);
+  }, [initialSorted, selectedYearId]);
+
+  // drag state
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [reorderSaving, setReorderSaving] = useState(false);
+  const [reorderError, setReorderError] = useState<string | null>(null);
+
+  function moveItem(arr: YearKeyword[], fromIndex: number, toIndex: number) {
+    const next = [...arr];
+    const [item] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, item);
+    return next;
+  }
+
+  async function saveReorder(nextList: YearKeyword[]) {
+    // يحفظ sort_order تسلسلي 1..N في DB
+    setReorderError(null);
+    setReorderSaving(true);
+    try {
+      const orderedIds = nextList.map((k) => k.id);
+
+      const res = await fetch("/api/dashboard/year-keywords/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ year_id: yearId, ordered_ids: orderedIds }),
+      });
+
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(data?.error || "فشل حفظ الترتيب");
+
+      // بعد الحفظ: نطلب من الأب يعيد تحميل الكلمات
+      if (onImported) await onImported();
+    } catch (e: any) {
+      setReorderError(e?.message || "حدث خطأ أثناء حفظ ترتيب الصفوف");
+    } finally {
+      setReorderSaving(false);
+    }
+  }
+
+  function onDragStartRow(id: number) {
+    setDraggingId(id);
+  }
+
+  function onDragOverRow(e: React.DragEvent<HTMLTableRowElement>) {
+    // لازم تمنع الافتراضي حتى يسمح بالـ drop
+    e.preventDefault();
+  }
+
+  async function onDropRow(targetId: number) {
+    if (!draggingId || draggingId === targetId) {
+      setDraggingId(null);
+      return;
+    }
+
+    const fromIndex = localKeywords.findIndex((k) => k.id === draggingId);
+    const toIndex = localKeywords.findIndex((k) => k.id === targetId);
+    if (fromIndex < 0 || toIndex < 0) {
+      setDraggingId(null);
+      return;
+    }
+
+    const moved = moveItem(localKeywords, fromIndex, toIndex);
+
+    // ✅ تحديث متسلسل فوراً للعرض (1..N)
+    const reNumbered = moved.map((k, idx) => ({
+      ...k,
+      sort_order: idx + 1,
+    }));
+
+    setLocalKeywords(reNumbered);
+    setDraggingId(null);
+
+    // ✅ حفظ تلقائي بعد الإفلات
+    await saveReorder(reNumbered);
+  }
+
+  const isAllSelected =
+    hasContext && localKeywords.length > 0 && selectedCount === localKeywords.length;
+  const isSomeSelected = selectedCount > 0 && !isAllSelected;
+
+  const toggleAll = () => {
+    if (!hasContext || localKeywords.length === 0) return;
+    setSelectedIds((prev) => {
+      if (prev.size === localKeywords.length) return new Set();
+      return new Set(localKeywords.map((k) => k.id));
+    });
+  };
+
   return (
     <div className="space-y-4" dir="rtl">
       {/* الهيدر */}
@@ -170,7 +343,7 @@ export function YearKeywordsTab({
             <span className="text-slate-500">
               إجمالي الكلمات في السياق الحالي:{" "}
               <span className="font-semibold text-slate-900">
-                {hasContext ? yearKeywords.length : 0}
+                {hasContext ? localKeywords.length : 0}
               </span>
             </span>
           </div>
@@ -189,16 +362,30 @@ export function YearKeywordsTab({
               </span>
             </p>
           )}
+
+          {reorderSaving && (
+            <p className="text-[11px] text-slate-500">جاري حفظ ترتيب الصفوف...</p>
+          )}
+          {reorderError && (
+            <p className="text-[11px] text-rose-600">خطأ ترتيب الصفوف: {reorderError}</p>
+          )}
         </div>
 
-        {/* ✅ زر الاستيراد (مثل اللي بالصورة) */}
         <div className="flex items-center gap-2">
           <YearKeywordsBulkImportDialog
             yearId={yearId}
             yearLabel={yearLabel}
             disabled={!hasContext}
             onImported={async () => {
-              // بعد الاستيراد: نرجع نجيب الكلمات من الأب
+              if (onImported) await onImported();
+            }}
+          />
+        </div> <div className="flex items-center gap-2">
+          <YearKeywordsBulkImportDialogTo
+            
+          
+            disabled={!hasContext}
+            onImported={async () => {
               if (onImported) await onImported();
             }}
           />
@@ -332,11 +519,7 @@ export function YearKeywordsTab({
                     (!selectedModelId || !selectedYearId) && "text-slate-400",
                   )}
                 >
-                  {selectedYear
-                    ? selectedYear.year
-                    : selectedModelId
-                      ? "اختر سنة..."
-                      : "اختر سيارة أولاً"}
+                  {selectedYear ? selectedYear.year : selectedModelId ? "اختر سنة..." : "اختر سيارة أولاً"}
                   <ChevronsUpDown className="h-4 w-4 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -395,7 +578,8 @@ export function YearKeywordsTab({
               </span>
               {isEdit && form.name_ar && (
                 <span className="text-[11px] text-slate-500">
-                  حالياً تعدّل: <span className="font-semibold text-slate-800">{form.name_ar}</span>
+                  حالياً تعدّل:{" "}
+                  <span className="font-semibold text-slate-800">{form.name_ar}</span>
                 </span>
               )}
             </div>
@@ -442,7 +626,8 @@ export function YearKeywordsTab({
 
           <div className="mt-3 flex items-center justify-between gap-3">
             <p className="hidden text-[11px] text-slate-500 sm:block">
-              هذه الكلمات تُحفظ في <span className="font-mono text-[10px]">filter_year_keywords</span>.
+              هذه الكلمات تُحفظ في{" "}
+              <span className="font-mono text-[10px]">filter_year_keywords</span>.
             </p>
             <button
               type="button"
@@ -463,12 +648,72 @@ export function YearKeywordsTab({
         </p>
       )}
 
+      {bulkDeleteError && (
+        <p className="rounded-xl border border-rose-200 bg-rose-50/80 px-3 py-2 text-[11px] text-rose-700">
+          خطأ حذف المحدد: {bulkDeleteError}
+        </p>
+      )}
+
       {/* جدول الكلمات */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/60">
+        {/* شريط حذف المحدد */}
+        <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white/70 px-3 py-2">
+          <div className="text-[11px] text-slate-500">
+            {selectedCount > 0 ? (
+              <>
+                تم تحديد{" "}
+                <span className="font-semibold text-slate-900">{selectedCount}</span>{" "}
+                عنصر
+              </>
+            ) : (
+              <>اسحب الصفوف لترتيبها + أو اختر عناصر للحذف الجماعي</>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {selectedCount > 0 && (
+              <button
+                type="button"
+                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                onClick={() => setSelectedIds(new Set())}
+                disabled={bulkDeleting}
+              >
+                إلغاء التحديد
+              </button>
+            )}
+
+            <DeleteConfirmButton
+              onConfirm={handleBulkDelete}
+              title="حذف المحدد"
+              description={
+                `هل أنت متأكد أنك تريد حذف ${selectedCount} كلمة محددة؟` +
+                (selectedPreview.length
+                  ? `\n\nأمثلة من المحدد:\n- ${selectedPreview.map((k) => k.name_ar).join("\n- ")}`
+                  : "")
+              }
+            >
+              {bulkDeleting ? `جاري الحذف... (${selectedCount})` : `حذف المحدد (${selectedCount})`}
+            </DeleteConfirmButton>
+          </div>
+        </div>
+
         <div className="max-h-[420px] overflow-auto">
           <table className="min-w-full text-xs">
             <thead className="sticky top-0 z-10 bg-slate-100/90 backdrop-blur">
               <tr>
+                <th className="px-3 py-2 text-right font-medium text-slate-500">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = isSomeSelected;
+                    }}
+                    onChange={toggleAll}
+                    disabled={!hasContext || localKeywords.length === 0 || bulkDeleting}
+                    className="h-4 w-4 accent-slate-900"
+                    title="تحديد الكل"
+                  />
+                </th>
                 <th className="px-3 py-2 text-right font-medium text-slate-500">#</th>
                 <th className="px-3 py-2 text-right font-medium text-slate-500">الكلمة</th>
                 <th className="px-3 py-2 text-right font-medium text-slate-500">الترتيب</th>
@@ -477,43 +722,85 @@ export function YearKeywordsTab({
             </thead>
 
             <tbody className="divide-y divide-slate-100 bg-white/80">
-              {(!hasContext || yearKeywords.length === 0) && (
+              {(!hasContext || localKeywords.length === 0) && (
                 <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-[11px] text-slate-400">
+                  <td colSpan={5} className="px-3 py-6 text-center text-[11px] text-slate-400">
                     لا توجد كلمات للسياق الحالي. اختر شركة، سيارة، وسنة ثم ابدأ بإضافة كلمات.
                   </td>
                 </tr>
               )}
 
               {hasContext &&
-                yearKeywords.map((k, index) => (
-                  <tr key={k.id} className="transition hover:bg-slate-50/80">
-                    <td className="px-3 py-2 text-[11px] text-slate-500">{index + 1}</td>
-                    <td className="px-3 py-2 text-xs font-medium text-slate-900">{k.name_ar}</td>
-                    <td className="px-3 py-2 text-[11px] text-slate-600">
-                      {k.sort_order ?? <span className="text-slate-300">-</span>}
-                    </td>
-                    <td className="px-3 py-2 text-[11px]">
-                      <div className="flex justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => onEdit(k)}
-                          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-                        >
-                          تعديل
-                        </button>
+                localKeywords.map((k, index) => {
+                  const checked = selectedIds.has(k.id);
+                  const isDragging = draggingId === k.id;
 
-                        <DeleteConfirmButton
-                          onConfirm={() => onDelete(k)}
-                          title="حذف كلمة"
-                          description={`هل أنت متأكد أنك تريد حذف الكلمة "${k.name_ar}" من هذا السياق؟`}
-                        >
-                          حذف
-                        </DeleteConfirmButton>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                  return (
+                    <tr
+                      key={k.id}
+                      draggable={!bulkDeleting && !reorderSaving}
+                      onDragStart={() => onDragStartRow(k.id)}
+                      onDragOver={onDragOverRow}
+                      onDrop={() => onDropRow(k.id)}
+                      className={cn(
+                        "transition hover:bg-slate-50/80",
+                        isDragging && "opacity-60",
+                      )}
+                      title="اسحب لترتيب الصف"
+                    >
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleOne(k.id)}
+                          disabled={bulkDeleting}
+                          className="h-4 w-4 accent-slate-900"
+                        />
+                      </td>
+
+                      {/* # (عرض فقط) */}
+                      <td className="px-3 py-2 text-[11px] text-slate-500">{index + 1}</td>
+
+                      <td className="px-3 py-2 text-xs font-medium text-slate-900">
+                        <span className="cursor-move select-none">≡</span>{" "}
+                        {k.name_ar}
+                      </td>
+
+                      {/* sort_order: متسلسل 1..N */}
+                      <td className="px-3 py-2 text-[11px] text-slate-600">
+                        {index + 1}
+                      </td>
+
+                      <td className="px-3 py-2 text-[11px]">
+                        <div className="flex justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onEdit(k)}
+                            className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+                            disabled={bulkDeleting || reorderSaving}
+                          >
+                            تعديل
+                          </button>
+
+                          <DeleteConfirmButton
+                            onConfirm={async () => {
+                              await onDelete(k);
+                              setSelectedIds((prev) => {
+                                const next = new Set(prev);
+                                next.delete(k.id);
+                                return next;
+                              });
+                            }}
+                            title="حذف كلمة"
+                            description={`هل أنت متأكد أنك تريد حذف الكلمة "${k.name_ar}" من هذا السياق؟`}
+                          >
+                            حذف
+                          </DeleteConfirmButton>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
