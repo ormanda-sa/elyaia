@@ -57,26 +57,44 @@ export async function GET(
 
     const payload: any = data.data || {};
 
-    // 2) نجيب الكلمات الجديدة من جدول filter_year_keywords (حسب store_id)
-    const { data: yearKeywords, error: yearKeywordsError } = await supabase
-      .from("filter_year_keywords")
-      .select("*")
-      .eq("store_id", storeId)
-      .order("sort_order", { ascending: true })
-      .order("id", { ascending: true });
+    // 2) نجيب الكلمات الجديدة من جدول filter_year_keywords (حسب store_id) — مع pagination عشان ما ينقص العدد
+    const PAGE_SIZE = 1000;
+    let allYearKeywords: any[] = [];
+    let from = 0;
 
-    if (yearKeywordsError) {
-      console.error("[WIDGET_DATA_V2_YEAR_KEYWORDS_ERROR]", yearKeywordsError);
-      return NextResponse.json(
-        { error: "Failed to load year keywords" },
-        { status: 500, headers: CORS_HEADERS },
-      );
+    while (true) {
+      const to = from + PAGE_SIZE - 1;
+
+      const { data: chunk, error: chunkError } = await supabase
+        .from("filter_year_keywords")
+        .select("*")
+        .eq("store_id", storeId)
+        .order("sort_order", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to);
+
+      if (chunkError) {
+        console.error("[WIDGET_DATA_V2_YEAR_KEYWORDS_ERROR]", chunkError);
+        return NextResponse.json(
+          { error: "Failed to load year keywords" },
+          { status: 500, headers: CORS_HEADERS },
+        );
+      }
+
+      if (!chunk || chunk.length === 0) break;
+
+      allYearKeywords = allYearKeywords.concat(chunk);
+
+      // إذا رجع أقل من حجم الصفحة يعني خلصنا
+      if (chunk.length < PAGE_SIZE) break;
+
+      from += PAGE_SIZE;
     }
 
     // 3) نفس الـ payload بالضبط، فقط استبدال keywords
     const payloadV2 = {
       ...payload,
-      keywords: yearKeywords ?? [],
+      keywords: allYearKeywords,
     };
 
     return new NextResponse(JSON.stringify(payloadV2), {
