@@ -806,16 +806,6 @@ export async function GET(_req: NextRequest) {
                 "salla_id"
               ]) || yearId;
 
-            var sallaBrandId =
-              getRowValue(brandObj, [
-                "brand.id",
-                "brand_id",
-                "salla_brand_id",
-                "salla_company_id",
-                "category.id",
-                "id"
-              ]) || brandId;
-
             var selectedKeywordIds = partsChoices.getValue(true) || [];
             if (!Array.isArray(selectedKeywordIds)) selectedKeywordIds = [selectedKeywordIds];
 
@@ -843,9 +833,7 @@ export async function GET(_req: NextRequest) {
               domain +
               basePath +
               "?filters[category_id]=" +
-              encodeURIComponent(String(yearCategoryId)) +
-              "&filters[brand_id]=" +
-              encodeURIComponent(String(sallaBrandId));
+              encodeURIComponent(String(yearCategoryId));
 
             if (keywordLabels.length) {
               url += "&keyword=" + encodeURIComponent(keywordLabels.join(" "));
