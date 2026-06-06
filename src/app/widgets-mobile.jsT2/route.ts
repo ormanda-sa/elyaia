@@ -1,4 +1,5 @@
-// src/app/widgets-mobile.js/route.ts
+// FILE: src/app/widgets-mobile.js/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
@@ -30,7 +31,7 @@ export async function GET(_req: NextRequest) {
     }
 
     var API_BASE = (PANEL_ORIGIN || "") + "/api/widget";
-var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data-v2";
+    var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data-v2";
 
     async function fetchJson(url, options) {
       var res = await fetch(url, {
@@ -38,11 +39,11 @@ var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data-v2";
         credentials: "omit",
         ...(options || {}),
       });
+
       if (!res.ok) throw new Error("Request failed: " + res.status);
       return res.json();
     }
 
-    // ===== snapshot =====
     var SNAPSHOT = null;
 
     async function ensureSnapshot(storeId) {
@@ -53,6 +54,7 @@ var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data-v2";
       try {
         var res = await fetch(url, { credentials: "omit" });
         if (!res.ok) throw new Error("Snapshot request failed: " + res.status);
+
         var data = await res.json();
         SNAPSHOT = data || {};
       } catch (e) {
@@ -66,6 +68,7 @@ var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data-v2";
           keywords: [],
         };
       }
+
       return SNAPSHOT;
     }
 
@@ -77,8 +80,10 @@ var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data-v2";
     async function loadModels(storeId, brandId) {
       var snap = await ensureSnapshot(storeId);
       var allModels = snap.models || [];
+
       var idNum = Number(brandId);
       if (Number.isNaN(idNum)) return allModels;
+
       return allModels.filter(function (m) {
         return Number(m.brand_id) === idNum;
       });
@@ -87,50 +92,56 @@ var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data-v2";
     async function loadYears(storeId, modelId) {
       var snap = await ensureSnapshot(storeId);
       var allYears = snap.years || [];
+
       var idNum = Number(modelId);
       if (Number.isNaN(idNum)) return allYears;
+
       return allYears.filter(function (y) {
         return Number(y.model_id) === idNum;
       });
     }
 
-    // ✅ بدون قسم: نجيب الكلمات حسب model_id فقط (ولو API يدعم section_id نخليه فاضي)
-// ✅ كلمات حسب السنة (year_id)
-async function loadKeywords(storeId, brandId, modelId, yearId) {
-  // 1) Live API (اختياري) — إذا عندك endpoint يدعم year_id
-  try {
-    var url =
-      API_BASE +
-      "/year-keywords?store_id=" + encodeURIComponent(storeId) +
-      "&year_id=" + encodeURIComponent(String(yearId || ""));
+    async function loadKeywords(storeId, brandId, modelId, yearId) {
+      try {
+        var url =
+          API_BASE +
+          "/year-keywords?store_id=" +
+          encodeURIComponent(storeId) +
+          "&year_id=" +
+          encodeURIComponent(String(yearId || ""));
 
-    var data = await fetchJson(url);
-    var live = (data && data.keywords) || [];
-    if (Array.isArray(live)) return live;
-  } catch (e) {
-    // fallback
-  }
- 
-  // 2) Snapshot fallback
-  var snap = await ensureSnapshot(storeId);
-  var allKeywords = (snap && snap.keywords) || [];
+        var data = await fetchJson(url);
+        var live = (data && data.keywords) || [];
+        if (Array.isArray(live)) return live;
+      } catch (e) {}
 
-  var yId = Number(yearId);
-  return allKeywords.filter(function (k) {
-    if (!Number.isNaN(yId) && Number(k.year_id) !== yId) return false;
-    return true;
-  });
-}
+      var snap = await ensureSnapshot(storeId);
+      var allKeywords = (snap && snap.keywords) || [];
+
+      var yId = Number(yearId);
+
+      return allKeywords.filter(function (k) {
+        if (!Number.isNaN(yId) && Number(k.year_id) !== yId) return false;
+        return true;
+      });
+    }
 
     function getFilterSessionKey() {
       var KEY = "darb_filter_sid";
+
       try {
         var v = localStorage.getItem(KEY);
+
         if (!v) {
-          if (window.crypto && window.crypto.randomUUID) v = window.crypto.randomUUID();
-          else v = String(Date.now()) + "-" + Math.random();
+          if (window.crypto && window.crypto.randomUUID) {
+            v = window.crypto.randomUUID();
+          } else {
+            v = String(Date.now()) + "-" + Math.random();
+          }
+
           localStorage.setItem(KEY, v);
         }
+
         return v;
       } catch (e) {
         return "no-storage-" + Date.now();
@@ -140,6 +151,7 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
     async function logFilterEvent(payload) {
       try {
         if (!WIDGET_SECRET) return;
+
         await fetch(API_BASE + "/event", {
           method: "POST",
           headers: {
@@ -162,15 +174,21 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
         );
 
         var domain = (data && data.domain) || "";
+
         if (!domain) {
           var originFallback = window.location.origin || "";
           return originFallback.replace(/\\/$/, "");
         }
 
         domain = String(domain).trim();
-        if (!domain.toLowerCase().startsWith("http://") && !domain.toLowerCase().startsWith("https://")) {
+
+        if (
+          !domain.toLowerCase().startsWith("http://") &&
+          !domain.toLowerCase().startsWith("https://")
+        ) {
           domain = "https://" + domain;
         }
+
         domain = domain.replace(/\\/$/, "");
         return domain;
       } catch (e) {
@@ -179,12 +197,60 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
       }
     }
 
+    function getRowValue(row, keys) {
+      if (!row) return "";
+
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+
+        if (
+          Object.prototype.hasOwnProperty.call(row, key) &&
+          row[key] !== undefined &&
+          row[key] !== null &&
+          row[key] !== ""
+        ) {
+          return row[key];
+        }
+
+        if (String(key).indexOf(".") > -1) {
+          var parts = String(key).split(".");
+          var cur = row;
+          var ok = true;
+
+          for (var j = 0; j < parts.length; j++) {
+            if (
+              cur &&
+              Object.prototype.hasOwnProperty.call(cur, parts[j]) &&
+              cur[parts[j]] !== undefined &&
+              cur[parts[j]] !== null
+            ) {
+              cur = cur[parts[j]];
+            } else {
+              ok = false;
+              break;
+            }
+          }
+
+          if (ok && cur !== undefined && cur !== null && cur !== "") {
+            return cur;
+          }
+        }
+      }
+
+      return "";
+    }
+
+    function cleanSlug(value) {
+      var slug = String(value || "").trim();
+      slug = slug.replace(/^\\/+/, "").replace(/\\/+$/, "");
+      return slug;
+    }
+
     function buildAdvancedSearchButton(widget) {
       var cfg = widget.config || {};
       var searchCfg = cfg.search || {};
 
       var maxParts = Number(searchCfg.maxParts || 5);
-
       var buttonLabel = typeof cfg.label === "string" ? cfg.label : "اختيار السيارة";
 
       var brands = [];
@@ -194,8 +260,8 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
 
       var state = {
         brand: null,
-        type: null,   // modelRow
-        model: null,  // yearRow
+        type: null,
+        model: null,
         options: [],
       };
 
@@ -203,7 +269,8 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
 
       var openBtn = document.createElement("button");
       openBtn.className = "popup-open-btn";
-      openBtn.textContent = buttonLabel && buttonLabel.trim() ? buttonLabel : "اختيار السيارة";
+      openBtn.textContent =
+        buttonLabel && buttonLabel.trim() ? buttonLabel : "اختيار السيارة";
       document.body.appendChild(openBtn);
 
       var popup = document.createElement("div");
@@ -232,12 +299,11 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
       var selectedOptionsDiv = popup.querySelector(".popup-selected-options");
       var progressDiv = popup.querySelector(".popup-progress");
 
-      // ✅ 4 خطوات فقط
       var stepsList = [
-        { label: "01" }, // brand
-        { label: "02" }, // model
-        { label: "03" }, // year
-        { label: "04" }, // parts
+        { label: "01" },
+        { label: "02" },
+        { label: "03" },
+        { label: "04" },
       ];
 
       function setProgressBar(currentStep) {
@@ -262,6 +328,7 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
           function (el) {
             el.onclick = function () {
               var stepIdx = Number(el.getAttribute("data-step"));
+
               if (stepIdx < step) {
                 if (stepIdx < 3) state.options = [];
                 if (stepIdx < 2) state.model = null;
@@ -282,29 +349,47 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
 
       function renderBreadcrumbs() {
         crumbs.innerHTML = "";
-        if (state.brand) crumbs.innerHTML += "🏢 " + (state.brand.name_ar || state.brand.name || "—") + " / ";
-        if (state.type) crumbs.innerHTML += (state.type.name_ar || state.type.name || "—") + " / ";
-        if (state.model) crumbs.innerHTML += (String(state.model.year) || state.model.name || "—") + " / ";
+
+        if (state.brand) {
+          crumbs.innerHTML += "🏢 " + (state.brand.name_ar || state.brand.name || "—") + " / ";
+        }
+
+        if (state.type) {
+          crumbs.innerHTML += (state.type.name_ar || state.type.name || "—") + " / ";
+        }
+
+        if (state.model) {
+          crumbs.innerHTML += (String(state.model.year) || state.model.name || "—") + " / ";
+        }
       }
 
       function renderStep(newStep) {
         step = newStep;
+
         setProgressBar(step);
+
         listDiv.innerHTML = "";
         searchInput.value = "";
         confirmBtn.style.display = "none";
         selectedOptionsDiv.style.display = "none";
         selectedOptionsDiv.innerHTML = "";
         backBtn.style.display = step > 0 ? "inline-block" : "none";
+
         renderBreadcrumbs();
 
         if (step === 0) {
-          if (!brands.length) return setPlaceholder("لا توجد ماركات متاحة حالياً");
+          if (!brands.length) {
+            return setPlaceholder("لا توجد ماركات متاحة حالياً");
+          }
 
           brands.forEach(function (brand) {
             var btn = document.createElement("button");
             btn.textContent = brand.name_ar || brand.name || "—";
-            if (state.brand && state.brand.id === brand.id) btn.className = "selected";
+
+            if (state.brand && state.brand.id === brand.id) {
+              btn.className = "selected";
+            }
+
             btn.onclick = async function () {
               state.brand = brand;
               state.type = null;
@@ -315,24 +400,35 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
               keywords = [];
 
               setPlaceholder("جاري تحميل الموديلات...");
+
               try {
                 models = await loadModels(storeId, brand.id);
               } catch (_) {
                 models = [];
               }
-              if (!models.length) return setPlaceholder("لا توجد موديلات لهذه الماركة");
+
+              if (!models.length) {
+                return setPlaceholder("لا توجد موديلات لهذه الماركة");
+              }
+
               renderStep(1);
             };
+
             listDiv.appendChild(btn);
           });
-
         } else if (step === 1) {
-          if (!models.length) return setPlaceholder("لا توجد موديلات متاحة");
+          if (!models.length) {
+            return setPlaceholder("لا توجد موديلات متاحة");
+          }
 
           models.forEach(function (m) {
             var btn = document.createElement("button");
             btn.textContent = m.name_ar || m.name || "—";
-            if (state.type && state.type.id === m.id) btn.className = "selected";
+
+            if (state.type && state.type.id === m.id) {
+              btn.className = "selected";
+            }
+
             btn.onclick = async function () {
               state.type = m;
               state.model = null;
@@ -342,28 +438,42 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
 
               var modelNumeric = Number(m.id);
               if (!Number.isNaN(modelNumeric)) {
-                logFilterEvent({ event_type: "model_select_popup", model_id: modelNumeric });
+                logFilterEvent({
+                  event_type: "model_select_popup",
+                  model_id: modelNumeric,
+                });
               }
 
               setPlaceholder("جاري تحميل السنوات...");
+
               try {
                 years = await loadYears(storeId, m.id);
               } catch (_) {
                 years = [];
               }
-              if (!years.length) return setPlaceholder("لا توجد سنوات لهذا الموديل");
+
+              if (!years.length) {
+                return setPlaceholder("لا توجد سنوات لهذا الموديل");
+              }
+
               renderStep(2);
             };
+
             listDiv.appendChild(btn);
           });
-
         } else if (step === 2) {
-          if (!years.length) return setPlaceholder("لا توجد سنوات متاحة");
+          if (!years.length) {
+            return setPlaceholder("لا توجد سنوات متاحة");
+          }
 
           years.forEach(function (y) {
             var btn = document.createElement("button");
             btn.textContent = String(y.year || y.name);
-            if (state.model && state.model.id === y.id) btn.className = "selected";
+
+            if (state.model && state.model.id === y.id) {
+              btn.className = "selected";
+            }
+
             btn.onclick = async function () {
               state.model = y;
               state.options = [];
@@ -371,10 +481,14 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
 
               var yearNumeric = Number(y.id);
               if (!Number.isNaN(yearNumeric)) {
-                logFilterEvent({ event_type: "year_select_popup", year_id: yearNumeric });
+                logFilterEvent({
+                  event_type: "year_select_popup",
+                  year_id: yearNumeric,
+                });
               }
 
               setPlaceholder("جاري تحميل القطع...");
+
               try {
                 keywords = await loadKeywords(
                   storeId,
@@ -385,13 +499,13 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
               } catch (_) {
                 keywords = [];
               }
+
               renderStep(3);
             };
+
             listDiv.appendChild(btn);
           });
-
         } else if (step === 3) {
-          // ✅ اختيار القطع + تأكيد
           selectedOptionsDiv.style.display = "flex";
           confirmBtn.style.display = "block";
           confirmBtn.textContent = "تأكيد";
@@ -404,7 +518,10 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
             var remove = document.createElement("button");
             remove.innerHTML = "×";
             remove.onclick = function () {
-              state.options = state.options.filter(function (x) { return x !== opt; });
+              state.options = state.options.filter(function (x) {
+                return x !== opt;
+              });
+
               renderStep(3);
             };
 
@@ -413,19 +530,28 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
           });
 
           listDiv.innerHTML = "";
+
           (keywords || []).forEach(function (k) {
-            var label = k.name_ar || k.slug || ("#" + k.id);
+            var label = k.name_ar || k.slug || "#" + k.id;
+
             var btn = document.createElement("button");
             btn.textContent = label;
             btn.className = state.options.indexOf(label) >= 0 ? "selected" : "";
+
             btn.onclick = function () {
               if (state.options.indexOf(label) < 0) {
-                if (state.options.length < maxParts) state.options.push(label);
+                if (state.options.length < maxParts) {
+                  state.options.push(label);
+                }
               } else {
-                state.options = state.options.filter(function (x) { return x !== label; });
+                state.options = state.options.filter(function (x) {
+                  return x !== label;
+                });
               }
+
               renderStep(3);
             };
+
             listDiv.appendChild(btn);
           });
 
@@ -444,39 +570,71 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
               (brandObj && brandObj.slug) ||
               "قطع-غيار";
 
-            var sallaCompanyId = (brandObj && brandObj.salla_company_id) || brandObj.id;
-            var sallaCategoryId = (modelRow && modelRow.salla_category_id) || modelRow.id;
-            var sallaYearId = (yearRow && yearRow.salla_year_id) || yearRow.id;
+            var modelSlug =
+              getRowValue(modelRow, [
+                "slug",
+                "seo_slug",
+                "url_slug",
+                "name_ar",
+                "name",
+              ]) ||
+              carSlug ||
+              "قطع-غيار";
+
+            modelSlug = cleanSlug(modelSlug);
+
+            var modelCategoryId =
+              getRowValue(modelRow, [
+                "category.id",
+                "ccategory.id",
+                "category_id",
+                "salla_category_id",
+                "salla_model_category_id",
+                "salla_id",
+              ]) || modelRow.id;
+
+            var yearCategoryId =
+              getRowValue(yearRow, [
+                "category.id",
+                "ccategory.id",
+                "category_id",
+                "salla_year_id",
+                "salla_category_id",
+                "salla_id",
+              ]) || yearRow.id;
 
             var keywordLabels = (state.options || []).slice();
 
             var keywordIdsNumeric = [];
+
             (keywords || []).forEach(function (k) {
-              var label = k.name_ar || k.slug || ("#" + k.id);
+              var label = k.name_ar || k.slug || "#" + k.id;
+
               if (keywordLabels.indexOf(label) !== -1) {
                 var numId = Number(k.id);
-                if (!Number.isNaN(numId)) keywordIdsNumeric.push(numId);
+                if (!Number.isNaN(numId)) {
+                  keywordIdsNumeric.push(numId);
+                }
               }
             });
 
-            var keywordParam = "";
-            if (keywordLabels.length) keywordParam = encodeURIComponent(keywordLabels.join("||"));
-
             var domain = await resolveStoreDomain(storeId);
 
-            // ✅ بدون filters[brand_id] (القسم)
+            var basePath =
+              "/" +
+              encodeURIComponent(modelSlug) +
+              "/c" +
+              encodeURIComponent(String(modelCategoryId));
+
             var url =
               domain +
-              "/category/" +
-              encodeURIComponent(carSlug) +
-              "?filters[company]=" +
-              encodeURIComponent(sallaCompanyId) +
-              "&filters[category_cat]=" +
-              encodeURIComponent(sallaCategoryId) +
-              "&filters[category_id]=" +
-              encodeURIComponent(sallaYearId);
+              basePath +
+              "?filters[category_id]=" +
+              encodeURIComponent(String(yearCategoryId));
 
-            if (keywordParam) url += "&keyword=" + keywordParam;
+            if (keywordLabels.length) {
+              url += "&keyword=" + encodeURIComponent(keywordLabels.join(" "));
+            }
 
             var brandNumeric = Number(brandObj.id);
             var modelNumeric = Number(modelRow.id);
@@ -501,11 +659,12 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
           };
         }
 
-        // بحث داخل القائمة
         searchInput.oninput = function () {
           var val = (this.value || "").trim();
+
           Array.prototype.forEach.call(listDiv.children, function (btn) {
-            btn.style.display = !val || btn.textContent.indexOf(val) !== -1 ? "" : "none";
+            btn.style.display =
+              !val || btn.textContent.indexOf(val) !== -1 ? "" : "none";
           });
         };
       }
@@ -515,7 +674,13 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
         openBtn.textContent = "جار التحميل...";
         popup.classList.add("active");
 
-        state = { brand: null, type: null, model: null, options: [] };
+        state = {
+          brand: null,
+          type: null,
+          model: null,
+          options: [],
+        };
+
         brands = [];
         models = [];
         years = [];
@@ -523,11 +688,16 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
         step = 0;
 
         setPlaceholder("جاري تحميل الماركات...");
+
         loadBrands(storeId)
           .then(function (b) {
             brands = b || [];
-            if (!brands.length) setPlaceholder("لا توجد ماركات متاحة");
-            else renderStep(0);
+
+            if (!brands.length) {
+              setPlaceholder("لا توجد ماركات متاحة");
+            } else {
+              renderStep(0);
+            }
           })
           .catch(function (e) {
             console.error("[widgets-mobile.js] loadBrands error:", e);
@@ -544,8 +714,9 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
       };
 
       backBtn.onclick = function () {
-        if (step === 3) renderStep(2);
-        else if (step === 2) {
+        if (step === 3) {
+          renderStep(2);
+        } else if (step === 2) {
           state.model = null;
           state.options = [];
           renderStep(1);
@@ -554,15 +725,18 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
           state.model = null;
           state.options = [];
           renderStep(0);
-        } else popup.classList.remove("active");
+        } else {
+          popup.classList.remove("active");
+        }
       };
 
       popup.onclick = function (e) {
-        if (e.target === popup) popup.classList.remove("active");
+        if (e.target === popup) {
+          popup.classList.remove("active");
+        }
       };
     }
 
-    // تشغيل بوب أب الجوال
     buildAdvancedSearchButton({ config: {} });
   } catch (err) {
     console.error("[widgets-mobile.js] runtime error:", err);
