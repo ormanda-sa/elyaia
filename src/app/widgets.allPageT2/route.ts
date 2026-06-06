@@ -1,5 +1,4 @@
 // FILE: src/app/widgets.allPageT2/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
@@ -32,6 +31,8 @@ export async function GET(_req: NextRequest) {
 
     var API_BASE = (PANEL_ORIGIN || "") + "/api/widget";
     var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data-v2";
+
+    // ========== Helpers ==========
 
     function ensureChoicesAssets() {
       return new Promise(function (resolve) {
@@ -72,22 +73,23 @@ export async function GET(_req: NextRequest) {
         credentials: "omit",
         ...(options || {}),
       });
-
       if (!res.ok) throw new Error("Request failed: " + res.status);
       return res.json();
     }
+
+    // ========= snapshot =========
 
     var SNAPSHOT = null;
 
     async function ensureSnapshot(storeId) {
       if (SNAPSHOT) return SNAPSHOT;
 
-      var url = SNAPSHOT_BASE + "/" + encodeURIComponent(storeId) + ".json";
+      var url =
+        SNAPSHOT_BASE + "/" + encodeURIComponent(storeId) + ".json";
 
       try {
         var res = await fetch(url, { credentials: "omit" });
         if (!res.ok) throw new Error("Snapshot request failed: " + res.status);
-
         var data = await res.json();
         SNAPSHOT = data || {};
       } catch (e) {
@@ -101,7 +103,6 @@ export async function GET(_req: NextRequest) {
           keywords: [],
         };
       }
-
       return SNAPSHOT;
     }
 
@@ -113,10 +114,8 @@ export async function GET(_req: NextRequest) {
     async function loadModels(storeId, brandId) {
       var snap = await ensureSnapshot(storeId);
       var allModels = snap.models || [];
-
       var idNum = Number(brandId);
       if (Number.isNaN(idNum)) return allModels;
-
       return allModels.filter(function (m) {
         return Number(m.brand_id) === idNum;
       });
@@ -125,16 +124,18 @@ export async function GET(_req: NextRequest) {
     async function loadYears(storeId, modelId) {
       var snap = await ensureSnapshot(storeId);
       var allYears = snap.years || [];
-
       var idNum = Number(modelId);
       if (Number.isNaN(idNum)) return allYears;
-
       return allYears.filter(function (y) {
         return Number(y.model_id) === idNum;
       });
     }
 
+    // ✅ حذفنا loadSections لأن "القسم" انحذف
+
+    // ✅ كلمات حسب السنة (year_id) من snapshot (widget-data-v2)
     async function loadKeywords(storeId, brandId, modelId, yearId) {
+      // 1) Live API
       try {
         var url =
           API_BASE +
@@ -148,6 +149,7 @@ export async function GET(_req: NextRequest) {
         if (Array.isArray(live)) return live;
       } catch (e) {}
 
+      // 2) Snapshot fallback
       var snap = await ensureSnapshot(storeId);
       var allKeywords = (snap && snap.keywords) || [];
 
@@ -161,20 +163,13 @@ export async function GET(_req: NextRequest) {
 
     function getFilterSessionKey() {
       var KEY = "darb_filter_sid";
-
       try {
         var v = localStorage.getItem(KEY);
-
         if (!v) {
-          if (window.crypto && window.crypto.randomUUID) {
-            v = window.crypto.randomUUID();
-          } else {
-            v = String(Date.now()) + "-" + Math.random();
-          }
-
+          if (window.crypto && window.crypto.randomUUID) v = window.crypto.randomUUID();
+          else v = String(Date.now()) + "-" + Math.random();
           localStorage.setItem(KEY, v);
         }
-
         return v;
       } catch (e) {
         return "no-storage-" + Date.now();
@@ -184,7 +179,6 @@ export async function GET(_req: NextRequest) {
     async function logFilterEvent(payload) {
       try {
         if (!WIDGET_SECRET) return;
-
         await fetch(API_BASE + "/event", {
           method: "POST",
           headers: {
@@ -207,14 +201,12 @@ export async function GET(_req: NextRequest) {
         );
 
         var domain = (data && data.domain) || "";
-
         if (!domain) {
           var originFallback = window.location.origin || "";
           return originFallback.replace(/\\/$/, "");
         }
 
         domain = String(domain).trim();
-
         if (
           !domain.toLowerCase().startsWith("http://") &&
           !domain.toLowerCase().startsWith("https://")
@@ -278,19 +270,6 @@ export async function GET(_req: NextRequest) {
       return slug;
     }
 
-    function parseKeywordLabels(value) {
-      var keyword = String(value || "").trim();
-      if (!keyword) return [];
-
-      if (keyword.indexOf("||") > -1) {
-        return keyword.split("||").filter(function (x) {
-          return x && x.trim();
-        });
-      }
-
-      return [keyword];
-    }
-
     function parseCurrentUrlFilters() {
       var result = {
         pathSlug: "",
@@ -312,31 +291,41 @@ export async function GET(_req: NextRequest) {
           result.modelCategoryId = seoMatch[2];
         }
 
-        var oldCategoryMatch = pathname.match(/^\\/category\\/([^/?#]+)/i);
-        if (oldCategoryMatch && !result.pathSlug) {
-          result.pathSlug = decodeURIComponent(oldCategoryMatch[1]);
-        }
+        var m = url.pathname.match(/\\/category\\/([^/?#]+)/);
+        if (m && !result.pathSlug) result.pathSlug = decodeURIComponent(m[1]);
 
         var sp = url.searchParams;
-
         result.sCompany = sp.get("filters[company]");
         result.sCategory = sp.get("filters[category_cat]");
         result.sYear = sp.get("filters[category_id]");
 
         var keyword = sp.get("keyword");
-        result.keywordLabels = parseKeywordLabels(keyword);
+        if (keyword) {
+          if (keyword.indexOf("||") > -1) {
+            result.keywordLabels = keyword.split("||").filter(function (x) {
+              return x && x.trim();
+            });
+          } else {
+            result.keywordLabels = [keyword].filter(function (x) {
+              return x && x.trim();
+            });
+          }
+        }
       } catch (e) {}
 
       return result;
     }
+
+    // ========== Build Inline Filter ==========
 
     function buildAllPageFilter() {
       (async function () {
         await ensureChoicesAssets();
 
         var wrap = document.createElement("div");
-        wrap.className = "zzz widgets-filter-hero-wrap";
+        wrap.className = "zzz";
 
+        // ✅ حذف select القسم
         var html = '\\
       <div class="X1">\\
         <div class="hero-filters-wrapper">\\
@@ -355,13 +344,9 @@ export async function GET(_req: NextRequest) {
         wrap.innerHTML = html;
 
         var headerEl = document.querySelector("header");
-
         if (headerEl && headerEl.parentNode) {
-          if (headerEl.nextSibling) {
-            headerEl.parentNode.insertBefore(wrap, headerEl.nextSibling);
-          } else {
-            headerEl.parentNode.appendChild(wrap);
-          }
+          if (headerEl.nextSibling) headerEl.parentNode.insertBefore(wrap, headerEl.nextSibling);
+          else headerEl.parentNode.appendChild(wrap);
         } else {
           document.body.insertBefore(wrap, document.body.firstChild);
         }
@@ -408,7 +393,6 @@ export async function GET(_req: NextRequest) {
               ".hero-filters-form select{width:100%;min-width:0;display:block;}" +
               ".hero-search-btn{width:100%;margin-top:4px;margin-bottom:0;}" +
             "}";
-
           document.head.appendChild(styleEl);
         }
 
@@ -417,22 +401,6 @@ export async function GET(_req: NextRequest) {
         var model = wrap.querySelector("#model-ap");
         var parts = wrap.querySelector("#parts-ap");
         var filterBtn = wrap.querySelector("#filter-btn-ap");
-
-        var steps = ["01", "02", "03", "04"];
-        wrap.querySelectorAll(".hero-filters-form select").forEach(function (el, idx) {
-          if (steps[idx]) {
-            var holder = document.createElement("div");
-            holder.className = "select-with-step";
-
-            var label = document.createElement("span");
-            label.className = "step-label";
-            label.textContent = steps[idx];
-
-            holder.appendChild(label);
-            el.parentNode.insertBefore(holder, el);
-            holder.appendChild(el);
-          }
-        });
 
         function initChoices(selectEl, placeholder) {
           return new Choices(selectEl, {
@@ -448,7 +416,6 @@ export async function GET(_req: NextRequest) {
         var companyChoices = initChoices(company, "اختر الموديل");
         var categoryChoices = initChoices(category, "اختر السنة");
         var modelChoices = initChoices(model, "اختر القسم");
-
         var partsChoices = new Choices(parts, {
           removeItemButton: true,
           maxItemCount: 5,
@@ -474,19 +441,14 @@ export async function GET(_req: NextRequest) {
 
         function setFieldError(selectEl, hasError) {
           if (!selectEl) return;
-
-          if (hasError) {
-            selectEl.classList.add("df-field-error");
-          } else {
-            selectEl.classList.remove("df-field-error");
-          }
+          if (hasError) selectEl.classList.add("df-field-error");
+          else selectEl.classList.remove("df-field-error");
         }
 
         function updateFilterButtonState() {
           var brandId = companyChoices.getValue(true);
           var modelId = categoryChoices.getValue(true);
           var yearId = modelChoices.getValue(true);
-
           var ready = !!(brandId && modelId && yearId);
           filterBtn.disabled = !ready;
         }
@@ -509,13 +471,9 @@ export async function GET(_req: NextRequest) {
                 item.year ||
                 item.name_ar ||
                 item.name ||
-                "#" + item.id;
+                ("#" + item.id);
 
-              return {
-                value: String(item.id),
-                label: label,
-                selected: false,
-              };
+              return { value: String(item.id), label: label, selected: false };
             })
           );
 
@@ -527,7 +485,6 @@ export async function GET(_req: NextRequest) {
 
         try {
           brands = await loadBrands(storeId);
-
           if (brands.length > 0) {
             setChoicesData(companyChoices, brands, "اختر الموديل", "name_ar");
             company.disabled = false;
@@ -546,8 +503,6 @@ export async function GET(_req: NextRequest) {
         company.addEventListener("change", async function () {
           var brandId = companyChoices.getValue(true);
 
-          if (brandId) setFieldError(company, false);
-
           setChoicesData(categoryChoices, [], "اختر السنة", "name_ar");
           setChoicesData(modelChoices, [], "اختر القسم", "year");
           partsChoices.clearStore();
@@ -561,16 +516,12 @@ export async function GET(_req: NextRequest) {
             categoryChoices.disable();
             modelChoices.disable();
             partsChoices.disable();
-            updateFilterButtonState();
             return;
           }
 
           var brandNumeric = Number(brandId);
           if (!Number.isNaN(brandNumeric)) {
-            logFilterEvent({
-              event_type: "brand_select",
-              brand_id: brandNumeric,
-            });
+            logFilterEvent({ event_type: "brand_select", brand_id: brandNumeric });
           }
 
           setChoicesData(categoryChoices, [], "جاري التحميل...", "name_ar");
@@ -579,7 +530,6 @@ export async function GET(_req: NextRequest) {
 
           try {
             models = await loadModels(storeId, brandId);
-
             if (models.length > 0) {
               setChoicesData(categoryChoices, models, "اختر السنة", "name_ar");
               category.disabled = false;
@@ -601,8 +551,6 @@ export async function GET(_req: NextRequest) {
         category.addEventListener("change", async function () {
           var categoryId = categoryChoices.getValue(true);
 
-          if (categoryId) setFieldError(category, false);
-
           setChoicesData(modelChoices, [], "اختر القسم", "year");
           partsChoices.clearStore();
 
@@ -613,16 +561,12 @@ export async function GET(_req: NextRequest) {
           if (!categoryId) {
             modelChoices.disable();
             partsChoices.disable();
-            updateFilterButtonState();
             return;
           }
 
           var modelNumeric = Number(categoryId);
           if (!Number.isNaN(modelNumeric)) {
-            logFilterEvent({
-              event_type: "model_select",
-              model_id: modelNumeric,
-            });
+            logFilterEvent({ event_type: "model_select", model_id: modelNumeric });
           }
 
           setChoicesData(modelChoices, [], "جاري التحميل...", "year");
@@ -631,7 +575,6 @@ export async function GET(_req: NextRequest) {
 
           try {
             years = await loadYears(storeId, categoryId);
-
             if (years.length > 0) {
               setChoicesData(modelChoices, years, "اختر الاقسام", "year");
               model.disabled = false;
@@ -650,10 +593,9 @@ export async function GET(_req: NextRequest) {
           updateFilterButtonState();
         });
 
+        // ✅ بعد اختيار السنة نحمل القطع مباشرة
         model.addEventListener("change", async function () {
           var yearId = modelChoices.getValue(true);
-
-          if (yearId) setFieldError(model, false);
 
           partsChoices.clearStore();
           parts.disabled = true;
@@ -667,10 +609,7 @@ export async function GET(_req: NextRequest) {
 
           var yearNumeric = Number(yearId);
           if (!Number.isNaN(yearNumeric)) {
-            logFilterEvent({
-              event_type: "year_select",
-              year_id: yearNumeric,
-            });
+            logFilterEvent({ event_type: "year_select", year_id: yearNumeric });
           }
 
           var brandId = companyChoices.getValue(true);
@@ -682,57 +621,46 @@ export async function GET(_req: NextRequest) {
             "label",
             true
           );
-
           parts.disabled = true;
           partsChoices.disable();
 
           try {
             keywords = await loadKeywords(storeId, brandId, modelId, yearId);
+
             partsChoices.clearStore();
 
             if ((keywords || []).length > 0) {
               parts.disabled = false;
-
               partsChoices.setChoices(
                 (keywords || []).map(function (k) {
-                  var label = k.name_ar || k.slug || "#" + k.id;
-
-                  return {
-                    value: String(k.id),
-                    label: label,
-                    selected: false,
-                  };
+                  var label = k.name_ar || k.slug || ("#" + k.id);
+                  return { value: String(k.id), label: label, selected: false };
                 }),
                 "value",
                 "label",
                 true
               );
-
               partsChoices.enable();
             } else {
               parts.disabled = true;
-
               partsChoices.setChoices(
                 [{ value: "", label: "لا توجد خيارات", selected: true }],
                 "value",
                 "label",
                 true
               );
-
               partsChoices.disable();
             }
 
             updateFilterButtonState();
           } catch (e) {
             partsChoices.clearStore();
-
             partsChoices.setChoices(
               [{ value: "", label: "خطأ في تحميل الكلمات", selected: true }],
               "value",
               "label",
               true
             );
-
             parts.disabled = true;
             partsChoices.disable();
             updateFilterButtonState();
@@ -749,135 +677,105 @@ export async function GET(_req: NextRequest) {
             return;
           }
 
-          try {
-            filterBtn.disabled = true;
+          var brandObj =
+            brands.find(function (b) { return String(b.id) === String(brandId); }) || null;
 
-            var brandObj =
-              brands.find(function (b) {
-                return String(b.id) === String(brandId);
-              }) || null;
+          var modelRow =
+            models.find(function (m) { return String(m.id) === String(modelId); }) || null;
 
-            var modelRow =
-              models.find(function (m) {
-                return String(m.id) === String(modelId);
-              }) || null;
+          var yearRow =
+            years.find(function (y) { return String(y.id) === String(yearId); }) || null;
 
-            var yearRow =
-              years.find(function (y) {
-                return String(y.id) === String(yearId);
-              }) || null;
+          var carSlug =
+            (modelRow && modelRow.slug) ||
+            (brandObj && brandObj.slug) ||
+            "قطع-غيار";
 
-            var carSlug =
-              (modelRow && modelRow.slug) ||
-              (brandObj && brandObj.slug) ||
-              "قطع-غيار";
+          var modelSlug =
+            getRowValue(modelRow, [
+              "slug",
+              "seo_slug",
+              "url_slug",
+              "name_ar",
+              "name"
+            ]) ||
+            carSlug ||
+            "قطع-غيار";
 
-            var modelSlug =
-              getRowValue(modelRow, [
-                "slug",
-                "seo_slug",
-                "url_slug",
-                "name_ar",
-                "name",
-              ]) ||
-              carSlug ||
-              "قطع-غيار";
+          modelSlug = cleanSlug(modelSlug);
 
-            modelSlug = cleanSlug(modelSlug);
+          var modelCategoryId =
+            getRowValue(modelRow, [
+              "category.id",
+              "ccategory.id",
+              "category_id",
+              "salla_category_id",
+              "salla_model_category_id",
+              "salla_id"
+            ]) || modelId;
 
-            var modelCategoryId =
-              getRowValue(modelRow, [
-                "category.id",
-                "ccategory.id",
-                "category_id",
-                "salla_category_id",
-                "salla_model_category_id",
-                "salla_id",
-              ]) || modelId;
+          var yearCategoryId =
+            getRowValue(yearRow, [
+              "category.id",
+              "ccategory.id",
+              "category_id",
+              "salla_year_id",
+              "salla_category_id",
+              "salla_id"
+            ]) || yearId;
 
-            var yearCategoryId =
-              getRowValue(yearRow, [
-                "category.id",
-                "ccategory.id",
-                "category_id",
-                "salla_year_id",
-                "salla_category_id",
-                "salla_id",
-              ]) || yearId;
+          var selectedKeywordIds = partsChoices.getValue(true) || [];
+          if (!Array.isArray(selectedKeywordIds)) selectedKeywordIds = [selectedKeywordIds];
 
-            var selectedKeywordIds = partsChoices.getValue(true) || [];
-            if (!Array.isArray(selectedKeywordIds)) {
-              selectedKeywordIds = [selectedKeywordIds];
-            }
+          var keywordIdsNumeric = selectedKeywordIds
+            .map(function (v) { return Number(v); })
+            .filter(function (v) { return !Number.isNaN(v); });
 
-            var keywordIdsNumeric = selectedKeywordIds
-              .map(function (v) {
-                return Number(v);
-              })
-              .filter(function (v) {
-                return !Number.isNaN(v);
-              });
+          var keywordLabels = [];
+          keywordIdsNumeric.forEach(function (id) {
+            var k = (keywords || []).find(function (kw) { return Number(kw.id) === id; });
+            if (k) keywordLabels.push(k.name_ar || k.slug || ("#" + k.id));
+          });
 
-            var keywordLabels = [];
+          var domain = await resolveStoreDomain(storeId);
 
-            keywordIdsNumeric.forEach(function (id) {
-              var k = (keywords || []).find(function (kw) {
-                return Number(kw.id) === id;
-              });
+          var url =
+            domain +
+            "/" +
+            encodeURIComponent(modelSlug) +
+            "/c" +
+            encodeURIComponent(String(modelCategoryId)) +
+            "?filters[category_id]=" +
+            encodeURIComponent(String(yearCategoryId));
 
-              if (k) {
-                keywordLabels.push(k.name_ar || k.slug || "#" + k.id);
-              }
-            });
-
-            var domain = await resolveStoreDomain(storeId);
-
-            var basePath =
-              "/" +
-              encodeURIComponent(modelSlug) +
-              "/c" +
-              encodeURIComponent(String(modelCategoryId));
-
-            var url =
-              domain +
-              basePath +
-              "?filters[category_id]=" +
-              encodeURIComponent(String(yearCategoryId));
-
-            if (keywordLabels.length) {
-              url += "&keyword=" + encodeURIComponent(keywordLabels.join(" "));
-            }
-
-            var brandNumeric = Number(brandId);
-            var modelNumeric = Number(modelId);
-            var yearNumeric = Number(yearId);
-
-            await logFilterEvent({
-              event_type: "search_submit",
-              brand_id: !Number.isNaN(brandNumeric) ? brandNumeric : null,
-              model_id: !Number.isNaN(modelNumeric) ? modelNumeric : null,
-              year_id: !Number.isNaN(yearNumeric) ? yearNumeric : null,
-              keyword_ids: keywordIdsNumeric,
-              meta: {
-                page_url: window.location.href,
-                target_url: url,
-                has_keywords: keywordLabels.length > 0,
-                keyword_labels: keywordLabels,
-                from: "all_page_filter",
-              },
-            });
-
-            window.location.href = url;
-          } catch (err) {
-            console.error("[widgets.allPage.js] search click error:", err);
-            filterBtn.disabled = false;
-            updateFilterButtonState();
+          if (keywordLabels.length) {
+            url += "&keyword=" + encodeURIComponent(keywordLabels.join(" "));
           }
+
+          var brandNumeric = Number(brandId);
+          var modelNumeric = Number(modelId);
+          var yearNumeric = Number(yearId);
+
+          logFilterEvent({
+            event_type: "search_submit",
+            brand_id: !Number.isNaN(brandNumeric) ? brandNumeric : null,
+            model_id: !Number.isNaN(modelNumeric) ? modelNumeric : null,
+            year_id: !Number.isNaN(yearNumeric) ? yearNumeric : null,
+            keyword_ids: keywordIdsNumeric,
+            meta: {
+              page_url: window.location.href,
+              target_url: url,
+              has_keywords: keywordLabels.length > 0,
+              keyword_labels: keywordLabels,
+              from: "all_page_filter",
+            },
+          });
+
+          window.location.href = url;
         });
 
         async function prefillFromUrl() {
           var info = parseCurrentUrlFilters();
-
           if (
             !info ||
             (!info.sCompany &&
@@ -952,15 +850,11 @@ export async function GET(_req: NextRequest) {
             company.disabled = false;
 
             models = await loadModels(storeId, preBrand.id);
-
             if (models.length > 0) {
               setChoicesData(categoryChoices, models, "اختر الموديل", "name_ar");
               category.disabled = false;
               categoryChoices.enable();
-            } else {
-              updateFilterButtonState();
-              return;
-            }
+            } else return;
 
             var preModel = null;
 
@@ -1000,99 +894,73 @@ export async function GET(_req: NextRequest) {
                 }) || null;
             }
 
-            if (!preModel) {
-              updateFilterButtonState();
-              return;
-            }
+            if (!preModel) { updateFilterButtonState(); return; }
 
             categoryChoices.setChoiceByValue(String(preModel.id));
 
             years = await loadYears(storeId, preModel.id);
-
             if (years.length > 0) {
               setChoicesData(modelChoices, years, "اختر السنة", "year");
               model.disabled = false;
               modelChoices.enable();
-            } else {
-              updateFilterButtonState();
-              return;
-            }
+            } else { updateFilterButtonState(); return; }
 
             var preYear = null;
-
             if (info.sYear) {
-              preYear =
-                years.find(function (y) {
-                  var yearCategoryId =
-                    getRowValue(y, [
-                      "category.id",
-                      "ccategory.id",
-                      "category_id",
-                      "salla_year_id",
-                      "salla_category_id",
-                      "salla_id",
-                    ]) || "";
+              preYear = years.find(function (y) {
+                var yearCategoryId =
+                  getRowValue(y, [
+                    "category.id",
+                    "ccategory.id",
+                    "category_id",
+                    "salla_year_id",
+                    "salla_category_id",
+                    "salla_id",
+                  ]) || "";
 
-                  return (
-                    String(yearCategoryId) === String(info.sYear) ||
-                    String(y.id) === String(info.sYear)
-                  );
-                }) || null;
+                return (
+                  String(yearCategoryId) === String(info.sYear) ||
+                  String(y.id) === String(info.sYear)
+                );
+              });
             }
 
             if (!preYear && info.pathSlug) {
-              preYear =
-                years.find(function (y) {
-                  return String(y.slug || "") === String(info.pathSlug);
-                }) || null;
+              preYear = years.find(function (y) { return String(y.slug) === String(info.pathSlug); });
             }
-
-            if (!preYear) {
-              updateFilterButtonState();
-              return;
-            }
+            if (!preYear) { updateFilterButtonState(); return; }
 
             modelChoices.setChoiceByValue(String(preYear.id));
 
             if (info.keywordLabels && info.keywordLabels.length) {
-              keywords = await loadKeywords(storeId, preBrand.id, preModel.id, preYear.id);
-              partsChoices.clearStore();
+              try {
+                keywords = await loadKeywords(storeId, preBrand.id, preModel.id, preYear.id);
 
-              if ((keywords || []).length > 0) {
-                parts.disabled = false;
+                partsChoices.clearStore();
+                if ((keywords || []).length > 0) {
+                  parts.disabled = false;
+                  partsChoices.setChoices(
+                    (keywords || []).map(function (k) {
+                      var label = k.name_ar || k.slug || ("#" + k.id);
+                      return { value: String(k.id), label: label, selected: false };
+                    }),
+                    "value",
+                    "label",
+                    true
+                  );
+                  partsChoices.enable();
 
-                partsChoices.setChoices(
-                  (keywords || []).map(function (k) {
-                    var label = k.name_ar || k.slug || "#" + k.id;
-
-                    return {
-                      value: String(k.id),
-                      label: label,
-                      selected: false,
-                    };
-                  }),
-                  "value",
-                  "label",
-                  true
-                );
-
-                partsChoices.enable();
-
-                var selectedIds = [];
-
-                info.keywordLabels.forEach(function (lbl) {
-                  var k = keywords.find(function (kw) {
-                    var nm = kw.name_ar || kw.slug || "#" + kw.id;
-                    return String(nm) === String(lbl);
+                  var selectedIds = [];
+                  info.keywordLabels.forEach(function (lbl) {
+                    var k = keywords.find(function (kw) {
+                      var nm = kw.name_ar || kw.slug || ("#" + kw.id);
+                      return nm === lbl;
+                    });
+                    if (k) selectedIds.push(String(k.id));
                   });
-
-                  if (k) selectedIds.push(String(k.id));
-                });
-
-                if (selectedIds.length) {
-                  partsChoices.setChoiceByValue(selectedIds);
+                  if (selectedIds.length) partsChoices.setChoiceByValue(selectedIds);
                 }
-              }
+              } catch (e) {}
             }
 
             updateFilterButtonState();
@@ -1110,9 +978,11 @@ export async function GET(_req: NextRequest) {
         var path = window.location && window.location.pathname;
         if (!path) return;
 
+        // =========================
+        // BLOCK PAGES (المطلوب فقط)
+        // =========================
         var p = String(path);
         if (p.length > 1) p = p.replace(/\\/+$/, "");
-
         var pl = p.toLowerCase();
 
         var blockedExact = {
@@ -1137,14 +1007,10 @@ export async function GET(_req: NextRequest) {
         var isCategory = pl.indexOf("/category/") === 0;
         var isNewCategorySeo = /^\\/.+\\/c[0-9]+$/i.test(pl);
 
-        var isProductPage =
-          isRootSlug &&
-          !isCategory &&
-          !isNewCategorySeo &&
-          !isInfoPage &&
-          !blockedExact[pl];
+        var isProductPage = isRootSlug && !isCategory && !isNewCategorySeo && !isInfoPage && !blockedExact[pl];
 
         if (blockedExact[pl] || isInfoPage || isProductPage) return;
+        // =========================
       } catch (e) {}
 
       var statusUrl =
@@ -1153,18 +1019,12 @@ export async function GET(_req: NextRequest) {
         encodeURIComponent(storeId);
 
       fetch(statusUrl)
-        .then(function (res) {
-          return res.json().catch(function () {
-            return {};
-          });
-        })
+        .then(function (res) { return res.json().catch(function () { return {}; }); })
         .then(function (data) {
           if (data && data.ok && data.suspended) return;
           buildAllPageFilter();
         })
-        .catch(function () {
-          buildAllPageFilter();
-        });
+        .catch(function () { buildAllPageFilter(); });
     }
 
     if (document.readyState === "loading") {
