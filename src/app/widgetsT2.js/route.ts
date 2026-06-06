@@ -1,5 +1,5 @@
-// src/app/widgetsT2.js/route.ts
- 
+// FILE: src/app/widgetsT2.js/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest) {
@@ -31,7 +31,7 @@ export async function GET(_req: NextRequest) {
     }
 
     var API_BASE = (PANEL_ORIGIN || "") + "/api/widget";
-var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data-v2";
+    var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data-v2";
 
     function ensureChoicesAssets() {
       return new Promise(function (resolve) {
@@ -126,33 +126,27 @@ var SNAPSHOT_BASE = (PANEL_ORIGIN || "") + "/api/widget-data-v2";
       });
     }
 
-// ✅ بدون قسم: نجيب الكلمات حسب model_id فقط (ولو API يدعم section_id نخليه فاضي)
-// ✅ كلمات حسب السنة (year_id)
-async function loadKeywords(storeId, brandId, modelId, yearId) {
-  // 1) Live API (اختياري) — إذا عندك endpoint يدعم year_id
-  try {
-    var url =
-      API_BASE +
-      "/year-keywords?store_id=" + encodeURIComponent(storeId) +
-      "&year_id=" + encodeURIComponent(String(yearId || ""));
+    async function loadKeywords(storeId, brandId, modelId, yearId) {
+      try {
+        var url =
+          API_BASE +
+          "/year-keywords?store_id=" + encodeURIComponent(storeId) +
+          "&year_id=" + encodeURIComponent(String(yearId || ""));
 
-    var data = await fetchJson(url);
-    var live = (data && data.keywords) || [];
-    if (Array.isArray(live)) return live;
-  } catch (e) {
-    // fallback
-  }
- 
-  // 2) Snapshot fallback
-  var snap = await ensureSnapshot(storeId);
-  var allKeywords = (snap && snap.keywords) || [];
+        var data = await fetchJson(url);
+        var live = (data && data.keywords) || [];
+        if (Array.isArray(live)) return live;
+      } catch (e) {}
 
-  var yId = Number(yearId);
-  return allKeywords.filter(function (k) {
-    if (!Number.isNaN(yId) && Number(k.year_id) !== yId) return false;
-    return true;
-  });
-}
+      var snap = await ensureSnapshot(storeId);
+      var allKeywords = (snap && snap.keywords) || [];
+
+      var yId = Number(yearId);
+      return allKeywords.filter(function (k) {
+        if (!Number.isNaN(yId) && Number(k.year_id) !== yId) return false;
+        return true;
+      });
+    }
 
     function getFilterSessionKey() {
       var KEY = "darb_filter_sid";
@@ -221,6 +215,55 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
       }
     }
 
+    function getRowValue(row, keys) {
+      if (!row) return "";
+
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+
+        if (
+          Object.prototype.hasOwnProperty.call(row, key) &&
+          row[key] !== undefined &&
+          row[key] !== null &&
+          row[key] !== ""
+        ) {
+          return row[key];
+        }
+
+        if (String(key).indexOf(".") > -1) {
+          var parts = String(key).split(".");
+          var cur = row;
+          var ok = true;
+
+          for (var j = 0; j < parts.length; j++) {
+            if (
+              cur &&
+              Object.prototype.hasOwnProperty.call(cur, parts[j]) &&
+              cur[parts[j]] !== undefined &&
+              cur[parts[j]] !== null
+            ) {
+              cur = cur[parts[j]];
+            } else {
+              ok = false;
+              break;
+            }
+          }
+
+          if (ok && cur !== undefined && cur !== null && cur !== "") {
+            return cur;
+          }
+        }
+      }
+
+      return "";
+    }
+
+    function cleanSlug(value) {
+      var slug = String(value || "").trim();
+      slug = slug.replace(/^\\/+/, "").replace(/\\/+$/, "");
+      return slug;
+    }
+
     function buildFilterHeroDom(showBranding) {
       (async function () {
         await ensureChoicesAssets();
@@ -279,7 +322,6 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
         var wrap = document.createElement("div");
         wrap.className = "widgets-filter-hero-wrap";
 
-        // ✅ حذفنا select القسم بالكامل
         var html = '\\
     <div class="hero-section widgets-filter-hero">\\
       <div class="hero-bg-img" style="background:' +
@@ -368,7 +410,6 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
           link.style.display = showBranding ? "inline-block" : "none";
         }
 
-        // ✅ صاروا 4 خطوات بدل 5
         var steps = ["01", "02", "03", "04"];
         wrap.querySelectorAll(".hero-filters-form select").forEach(function (
           el,
@@ -625,7 +666,6 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
           updateFilterButtonState();
         });
 
-        // ✅ بعد اختيار السنة نحمل القطع مباشرة (بدون قسم)
         model.addEventListener("change", async function () {
           var yearId = modelChoices.getValue(true);
 
@@ -729,19 +769,52 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
                 return String(m.id) === String(modelId);
               }) || null;
 
-            var carSlug =
-              (modelRow && modelRow.slug) ||
-              (brandObj && brandObj.slug) ||
-              "قطع-غيار";
-
             var yearRow =
               years.find(function (y) {
                 return String(y.id) === String(yearId);
               }) || null;
 
-            var sallaCompanyId = (brandObj && brandObj.salla_company_id) || brandId;
-            var sallaCategoryId = (modelRow && modelRow.salla_category_id) || modelId;
-            var sallaYearId = (yearRow && yearRow.salla_year_id) || yearId;
+            var carSlug =
+              (modelRow && modelRow.slug) ||
+              (brandObj && brandObj.slug) ||
+              "قطع-غيار";
+
+            var modelSlug =
+              getRowValue(modelRow, ["slug", "seo_slug", "url_slug", "name_ar", "name"]) ||
+              carSlug ||
+              "قطع-غيار";
+
+            modelSlug = cleanSlug(modelSlug);
+
+            var modelCategoryId =
+              getRowValue(modelRow, [
+                "category.id",
+                "ccategory.id",
+                "category_id",
+                "salla_category_id",
+                "salla_model_category_id",
+                "salla_id"
+              ]) || modelId;
+
+            var yearCategoryId =
+              getRowValue(yearRow, [
+                "category.id",
+                "ccategory.id",
+                "category_id",
+                "salla_year_id",
+                "salla_category_id",
+                "salla_id"
+              ]) || yearId;
+
+            var sallaBrandId =
+              getRowValue(brandObj, [
+                "brand.id",
+                "brand_id",
+                "salla_brand_id",
+                "salla_company_id",
+                "category.id",
+                "id"
+              ]) || brandId;
 
             var selectedKeywordIds = partsChoices.getValue(true) || [];
             if (!Array.isArray(selectedKeywordIds)) selectedKeywordIds = [selectedKeywordIds];
@@ -758,25 +831,24 @@ async function loadKeywords(storeId, brandId, modelId, yearId) {
               if (k) keywordLabels.push(k.name_ar || k.slug || ("#" + k.id));
             });
 
-            var keywordParam = "";
-            if (keywordLabels.length) keywordParam = encodeURIComponent(keywordLabels.join("||"));
-
             var domain = await resolveStoreDomain(storeId);
 
-            // ✅ حذفنا filters[brand_id] لأنه كان مربوط بالقسم
+            var basePath =
+              "/" +
+              encodeURIComponent(modelSlug) +
+              "/c" +
+              encodeURIComponent(String(modelCategoryId));
+
             var url =
               domain +
-              "/category/" +
-              encodeURIComponent(carSlug) +
-              "?filters[company]=" +
-              encodeURIComponent(sallaCompanyId) +
-              "&filters[category_cat]=" +
-              encodeURIComponent(sallaCategoryId) +
-              "&filters[category_id]=" +
-              encodeURIComponent(sallaYearId);
+              basePath +
+              "?filters[category_id]=" +
+              encodeURIComponent(String(yearCategoryId)) +
+              "&filters[brand_id]=" +
+              encodeURIComponent(String(sallaBrandId));
 
-            if (keywordParam) {
-              url += "&keyword=" + keywordParam;
+            if (keywordLabels.length) {
+              url += "&keyword=" + encodeURIComponent(keywordLabels.join(" "));
             }
 
             var brandNumeric = Number(brandId);
