@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest) {
       })();
 
     if (!script) return;
-
+ 
     var storeId = script.getAttribute("data-store-id");
     if (!storeId) return;
 
