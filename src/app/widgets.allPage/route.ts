@@ -141,45 +141,45 @@ export async function GET(_req: NextRequest) {
       return snap.sections || [];
     }
 
-async function loadKeywords(
-  storeId,
-  brandId,
-  modelId,
-  yearId,
-  sectionId
-) {
-  // 1) Live من DB عبر API (يحُل نقص snapshot)
-  try {
-    var url =
-      API_BASE +
-      "/keywords?store_id=" +
-      encodeURIComponent(storeId) +
-      "&section_id=" +
-      encodeURIComponent(String(sectionId || "")) +
-      "&model_id=" +
-      encodeURIComponent(String(modelId || ""));
+    async function loadKeywords(
+      storeId,
+      brandId,
+      modelId,
+      yearId,
+      sectionId
+    ) {
+      // 1) Live من DB عبر API (يحُل نقص snapshot)
+      try {
+        var url =
+          API_BASE +
+          "/keywords?store_id=" +
+          encodeURIComponent(storeId) +
+          "&section_id=" +
+          encodeURIComponent(String(sectionId || "")) +
+          "&model_id=" +
+          encodeURIComponent(String(modelId || ""));
 
-    var data = await fetchJson(url);
-    var live = (data && data.keywords) || [];
+        var data = await fetchJson(url);
+        var live = (data && data.keywords) || [];
 
-    if (Array.isArray(live)) return live;
-  } catch (e) {
-    // نسكت ونروح fallback
-  }
+        if (Array.isArray(live)) return live;
+      } catch (e) {
+        // نسكت ونروح fallback
+      }
 
-  // 2) Fallback: snapshot (سلوكك القديم)
-  var snap = await ensureSnapshot(storeId);
-  var allKeywords = (snap && snap.keywords) || [];
+      // 2) Fallback: snapshot (سلوكك القديم)
+      var snap = await ensureSnapshot(storeId);
+      var allKeywords = (snap && snap.keywords) || [];
 
-  var mId = Number(modelId);
-  var sId = Number(sectionId);
+      var mId = Number(modelId);
+      var sId = Number(sectionId);
 
-  return allKeywords.filter(function (k) {
-    if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
-    if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
-    return true;
-  });
-}
+      return allKeywords.filter(function (k) {
+        if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
+        if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
+        return true;
+      });
+    }
 
     function getFilterSessionKey() {
       var KEY = "darb_filter_sid";
@@ -251,23 +251,35 @@ async function loadKeywords(
     function parseCurrentUrlFilters() {
       var result = {
         pathSlug: "",
+        routeCategoryId: null,
         sCompany: null,
         sCategory: null,
         sYear: null,
         sSection: null,
         keywordLabels: [],
       };
+
       try {
         var url = new URL(window.location.href);
-        var m = url.pathname.match(/\\/category\\/([^/?#]+)/);
-        if (m) {
-          result.pathSlug = decodeURIComponent(m[1]);
+        var path = url.pathname || "";
+
+        var newRouteMatch = path.match(/^\\/([^/?#]+)\\/c([^/?#]+)/i);
+        if (newRouteMatch) {
+          result.pathSlug = decodeURIComponent(newRouteMatch[1] || "");
+          result.routeCategoryId = decodeURIComponent(newRouteMatch[2] || "");
+        } else {
+          var oldRouteMatch = path.match(/\\/category\\/([^/?#]+)/);
+          if (oldRouteMatch) {
+            result.pathSlug = decodeURIComponent(oldRouteMatch[1] || "");
+          }
         }
+
         var sp = url.searchParams;
         result.sCompany = sp.get("filters[company]");
-        result.sCategory = sp.get("filters[category_cat]");
+        result.sCategory = sp.get("filters[category_cat]") || result.routeCategoryId;
         result.sYear = sp.get("filters[category_id]");
         result.sSection = sp.get("filters[brand_id]");
+
         var keyword = sp.get("keyword");
         if (keyword) {
           result.keywordLabels = keyword.split("||").filter(function (x) {
@@ -275,6 +287,7 @@ async function loadKeywords(
           });
         }
       } catch (e) {}
+
       return result;
     }
 
@@ -796,10 +809,12 @@ async function loadKeywords(
               return String(s.id) === String(sectionId);
             }) || null;
 
-          var carSlug =
-            (modelRow && modelRow.slug) ||
-            (brandObj && brandObj.slug) ||
-            "قطع-غيار";
+          var slug = modelRow && modelRow.slug;
+
+          if (!slug) {
+            console.error("[widgets.allPage.js] missing slug for selected model");
+            return;
+          }
 
           var sallaCompanyId =
             (brandObj && brandObj.salla_company_id) || brandId;
@@ -842,19 +857,21 @@ async function loadKeywords(
 
           var url =
             domain +
-            "/category/"+
-            encodeURIComponent(carSlug)+
-            "?filters[company]="+
-            encodeURIComponent(sallaCompanyId)+
-            "&filters[category_cat]="+
-            encodeURIComponent(sallaCategoryId)+
-            "&filters[category_id]="+
-            encodeURIComponent(sallaYearId)+
-            "&filters[brand_id]="+
+            "/" +
+            encodeURIComponent(slug) +
+            "/c" +
+            encodeURIComponent(sallaCategoryId) +
+            "?filters[company]=" +
+            encodeURIComponent(sallaCompanyId) +
+            "&filters[category_cat]=" +
+            encodeURIComponent(sallaCategoryId) +
+            "&filters[category_id]=" +
+            encodeURIComponent(sallaYearId) +
+            "&filters[brand_id]=" +
             encodeURIComponent(sallaSectionId);
 
           if (keywordParam) {
-            url +="&keyword="+keywordParam;
+            url += "&keyword=" + keywordParam;
           }
 
           var brandNumeric = Number(brandId);
@@ -1112,7 +1129,9 @@ async function loadKeywords(
           pl !== "/" &&
           pl !== "/index.html";
 
-        var isCategory = pl.indexOf("/category/") === 0;
+        var isCategory =
+          pl.indexOf("/category/") === 0 ||
+          /^\\/[^/]+\\/c[^/]+$/i.test(pl);
 
         var isProductPage = isRootSlug && !isCategory && !isInfoPage && !blockedExact[pl];
 
