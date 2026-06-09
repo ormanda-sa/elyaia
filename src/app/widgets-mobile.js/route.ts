@@ -109,64 +109,63 @@ export async function GET(_req: NextRequest) {
     }
 
     async function loadKeywords(
-  storeId,
-  brandId,
-  modelId,
-  yearId,
-  sectionId
-) {
-  // 1) جرّب Live من DB (الأفضل) — يحل مشكلة نقص snapshot
-  try {
-    var url =
-      API_BASE +
-      "/keywords?store_id=" +
-      encodeURIComponent(storeId) +
-      "&section_id=" +
-      encodeURIComponent(String(sectionId || "")) +
-      "&model_id=" +
-      encodeURIComponent(String(modelId || ""));
+      storeId,
+      brandId,
+      modelId,
+      yearId,
+      sectionId
+    ) {
+      // 1) جرّب Live من DB (الأفضل) — يحل مشكلة نقص snapshot
+      try {
+        var url =
+          API_BASE +
+          "/keywords?store_id=" +
+          encodeURIComponent(storeId) +
+          "&section_id=" +
+          encodeURIComponent(String(sectionId || "")) +
+          "&model_id=" +
+          encodeURIComponent(String(modelId || ""));
 
-    var data = await fetchJson(url);
-    var live = (data && data.keywords) || [];
+        var data = await fetchJson(url);
+        var live = (data && data.keywords) || [];
 
-    console.log("[widgets-mobile] live keywords length:", Array.isArray(live) ? live.length : 0);
+        console.log("[widgets-mobile] live keywords length:", Array.isArray(live) ? live.length : 0);
 
-    if (Array.isArray(live)) return live;
-  } catch (e) {
-    console.warn("[widgets-mobile] live keywords failed, fallback to snapshot", e);
-  }
+        if (Array.isArray(live)) return live;
+      } catch (e) {
+        console.warn("[widgets-mobile] live keywords failed, fallback to snapshot", e);
+      }
 
-  // 2) Fallback: snapshot (نفس منطقك القديم)
-  var snap = await ensureSnapshot(storeId);
-  var allKeywords = (snap && snap.keywords) || [];
+      // 2) Fallback: snapshot (نفس منطقك القديم)
+      var snap = await ensureSnapshot(storeId);
+      var allKeywords = (snap && snap.keywords) || [];
 
-  console.log("[widgets-mobile] allKeywords length:", allKeywords.length);
+      console.log("[widgets-mobile] allKeywords length:", allKeywords.length);
 
-  var mId = Number(modelId);
-  var sId = Number(sectionId);
+      var mId = Number(modelId);
+      var sId = Number(sectionId);
 
-  var result = allKeywords.filter(function (k) {
-    if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
-    if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
-    return true;
-  });
+      var result = allKeywords.filter(function (k) {
+        if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
+        if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
+        return true;
+      });
 
-  console.log(
-    "[widgets-mobile] filtered keywords length:",
-    result.length,
-    "for model_id=",
-    modelId,
-    "section_id=",
-    sectionId
-  );
+      console.log(
+        "[widgets-mobile] filtered keywords length:",
+        result.length,
+        "for model_id=",
+        modelId,
+        "section_id=",
+        sectionId
+      );
 
-  if (result.length > 0) {
-    console.log("[widgets-mobile] sample keyword:", result[0]);
-  }
+      if (result.length > 0) {
+        console.log("[widgets-mobile] sample keyword:", result[0]);
+      }
 
-  return result;
-}
-
+      return result;
+    }
 
     function getFilterSessionKey() {
       var KEY = "darb_filter_sid";
@@ -590,7 +589,7 @@ export async function GET(_req: NextRequest) {
             listDiv.appendChild(btn);
           });
 
-                    confirmBtn.onclick = async function () {
+          confirmBtn.onclick = async function () {
             var brandObj = state.brand;
             var modelRow = state.type;
             var yearRow = state.model;
@@ -601,10 +600,12 @@ export async function GET(_req: NextRequest) {
               return;
             }
 
-            var carSlug =
-              (modelRow && modelRow.slug) ||
-              (brandObj && brandObj.slug) ||
-              "قطع-غيار";
+            var slug = modelRow && modelRow.slug;
+
+            if (!slug) {
+              console.error("[widgets-mobile.js] missing slug for selected model");
+              return;
+            }
 
             var sallaCompanyId =
               (brandObj && brandObj.salla_company_id) || brandObj.id;
@@ -639,19 +640,21 @@ export async function GET(_req: NextRequest) {
 
             var url =
               domain +
-              "/category/"+
-              encodeURIComponent(carSlug)+
-              "?filters[company]="+
-              encodeURIComponent(sallaCompanyId)+
-              "&filters[category_cat]="+
-              encodeURIComponent(sallaCategoryId)+
-              "&filters[category_id]="+
-              encodeURIComponent(sallaYearId)+
-              "&filters[brand_id]="+
+              "/" +
+              encodeURIComponent(slug) +
+              "/c" +
+              encodeURIComponent(sallaCategoryId) +
+              "?filters[company]=" +
+              encodeURIComponent(sallaCompanyId) +
+              "&filters[category_cat]=" +
+              encodeURIComponent(sallaCategoryId) +
+              "&filters[category_id]=" +
+              encodeURIComponent(sallaYearId) +
+              "&filters[brand_id]=" +
               encodeURIComponent(sallaSectionId);
 
             if (keywordParam) {
-              url +="&keyword="+keywordParam;
+              url += "&keyword=" + keywordParam;
             }
 
             var brandNumeric = Number(brandObj.id);
@@ -677,7 +680,6 @@ export async function GET(_req: NextRequest) {
 
             window.location.href = url;
           };
-
         }
 
         // فلتر البحث في القائمة الحالية
