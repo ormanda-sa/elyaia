@@ -134,46 +134,41 @@ export async function GET(_req: NextRequest) {
       return snap.sections || [];
     }
 
-   async function loadKeywords(
-  storeId,
-  brandId,
-  modelId,
-  yearId,
-  sectionId
-) {
-  // 1) Live من DB عبر API (يحُل مشكلة نقص snapshot)
-  try {
-    var url =
-      API_BASE +
-      "/keywords?store_id=" +
-      encodeURIComponent(storeId) +
-      "&section_id=" +
-      encodeURIComponent(String(sectionId || "")) +
-      "&model_id=" +
-      encodeURIComponent(String(modelId || ""));
+    async function loadKeywords(
+      storeId,
+      brandId,
+      modelId,
+      yearId,
+      sectionId
+    ) {
+      try {
+        var url =
+          API_BASE +
+          "/keywords?store_id=" +
+          encodeURIComponent(storeId) +
+          "&section_id=" +
+          encodeURIComponent(String(sectionId || "")) +
+          "&model_id=" +
+          encodeURIComponent(String(modelId || ""));
 
-    var data = await fetchJson(url);
-    var live = (data && data.keywords) || [];
+        var data = await fetchJson(url);
+        var live = (data && data.keywords) || [];
 
-    if (Array.isArray(live)) return live;
-  } catch (e) {
-    // نسكت ونروح fallback
-  }
+        if (Array.isArray(live)) return live;
+      } catch (e) {}
 
-  // 2) Fallback: snapshot (نفس منطقك القديم)
-  var snap = await ensureSnapshot(storeId);
-  var allKeywords = (snap && snap.keywords) || [];
+      var snap = await ensureSnapshot(storeId);
+      var allKeywords = (snap && snap.keywords) || [];
 
-  var mId = Number(modelId);
-  var sId = Number(sectionId);
+      var mId = Number(modelId);
+      var sId = Number(sectionId);
 
-  return allKeywords.filter(function (k) {
-    if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
-    if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
-    return true;
-  });
-}
-
+      return allKeywords.filter(function (k) {
+        if (!Number.isNaN(mId) && Number(k.model_id) !== mId) return false;
+        if (!Number.isNaN(sId) && Number(k.section_id) !== sId) return false;
+        return true;
+      });
+    }
 
     function getFilterSessionKey() {
       var KEY = "darb_filter_sid";
@@ -266,7 +261,6 @@ export async function GET(_req: NextRequest) {
         var shippingColor = cfg.shipping_color || "#2563eb";
         var stepBadgeBg = cfg.step_badge_bg || "#d50026";
 
-        // نصوص القالب
         var prefixTemplate =
           cfg.hero_description_prefix ||
           "ابحث بين {counter} قطعة غيار لجميع سيارات تويوتا الأصلية واليابانية والتجارية";
@@ -274,7 +268,6 @@ export async function GET(_req: NextRequest) {
           cfg.hero_shipping_line ||
           "شحن سريع خلال 4-6 أيام وسعر منافس جداً";
 
-        // نبني HTML من القوالب إذا ما فيه subtitle_text مخصص
         var heroDescHtml =
           cfg.subtitle_text ||
           (
@@ -884,10 +877,13 @@ export async function GET(_req: NextRequest) {
                 return String(m.id) === String(modelId);
               }) || null;
 
-            var carSlug =
-              (modelRow && modelRow.slug) ||
-              (brandObj && brandObj.slug) ||
-              "قطع-غيار";
+            var slug = modelRow && modelRow.slug;
+
+            if (!slug) {
+              console.error("[widgets.js] missing slug for selected model");
+              setButtonLoading(false);
+              return;
+            }
 
             var yearRow =
               years.find(function (y) {
@@ -932,19 +928,21 @@ export async function GET(_req: NextRequest) {
 
             var url =
               domain +
-              "/category/"+
-              encodeURIComponent(carSlug)+
-              "?filters[company]="+
-              encodeURIComponent(sallaCompanyId)+
-              "&filters[category_cat]="+
-              encodeURIComponent(sallaCategoryId)+
-              "&filters[category_id]="+
-              encodeURIComponent(sallaYearId)+
-              "&filters[brand_id]="+
+              "/" +
+              encodeURIComponent(slug) +
+              "/c" +
+              encodeURIComponent(sallaCategoryId) +
+              "?filters[company]=" +
+              encodeURIComponent(sallaCompanyId) +
+              "&filters[category_cat]=" +
+              encodeURIComponent(sallaCategoryId) +
+              "&filters[category_id]=" +
+              encodeURIComponent(sallaYearId) +
+              "&filters[brand_id]=" +
               encodeURIComponent(sallaSectionId);
 
             if (keywordParam) {
-              url +="&keyword="+keywordParam;
+              url += "&keyword=" + keywordParam;
             }
 
             var brandNumeric   = Number(brandId);
@@ -1031,7 +1029,7 @@ export async function GET(_req: NextRequest) {
   }
 })();
 `;
- 
+
   return new NextResponse(js, {
     status: 200,
     headers: {
